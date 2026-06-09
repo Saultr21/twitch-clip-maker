@@ -30,10 +30,17 @@ export async function ensureBinaries(): Promise<void> {
       if (!res.ok || !res.body) {
         throw new Error(`Descarga de yt-dlp fallida: HTTP ${res.status}`);
       }
-      await pipeline(
-        Readable.fromWeb(res.body as WebReadableStream),
-        fs.createWriteStream(ytDlpPath),
-      );
+      const tmpPath = `${ytDlpPath}.tmp`;
+      try {
+        await pipeline(
+          Readable.fromWeb(res.body as WebReadableStream),
+          fs.createWriteStream(tmpPath),
+        );
+        fs.renameSync(tmpPath, ytDlpPath);
+      } catch (err) {
+        fs.rmSync(tmpPath, { force: true });
+        throw err;
+      }
     } else {
       // Twitch rompe el extractor periódicamente; nightly lleva el fix antes
       await execa(ytDlpPath, ["--update-to", "nightly"]).catch(() => {});

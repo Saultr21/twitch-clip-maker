@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import path from "node:path";
 import { execa } from "execa";
 import type { ClipInfo } from "@clipforge/shared";
@@ -16,40 +17,46 @@ export async function downloadClip(
   const fileName = `${id}.mp4`;
   const outPath = path.join(CLIPS_DIR, fileName);
 
-  const { stdout: title } = await execa(ytDlpPath, [
-    "--print", "title",
-    "--skip-download",
-    url,
-  ]);
+  try {
+    const { stdout: title } = await execa(ytDlpPath, [
+      "--print", "title",
+      "--skip-download",
+      url,
+    ]);
 
-  const proc = execa(ytDlpPath, [
-    url,
-    "-o", outPath,
-    "--newline",
-    "--no-playlist",
-    "--ffmpeg-location", ffmpegBin,
-    "-f", "best",
-    "--remux-video", "mp4",
-  ]);
+    const proc = execa(ytDlpPath, [
+      url,
+      "-o", outPath,
+      "--newline",
+      "--no-playlist",
+      "--ffmpeg-location", ffmpegBin,
+      "-f", "best",
+      "--remux-video", "mp4",
+    ]);
 
-  proc.stdout?.on("data", (chunk: Buffer) => {
-    for (const line of chunk.toString().split("\n")) {
-      const percent = parseYtDlpProgress(line);
-      if (percent !== null) onProgress(percent);
-    }
-  });
+    proc.stdout?.on("data", (chunk: Buffer) => {
+      for (const line of chunk.toString().split("\n")) {
+        const percent = parseYtDlpProgress(line);
+        if (percent !== null) onProgress(percent);
+      }
+    });
 
-  await proc;
+    await proc;
 
-  const meta = await probeVideo(outPath);
-  const clip: ClipInfo = {
-    id,
-    url,
-    title: title.trim(),
-    fileName,
-    ...meta,
-    createdAt: new Date().toISOString(),
-  };
-  addClip(clip);
-  return clip;
+    const meta = await probeVideo(outPath);
+    const clip: ClipInfo = {
+      id,
+      url,
+      title: title.trim(),
+      fileName,
+      ...meta,
+      createdAt: new Date().toISOString(),
+    };
+    addClip(clip);
+    return clip;
+  } catch (err) {
+    fs.rmSync(outPath, { force: true });
+    fs.rmSync(`${outPath}.part`, { force: true });
+    throw err;
+  }
 }

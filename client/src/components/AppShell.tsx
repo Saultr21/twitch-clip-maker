@@ -1,5 +1,4 @@
-import { MediaPanel } from "./MediaPanel";
-import { PreviewPlayer } from "./PreviewPlayer";
+import { MediaPanel } from "../features/media/MediaPanel";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
 
@@ -11,7 +10,7 @@ export function AppShell() {
         <ToolRail />
         <main className="flex flex-1 min-w-0">
           <MediaPanel />
-          <PreviewPlayer />
+          <div className="flex-1 grid place-items-center text-muted text-sm bg-canvas">Lienzo (Task 7)</div>
         </main>
         <aside
           aria-label="Propiedades"

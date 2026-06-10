@@ -18,7 +18,9 @@ export async function downloadClip(
   const outPath = path.join(CLIPS_DIR, fileName);
 
   try {
+    // En Windows yt-dlp emite stdout en cp1252 salvo que se fuerce UTF-8
     const { stdout: title } = await execa(ytDlpPath, [
+      "--encoding", "utf-8",
       "--print", "title",
       "--skip-download",
       url,
@@ -27,6 +29,7 @@ export async function downloadClip(
     const proc = execa(ytDlpPath, [
       url,
       "-o", outPath,
+      "--encoding", "utf-8",
       "--newline",
       "--no-playlist",
       "--ffmpeg-location", ffmpegBin,

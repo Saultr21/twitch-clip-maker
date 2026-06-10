@@ -2,18 +2,13 @@
 
 > Last updated: 2026-06-10
 > Current phase: development
-> Overall progress: Hito 1 completo (10/10 tareas) — pendiente merge
+> Overall progress: Hito 1 completo y fusionado — Hito 2 pendiente de plan
 
 ## In Progress
-- [ ] `TASK-001` — Hito 1: base, descarga y reproducción — **IMPLEMENTACIÓN COMPLETA, pendiente merge a master**
-  - Plan: `docs/superpowers/plans/2026-06-09-hito-1-base-descarga.md` (10/10 tareas, doble revisión por tarea + revisión final ✅ READY TO MERGE)
-  - Rama: `feat/hito-1-base-descarga` (17 commits de código)
-  - Verificado: descarga real end-to-end con progreso NDJSON, streaming con Range (206), URL inválida → 400, persistencia tras recarga, typecheck ambos workspaces, 20 tests verdes
-  - Pendiente del usuario: smoke test visual en navegador (scrub, fotograma a fotograma, Space, foco con Tab) — todo lo automatizable ya está verificado
+- (nada — Hito 1 cerrado)
 
 ## Up Next
-- Merge de `feat/hito-1-base-descarga` a `master`
-- Planificación del Hito 2 (writing-plans)
+- Planificación del Hito 2 (writing-plans) y rama `feat/hito-2-editor`
 
 ## Backlog (hitos pendientes de plan)
 - [ ] `TASK-002` — Hito 2: editor (overlays Konva drag/resize/rotación, timeline multipista a medida, panel propiedades, undo/redo, autoguardado, proyectos)
@@ -32,6 +27,11 @@
   - Origin: revisión final Hito 1 | Priority: low
 
 ## Completed
+- [x] `TASK-001` — Hito 1: base, descarga y reproducción (2026-06-10)
+  - Fusionado en master (PR #1, https://github.com/Saultr21/twitch-clip-maker/pull/1)
+  - Plan: `docs/superpowers/plans/2026-06-09-hito-1-base-descarga.md` (10/10 tareas, doble revisión por tarea + revisión final)
+  - Verificado: descarga real end-to-end con progreso NDJSON, streaming con Range, URL inválida → 400, persistencia, smoke test visual del usuario OK, 20 tests verdes, typecheck limpio
+  - Fixes post-smoke-test: layout del reproductor (grid→flex, el vídeo tapaba los controles) y salida UTF-8 de yt-dlp (`--encoding utf-8`, títulos con acentos)
 - [x] `TASK-000` — Brainstorming, spec y plan del Hito 1 (2026-06-09)
   - Spec: `docs/superpowers/specs/2026-06-09-twitch-clip-editor-design.md`
 

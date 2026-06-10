@@ -1,4 +1,5 @@
 import { MediaPanel } from "./MediaPanel";
+import { PreviewPlayer } from "./PreviewPlayer";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
 
@@ -10,9 +11,7 @@ export function AppShell() {
         <ToolRail />
         <main className="flex flex-1 min-w-0">
           <MediaPanel />
-          <div className="flex-1 grid place-items-center text-muted text-sm bg-canvas">
-            Reproductor (Task 10)
-          </div>
+          <PreviewPlayer />
         </main>
         <aside
           aria-label="Propiedades"

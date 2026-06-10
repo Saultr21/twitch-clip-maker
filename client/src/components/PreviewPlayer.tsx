@@ -62,7 +62,8 @@ export function PreviewPlayer() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 bg-canvas">
-      <div className="flex-1 grid place-items-center p-4 min-h-0">
+      {/* flex (no grid): max-h-full del vídeo necesita altura definida del contenedor */}
+      <div className="flex-1 flex items-center justify-center p-4 min-h-0 overflow-hidden">
         <video
           key={clip.id}
           ref={videoRef}
@@ -76,7 +77,7 @@ export function PreviewPlayer() {
         />
       </div>
 
-      <div className="px-6 pb-4 flex flex-col gap-2">
+      <div className="px-6 pb-4 pt-2 flex flex-col gap-2 shrink-0">
         <input
           type="range"
           min={0}

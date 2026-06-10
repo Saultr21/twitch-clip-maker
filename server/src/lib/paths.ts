@@ -6,9 +6,11 @@ const ROOT = path.resolve(import.meta.dirname, "../../..");
 export const DATA_DIR = path.join(ROOT, "data");
 export const CLIPS_DIR = path.join(DATA_DIR, "clips");
 export const BIN_DIR = path.join(DATA_DIR, "bin");
+export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
+export const ASSETS_DIR = path.join(DATA_DIR, "assets");
 
 export function ensureDataDirs(): void {
-  for (const dir of [DATA_DIR, CLIPS_DIR, BIN_DIR]) {
+  for (const dir of [DATA_DIR, CLIPS_DIR, BIN_DIR, PROJECTS_DIR, ASSETS_DIR]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }

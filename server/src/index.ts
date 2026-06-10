@@ -3,6 +3,7 @@ import fastifyStatic from "@fastify/static";
 import { CLIPS_DIR, ensureDataDirs } from "./lib/paths.js";
 import { ensureBinaries } from "./services/binaries.js";
 import { clipRoutes } from "./routes/clips.js";
+import { projectRoutes } from "./routes/projects.js";
 import { setupRoutes } from "./routes/setup.js";
 
 ensureDataDirs();
@@ -18,6 +19,7 @@ await app.register(fastifyStatic, {
 app.get("/api/health", async () => ({ ok: true }));
 setupRoutes(app);
 clipRoutes(app);
+projectRoutes(app);
 
 await app.listen({ port: 3001, host: "127.0.0.1" });
 

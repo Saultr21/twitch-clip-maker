@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
 import { useClipsStore } from "../../stores/clipsStore";
+import { usePlayerStore } from "../../stores/playerStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { clipEnd, projectDuration, sourceTimeFor, videoClipAt } from "../../lib/timeline";
@@ -27,9 +28,11 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
       const info = clips.find((c) => c.id === active.clipId);
       if (!info) return;
       const src = `/files/${info.fileName}`;
-      if (!video.src.endsWith(src)) {
+      // getAttribute: video.src devuelve la URL absoluta y rompería la comparación
+      if (video.getAttribute("src") !== src) {
         video.src = src;
       }
+      video.volume = usePlayerStore.getState().volume;
       const target = sourceTimeFor(active, playhead);
       if (seeking || Math.abs(video.currentTime - target) > SYNC_TOLERANCE) {
         video.currentTime = target;

@@ -30,6 +30,12 @@ describe("sanitizeProjectName", () => {
   it("rechaza nombres vacíos tras sanear", () => {
     expect(() => sanitizeProjectName("../..")).toThrow();
   });
+
+  it("rechaza nombres de dispositivo reservados de Windows", () => {
+    expect(() => sanitizeProjectName("CON")).toThrow();
+    expect(() => sanitizeProjectName("nul")).toThrow();
+    expect(() => sanitizeProjectName("COM3")).toThrow();
+  });
 });
 
 describe("projectsRepo", () => {

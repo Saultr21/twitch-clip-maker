@@ -4,10 +4,15 @@ import type { Project } from "@clipforge/shared";
 import { projectSchema } from "@clipforge/shared";
 import { PROJECTS_DIR } from "../lib/paths.js";
 
+// Nombres de dispositivo de Win32: CON.json se resuelve como handle de dispositivo
+const WINDOWS_RESERVED = /^(con|prn|aux|nul|com\d|lpt\d)$/i;
+
 /** Nombre de proyecto → nombre de archivo seguro (sin path traversal). */
 export function sanitizeProjectName(raw: string): string {
   const clean = raw.replace(/[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ _-]/g, "").trim();
-  if (!clean) throw new Error("Nombre de proyecto no válido");
+  if (!clean || WINDOWS_RESERVED.test(clean)) {
+    throw new Error("Nombre de proyecto no válido");
+  }
   return clean;
 }
 

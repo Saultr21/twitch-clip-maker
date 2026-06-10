@@ -1,0 +1,14 @@
+import fs from "node:fs";
+import path from "node:path";
+
+const ROOT = path.resolve(import.meta.dirname, "../../..");
+
+export const DATA_DIR = path.join(ROOT, "data");
+export const CLIPS_DIR = path.join(DATA_DIR, "clips");
+export const BIN_DIR = path.join(DATA_DIR, "bin");
+
+export function ensureDataDirs(): void {
+  for (const dir of [DATA_DIR, CLIPS_DIR, BIN_DIR]) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+}

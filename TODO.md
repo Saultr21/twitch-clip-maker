@@ -1,16 +1,19 @@
 # TODO — ClipForge (editor local de clips de Twitch)
 
-> Last updated: 2026-06-09
+> Last updated: 2026-06-10
 > Current phase: development
-> Overall progress: 0/10 tasks completed (Hito 1)
+> Overall progress: Hito 1 completo (10/10 tareas) — pendiente merge
 
 ## In Progress
-- (ninguna — listo para empezar el Hito 1)
+- [ ] `TASK-001` — Hito 1: base, descarga y reproducción — **IMPLEMENTACIÓN COMPLETA, pendiente merge a master**
+  - Plan: `docs/superpowers/plans/2026-06-09-hito-1-base-descarga.md` (10/10 tareas, doble revisión por tarea + revisión final ✅ READY TO MERGE)
+  - Rama: `feat/hito-1-base-descarga` (17 commits de código)
+  - Verificado: descarga real end-to-end con progreso NDJSON, streaming con Range (206), URL inválida → 400, persistencia tras recarga, typecheck ambos workspaces, 20 tests verdes
+  - Pendiente del usuario: smoke test visual en navegador (scrub, fotograma a fotograma, Space, foco con Tab) — todo lo automatizable ya está verificado
 
 ## Up Next
-- [ ] `TASK-001` — Hito 1: base, descarga y reproducción
-  - Plan detallado: `docs/superpowers/plans/2026-06-09-hito-1-base-descarga.md` (10 tareas)
-  - Scaffold monorepo → servidor Fastify → validador URLs → parser progreso → registro clips → binarios → descarga yt-dlp → shell cliente → panel medios → reproductor B+C
+- Merge de `feat/hito-1-base-descarga` a `master`
+- Planificación del Hito 2 (writing-plans)
 
 ## Backlog (hitos pendientes de plan)
 - [ ] `TASK-002` — Hito 2: editor (overlays Konva drag/resize/rotación, timeline multipista a medida, panel propiedades, undo/redo, autoguardado, proyectos)
@@ -19,6 +22,14 @@
   - Depends on: TASK-002
 - [ ] `TASK-004` — Hito 4: presets de plantilla, filtros de color, velocidad por tramos, zoom/pan, música de fondo, pulido y accesibilidad final
   - Depends on: TASK-003
+
+## Discovered / Backlog (mejoras menores del review final, para Hito 2)
+- [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)
+  - Origin: revisión final Hito 1 | Priority: low
+- [ ] Null-check explícito de `ffmpegStatic` en vez del cast (`as unknown as string`)
+  - Origin: revisión final Hito 1 | Priority: low
+- [ ] Sustituir `res.body!` por guard en `clipsStore.ts`
+  - Origin: revisión final Hito 1 | Priority: low
 
 ## Completed
 - [x] `TASK-000` — Brainstorming, spec y plan del Hito 1 (2026-06-09)
@@ -31,9 +42,14 @@
 - `DEC-004`: FFmpeg nativo + execa con filter_complex a mano — fluent-ffmpeg archivado, ffmpeg.wasm ~10x más lento (2026-06-09)
 - `DEC-005`: Coordenadas normalizadas (0–1) en el modelo — presets reutilizables entre formatos (2026-06-09)
 - `DEC-006`: Progreso de descarga por NDJSON sobre fetch en vez de SSE — más simple sobre POST, mismo efecto (2026-06-09)
+- `DEC-007`: Script dev del server con `node --watch --import tsx` — `tsx watch` se cuelga bajo concurrently en Windows (privatenumber/tsx#623) (2026-06-10)
+- `DEC-008`: `@fastify/static` ^9.1.3 y shell-quote parcheados por avisos de seguridad (GHSA-pr96-94w5-mx2h, GHSA-w7jw-789q-3m8p) (2026-06-10)
+- `DEC-009`: Volumen del reproductor en `playerStore` (Zustand) — sobrevive al remontaje por `key={clip.id}` al cambiar de clip (2026-06-10)
 
 ## Notes
-- Estilo aprobado: oscuro Twitch (#0e0e10 / #18181b, acento #9146FF)
+- Estilo aprobado: oscuro Twitch (#0e0e10 / #18181b, acento #9146FF); token `--color-muted` subido a #8e8e96 por contraste AA
 - Controles de transporte: combinación B+C (inicio/fin, fotograma a fotograma, bucle + barra de progreso y volumen)
 - Usuario en Windows; binarios asumen yt-dlp.exe
 - data/ y .superpowers/ están en .gitignore
+- El logotipo "ClipForge" en acento #9146FF está exento de contraste por WCAG 1.4.3 (logotypes)
+- Rama base del repo: `master` (no `main`)

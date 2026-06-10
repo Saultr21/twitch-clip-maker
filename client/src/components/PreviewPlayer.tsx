@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { formatTimecode } from "../lib/time";
 import { useClipsStore } from "../stores/clipsStore";
+import { usePlayerStore } from "../stores/playerStore";
 
 const FRAME_STEP = 1 / 30;
 
@@ -13,7 +14,8 @@ export function PreviewPlayer() {
   const [time, setTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loop, setLoop] = useState(false);
-  const [volume, setVolume] = useState(1);
+  const volume = usePlayerStore((s) => s.volume);
+  const setVolume = usePlayerStore((s) => s.setVolume);
 
   const seek = useCallback((t: number) => {
     const v = videoRef.current;

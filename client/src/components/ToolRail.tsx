@@ -18,7 +18,7 @@ export function ToolRail() {
           key={tool.id}
           type="button"
           disabled={!tool.enabled}
-          aria-pressed={tool.id === "media"}
+          aria-pressed={tool.enabled ? tool.id === "media" : undefined}
           title={tool.enabled ? tool.label : `${tool.label} — próximos hitos`}
           className={`w-12 rounded-lg py-1.5 text-center text-[10px] disabled:opacity-40 ${
             tool.id === "media"

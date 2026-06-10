@@ -12,7 +12,10 @@ export function AppShell() {
             Panel de medios (Task 9)
           </div>
         </main>
-        <aside className="w-72 bg-surface border-l border-border p-3 text-xs text-muted">
+        <aside
+          aria-label="Propiedades"
+          className="w-72 bg-surface border-l border-border p-3 text-xs text-muted"
+        >
           Propiedades — Hito 2
         </aside>
       </div>

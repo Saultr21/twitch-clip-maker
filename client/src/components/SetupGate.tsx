@@ -17,6 +17,7 @@ export function SetupGate({ children }: { children: ReactNode }) {
     const poll = async () => {
       try {
         const res = await fetch("/api/setup/status");
+        if (!res.ok) throw new Error(res.statusText);
         const next = (await res.json()) as SetupStatus;
         if (cancelled) return;
         setStatus(next);
@@ -43,9 +44,14 @@ export function SetupGate({ children }: { children: ReactNode }) {
           Clip<span className="text-accent">Forge</span>
         </p>
         {status?.step === "error" ? (
-          <p className="text-danger text-sm max-w-md">
-            {STEP_LABELS.error}: {status.message}
-          </p>
+          <div className="max-w-md">
+            <p className="text-danger text-sm">
+              {STEP_LABELS.error}: {status.message}
+            </p>
+            <p className="text-muted text-sm mt-1">
+              Reinicia la aplicación para reintentar.
+            </p>
+          </div>
         ) : (
           <p className="text-muted text-sm animate-pulse">
             {STEP_LABELS[status?.step ?? "checking"]}

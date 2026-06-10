@@ -16,9 +16,11 @@ export async function probeVideo(
     streams: Array<{ width: number; height: number }>;
     format: { duration: string };
   };
+  const stream = data.streams[0];
+  if (!stream) throw new Error("El archivo no contiene pista de vídeo");
   return {
     duration: parseFloat(data.format.duration),
-    width: data.streams[0].width,
-    height: data.streams[0].height,
+    width: stream.width,
+    height: stream.height,
   };
 }

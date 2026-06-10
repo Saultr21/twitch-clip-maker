@@ -1,3 +1,4 @@
+import { MediaPanel } from "./MediaPanel";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
 
@@ -8,8 +9,9 @@ export function AppShell() {
       <div className="flex flex-1 min-h-0">
         <ToolRail />
         <main className="flex flex-1 min-w-0">
-          <div className="flex-1 grid place-items-center text-muted text-sm">
-            Panel de medios (Task 9)
+          <MediaPanel />
+          <div className="flex-1 grid place-items-center text-muted text-sm bg-canvas">
+            Reproductor (Task 10)
           </div>
         </main>
         <aside

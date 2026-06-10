@@ -1,0 +1,84 @@
+import { create } from "zustand";
+import type { ClipInfo, DownloadEvent } from "@clipforge/shared";
+
+interface ClipsState {
+  clips: ClipInfo[];
+  selectedClipId: string | null;
+  downloading: boolean;
+  downloadProgress: number;
+  downloadError: string | null;
+  fetchClips: () => Promise<void>;
+  selectClip: (id: string) => void;
+  downloadClip: (url: string) => Promise<void>;
+}
+
+export const useClipsStore = create<ClipsState>((set) => ({
+  clips: [],
+  selectedClipId: null,
+  downloading: false,
+  downloadProgress: 0,
+  downloadError: null,
+
+  fetchClips: async () => {
+    try {
+      const res = await fetch("/api/clips");
+      if (!res.ok) throw new Error(res.statusText);
+      set({ clips: (await res.json()) as ClipInfo[] });
+    } catch {
+      set({ downloadError: "No se pudo cargar la lista de clips" });
+    }
+  },
+
+  selectClip: (id) => set({ selectedClipId: id }),
+
+  downloadClip: async (url) => {
+    set({ downloading: true, downloadProgress: 0, downloadError: null });
+    try {
+      const res = await fetch("/api/clips", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      if (!res.ok) {
+        const body = (await res.json()) as { error: string };
+        throw new Error(body.error);
+      }
+      const reader = res.body!.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event: DownloadEvent;
+          try {
+            event = JSON.parse(line) as DownloadEvent;
+          } catch {
+            continue;
+          }
+          if (event.type === "progress") {
+            set({ downloadProgress: event.percent });
+          } else if (event.type === "error") {
+            throw new Error(event.message);
+          } else {
+            set((s) => ({
+              clips: [event.clip, ...s.clips],
+              selectedClipId: event.clip.id,
+            }));
+          }
+        }
+      }
+    } catch (err) {
+      set({
+        downloadError:
+          err instanceof Error ? err.message : "Error desconocido",
+      });
+    } finally {
+      set({ downloading: false });
+    }
+  },
+}));

@@ -6,3 +6,4 @@ dist/
 .env
 data/exports/
 *.tsbuildinfo
+client/.vite/

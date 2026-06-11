@@ -90,9 +90,11 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
         className="flex-1 min-h-0 grid place-items-center p-4 overflow-hidden"
       >
         {/* El <video> existe SIEMPRE (aunque el lienzo mida 0 hasta el primer
-            ResizeObserver): el motor engancha sus listeners en el montaje */}
+            ResizeObserver): el motor engancha sus listeners en el montaje.
+            Sin overflow-hidden: lo que desborda el lienzo se ve atenuado por el
+            velo de abajo, para saber qué parte queda fuera del encuadre */}
         <div
-          className="relative bg-black rounded-sm overflow-hidden shadow-[0_4px_24px_rgba(145,70,255,.15)]"
+          className="relative bg-black rounded-sm shadow-[0_4px_24px_rgba(145,70,255,.15)]"
           style={{ width: canvas.width, height: canvas.height }}
         >
           <video
@@ -105,6 +107,12 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               visibility: inGap || !videoStyle ? "hidden" : "visible",
               ...(videoStyle ?? { inset: 0, width: "100%", height: "100%" }),
             }}
+          />
+          {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
+          <div
+            aria-hidden="true"
+            className="absolute inset-0 pointer-events-none rounded-sm"
+            style={{ boxShadow: "0 0 0 600px rgba(10, 10, 12, 0.85)" }}
           />
           {canvas.width > 0 && children?.(canvas)}
         </div>

@@ -13,6 +13,10 @@ interface OverlayLayerProps {
   height: number;
 }
 
+// Margen del Stage alrededor del lienzo: las asas del Transformer siguen
+// siendo agarrables cuando el vídeo u overlay desborda el encuadre
+const STAGE_MARGIN = 200;
+
 function useHtmlImage(src: string): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
@@ -305,9 +309,13 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
 
   return (
     <Stage
-      width={width}
-      height={height}
-      className="absolute inset-0"
+      width={width + STAGE_MARGIN * 2}
+      height={height + STAGE_MARGIN * 2}
+      // x/y trasladan la escena: los nodos siguen usando coordenadas del lienzo
+      x={STAGE_MARGIN}
+      y={STAGE_MARGIN}
+      className="absolute"
+      style={{ left: -STAGE_MARGIN, top: -STAGE_MARGIN }}
       onMouseDown={(e) => {
         if (e.target === e.target.getStage()) select(null);
       }}

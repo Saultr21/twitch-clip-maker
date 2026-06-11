@@ -61,8 +61,15 @@ export function TrackRow({ title, blocks, pxPerSecond, onMove, onTrim }: TrackRo
                 select({ kind: b.kind, id: b.id });
                 const rect = e.currentTarget.getBoundingClientRect();
                 const px = e.clientX - rect.left;
+                // En bloques muy estrechos las asas ocuparían todo el ancho y
+                // sería imposible moverlos: solo hay trim si queda zona central
+                const hasEdges = rect.width > EDGE_PX * 3;
                 const mode =
-                  px < EDGE_PX ? "trim-start" : px > rect.width - EDGE_PX ? "trim-end" : "move";
+                  hasEdges && px < EDGE_PX
+                    ? "trim-start"
+                    : hasEdges && px > rect.width - EDGE_PX
+                      ? "trim-end"
+                      : "move";
                 dragRef.current = { id: b.id, mode, offsetT: px / pxPerSecond, started: false };
               }}
               onPointerMove={(e) => {
@@ -84,6 +91,9 @@ export function TrackRow({ title, blocks, pxPerSecond, onMove, onTrim }: TrackRo
                 }
               }}
               onPointerUp={() => {
+                dragRef.current = null;
+              }}
+              onPointerCancel={() => {
                 dragRef.current = null;
               }}
             >

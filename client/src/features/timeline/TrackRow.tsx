@@ -17,6 +17,9 @@ interface TrackRowProps {
   title: string;
   blocks: BlockDescriptor[];
   pxPerSecond: number;
+  /** Carril por id de bloque (los bloques solapados en el tiempo se apilan). */
+  lanes?: Record<string, number>;
+  laneCount?: number;
   /** Mueve el bloque a un nuevo start (ya con snap aplicado). */
   onMove: (id: string, newStart: number, transient: boolean) => void;
   /** Recorta un borde del bloque al instante t (ya con snap aplicado). */
@@ -26,7 +29,17 @@ interface TrackRowProps {
 const SNAP_PX = 8;
 const EDGE_PX = 8;
 
-export function TrackRow({ title, blocks, pxPerSecond, onMove, onTrim }: TrackRowProps) {
+const LANE_HEIGHT = 32;
+
+export function TrackRow({
+  title,
+  blocks,
+  pxPerSecond,
+  lanes,
+  laneCount = 1,
+  onMove,
+  onTrim,
+}: TrackRowProps) {
   // started: la transacción de historial se abre en el PRIMER movimiento real,
   // no en el pointerdown — un simple clic de selección no debe crear entrada de undo
   const dragRef = useRef<{ id: string; mode: "move" | "trim-start" | "trim-end"; offsetT: number; started: boolean } | null>(null);
@@ -43,7 +56,7 @@ export function TrackRow({ title, blocks, pxPerSecond, onMove, onTrim }: TrackRo
       <div className="w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10">
         {title}
       </div>
-      <div className="relative h-9 flex-1">
+      <div className="relative flex-1" style={{ height: 4 + laneCount * LANE_HEIGHT }}>
         {blocks.map((b) => {
           const selected = selection?.id === b.id;
           return (
@@ -52,10 +65,14 @@ export function TrackRow({ title, blocks, pxPerSecond, onMove, onTrim }: TrackRo
               type="button"
               aria-label={`${title}: ${b.label}`}
               aria-pressed={selected}
-              className={`absolute top-1 h-7 rounded-md border text-[10px] truncate px-1.5 text-left cursor-grab active:cursor-grabbing ${b.color} ${
+              className={`absolute h-7 rounded-md border text-[10px] truncate px-1.5 text-left cursor-grab active:cursor-grabbing ${b.color} ${
                 selected ? "border-accent ring-1 ring-accent" : "border-transparent"
               }`}
-              style={{ left: b.start * pxPerSecond, width: Math.max(8, (b.end - b.start) * pxPerSecond) }}
+              style={{
+                left: b.start * pxPerSecond,
+                top: 4 + (lanes?.[b.id] ?? 0) * LANE_HEIGHT,
+                width: Math.max(8, (b.end - b.start) * pxPerSecond),
+              }}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 select({ kind: b.kind, id: b.id });

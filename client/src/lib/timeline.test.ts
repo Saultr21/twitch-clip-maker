@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyProject, createVideoClip, createTextOverlay } from "@clipforge/shared";
 import {
+  assignLanes,
   clipDuration,
   clipEnd,
   findSnapPoints,
@@ -77,6 +78,33 @@ describe("snapping", () => {
   it("snapTime ajusta dentro del umbral y respeta fuera de él", () => {
     expect(snapTime(4.93, [5], 0.1)).toBe(5);
     expect(snapTime(4.7, [5], 0.1)).toBe(4.7);
+  });
+});
+
+describe("assignLanes", () => {
+  it("bloques sin solape comparten el carril 0", () => {
+    const { lanes, count } = assignLanes([
+      { id: "a", start: 0, end: 3 },
+      { id: "b", start: 3, end: 6 },
+    ]);
+    expect(lanes).toEqual({ a: 0, b: 0 });
+    expect(count).toBe(1);
+  });
+
+  it("bloques solapados abren carriles nuevos y se reutiliza el primero libre", () => {
+    const { lanes, count } = assignLanes([
+      { id: "a", start: 0, end: 5 },
+      { id: "b", start: 2, end: 7 },
+      { id: "c", start: 5, end: 9 },
+    ]);
+    expect(lanes.a).toBe(0);
+    expect(lanes.b).toBe(1);
+    expect(lanes.c).toBe(0); // cabe en el carril de a
+    expect(count).toBe(2);
+  });
+
+  it("una pista vacía tiene al menos un carril", () => {
+    expect(assignLanes([]).count).toBe(1);
   });
 });
 

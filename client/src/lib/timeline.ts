@@ -71,6 +71,30 @@ export function snapTime(t: number, points: number[], threshold: number): number
   return best;
 }
 
+/**
+ * Asigna un carril a cada bloque de una pista cuyos elementos pueden solaparse
+ * en el tiempo (texto/imagen): greedy por orden de inicio, reutilizando el
+ * primer carril libre. Devuelve carril por id y número total de carriles.
+ */
+export function assignLanes(
+  items: Array<{ id: string; start: number; end: number }>,
+): { lanes: Record<string, number>; count: number } {
+  const sorted = [...items].sort((a, b) => a.start - b.start || a.end - b.end);
+  const laneEnds: number[] = [];
+  const lanes: Record<string, number> = {};
+  for (const item of sorted) {
+    let lane = laneEnds.findIndex((end) => item.start >= end);
+    if (lane === -1) {
+      lane = laneEnds.length;
+      laneEnds.push(item.end);
+    } else {
+      laneEnds[lane] = item.end;
+    }
+    lanes[item.id] = lane;
+  }
+  return { lanes, count: Math.max(1, laneEnds.length) };
+}
+
 /** Divide un clip en el instante t de la línea de tiempo. */
 export function splitVideoClip(c: VideoClip, t: number): [VideoClip, VideoClip] {
   if (t <= c.timelineStart || t >= clipEnd(c)) {

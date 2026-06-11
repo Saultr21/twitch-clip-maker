@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { clipEnd, projectDuration } from "../../lib/timeline";
+import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -67,6 +67,10 @@ export function Timeline() {
     color: "bg-amber-500/20 text-amber-200",
   }));
 
+  // Texto e imagen pueden solaparse en el tiempo: carriles automáticos
+  const textLanes = assignLanes(textBlocks);
+  const imageLanes = assignLanes(imageBlocks);
+
   return (
     <footer className="h-44 bg-surface border-t border-border flex flex-col shrink-0">
       <div className="flex items-center gap-2 px-3 py-1 border-b border-border">
@@ -107,7 +111,7 @@ export function Timeline() {
         />
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
+      <div className="flex-1 overflow-x-auto overflow-y-auto">
         <div className="relative" style={{ width: contentWidth }}>
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
@@ -123,6 +127,8 @@ export function Timeline() {
             title="Texto"
             blocks={textBlocks}
             pxPerSecond={pxPerSecond}
+            lanes={textLanes.lanes}
+            laneCount={textLanes.count}
             onMove={(id, t, transient) => moveOverlay("text", id, t, { transient })}
             onTrim={(id, edge, t, transient) => trimOverlay("text", id, edge, t, { transient })}
           />
@@ -130,6 +136,8 @@ export function Timeline() {
             title="Imagen"
             blocks={imageBlocks}
             pxPerSecond={pxPerSecond}
+            lanes={imageLanes.lanes}
+            laneCount={imageLanes.count}
             onMove={(id, t, transient) => moveOverlay("image", id, t, { transient })}
             onTrim={(id, edge, t, transient) => trimOverlay("image", id, edge, t, { transient })}
           />

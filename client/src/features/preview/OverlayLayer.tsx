@@ -240,6 +240,9 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           if (Math.abs(width - w) > 1) zoom.x = clamp01(node.x() / (width - w));
           if (Math.abs(height - h) > 1) zoom.y = clamp01(node.y() / (height - h));
           updateVideoClip(clip.id, { zoom }, { transient: true });
+          // Re-clava el nodo a la posición derivada del modelo: si el clamp lo
+          // detuvo, el recuadro no debe seguir al puntero más allá del vídeo
+          node.position({ x: zoom.x * (width - w), y: zoom.y * (height - h) });
         }}
         onTransformStart={() => beginTransaction()}
         // En vivo: cada frame del gesto vuelca la escala al modelo y resetea el
@@ -258,6 +261,7 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           if (Math.abs(height - h2) > 1) zoom.y = clamp01(node.y() / (height - h2));
           updateVideoClip(clip.id, { zoom }, { transient: true });
           node.scale({ x: 1, y: 1 });
+          node.position({ x: zoom.x * (width - w2), y: zoom.y * (height - h2) });
         }}
         onTransformEnd={(e) => {
           e.target.scale({ x: 1, y: 1 });

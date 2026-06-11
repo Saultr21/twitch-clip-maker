@@ -27,6 +27,8 @@ export function Timeline() {
   const project = useProjectStore((s) => s.project);
   const moveVideoClip = useProjectStore((s) => s.moveVideoClip);
   const moveOverlay = useProjectStore((s) => s.moveOverlay);
+  const trimVideoClip = useProjectStore((s) => s.trimVideoClip);
+  const trimOverlay = useProjectStore((s) => s.trimOverlay);
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
@@ -69,6 +71,29 @@ export function Timeline() {
     <footer className="h-44 bg-surface border-t border-border flex flex-col shrink-0">
       <div className="flex items-center gap-2 px-3 py-1 border-b border-border">
         <span className="text-[10px] text-muted">Línea de tiempo</span>
+        <button
+          type="button"
+          onClick={() => useProjectStore.getState().splitVideoAt(useUiStore.getState().playhead)}
+          title="Dividir en el playhead (S)"
+          aria-label="Dividir clip en el playhead"
+          className="text-muted hover:text-text text-xs px-1.5"
+        >
+          ✂ Dividir
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const sel = useUiStore.getState().selection;
+            if (!sel) return;
+            useProjectStore.getState().removeElement(sel.kind, sel.id);
+            useUiStore.getState().select(null);
+          }}
+          title="Eliminar seleccionado (Supr)"
+          aria-label="Eliminar elemento seleccionado"
+          className="text-muted hover:text-danger text-xs px-1.5"
+        >
+          🗑 Eliminar
+        </button>
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input
           id="tl-zoom"
@@ -92,18 +117,21 @@ export function Timeline() {
             blocks={videoBlocks}
             pxPerSecond={pxPerSecond}
             onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
+            onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
           />
           <TrackRow
             title="Texto"
             blocks={textBlocks}
             pxPerSecond={pxPerSecond}
             onMove={(id, t, transient) => moveOverlay("text", id, t, { transient })}
+            onTrim={(id, edge, t, transient) => trimOverlay("text", id, edge, t, { transient })}
           />
           <TrackRow
             title="Imagen"
             blocks={imageBlocks}
             pxPerSecond={pxPerSecond}
             onMove={(id, t, transient) => moveOverlay("image", id, t, { transient })}
+            onTrim={(id, edge, t, transient) => trimOverlay("image", id, edge, t, { transient })}
           />
           <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>

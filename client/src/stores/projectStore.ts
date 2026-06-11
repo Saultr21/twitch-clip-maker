@@ -8,6 +8,16 @@ import {
   createVideoClip,
 } from "@clipforge/shared";
 import { clipDuration, clipEnd, hasOverlap, splitVideoClip, videoClipAt } from "../lib/timeline";
+import { useUiStore } from "./uiStore";
+
+// Tras undo/redo el elemento seleccionado puede haber dejado de existir;
+// se poda la selección solo en ese caso para no deseleccionar al deshacer ediciones
+function pruneSelection(project: Project): void {
+  const sel = useUiStore.getState().selection;
+  if (!sel) return;
+  const track = project.tracks[sel.kind] as Array<{ id: string }>;
+  if (!track.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
+}
 
 const HISTORY_LIMIT = 100;
 const MIN_CLIP_DURATION = 0.1;
@@ -171,7 +181,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         future: [],
       })),
 
-    undo: () =>
+    undo: () => {
       set((s) => {
         const prev = s.past.at(-1);
         if (!prev) return s;
@@ -181,9 +191,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           future: [s.project, ...s.future],
           dirty: true,
         };
-      }),
+      });
+      pruneSelection(get().project);
+    },
 
-    redo: () =>
+    redo: () => {
       set((s) => {
         const next = s.future[0];
         if (!next) return s;
@@ -193,7 +205,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           future: s.future.slice(1),
           dirty: true,
         };
-      }),
+      });
+      pruneSelection(get().project);
+    },
 
     canUndo: () => get().past.length > 0,
     canRedo: () => get().future.length > 0,

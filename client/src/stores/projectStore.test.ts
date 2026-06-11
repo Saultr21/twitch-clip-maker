@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { createEmptyProject } from "@clipforge/shared";
 import type { ClipInfo } from "@clipforge/shared";
 import { useProjectStore } from "./projectStore";
+import { useUiStore } from "./uiStore";
 
 const clipInfo: ClipInfo = {
   id: "clip-1",
@@ -128,5 +129,22 @@ describe("historial", () => {
     expect(useProjectStore.getState().project.tracks.text[0].x).toBe(0.3);
     s.undo(); // una sola entrada para todo el arrastre
     expect(useProjectStore.getState().project.tracks.text[0].x).toBe(0.5);
+  });
+
+  it("undo poda la selección si el elemento seleccionado deja de existir", () => {
+    const s = useProjectStore.getState();
+    const id = s.addText(0);
+    useUiStore.getState().select({ kind: "text", id });
+    s.undo(); // el texto desaparece
+    expect(useUiStore.getState().selection).toBeNull();
+  });
+
+  it("undo conserva la selección si el elemento sigue existiendo", () => {
+    const s = useProjectStore.getState();
+    const id = s.addText(0);
+    useUiStore.getState().select({ kind: "text", id });
+    s.updateText(id, { x: 0.2 });
+    s.undo(); // se deshace la edición, no la existencia
+    expect(useUiStore.getState().selection?.id).toBe(id);
   });
 });

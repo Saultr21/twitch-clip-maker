@@ -193,7 +193,7 @@ export function PropertiesPanel() {
   return (
     <aside
       aria-label="Propiedades"
-      className="w-72 bg-surface border-l border-border p-3 overflow-y-auto shrink-0"
+      className="flex-1 min-w-0 bg-surface border-l border-border p-3 overflow-y-auto"
     >
       <h2 className="text-xs font-bold tracking-wide mb-3">PROPIEDADES</h2>
       {!selection && (

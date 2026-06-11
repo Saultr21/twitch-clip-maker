@@ -54,7 +54,7 @@ export function ImagePanel() {
   return (
     <section
       aria-label="Imágenes"
-      className="w-56 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto"
+      className="flex-1 min-w-0 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto"
     >
       <h2 className="text-xs font-bold tracking-wide">IMAGEN</h2>
       <input

@@ -22,7 +22,7 @@ function PlayheadLine({ pxPerSecond }: { pxPerSecond: number }) {
   );
 }
 
-export function Timeline() {
+export function Timeline({ height }: { height: number }) {
   const { seek } = usePlayback();
   const project = useProjectStore((s) => s.project);
   const moveVideoClip = useProjectStore((s) => s.moveVideoClip);
@@ -72,7 +72,7 @@ export function Timeline() {
   const imageLanes = assignLanes(imageBlocks);
 
   return (
-    <footer className="h-44 bg-surface border-t border-border flex flex-col shrink-0">
+    <footer className="bg-surface border-t border-border flex flex-col shrink-0" style={{ height }}>
       <div className="flex items-center gap-2 px-3 py-1 border-b border-border">
         <span className="text-[10px] text-muted">Línea de tiempo</span>
         <button

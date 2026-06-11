@@ -19,7 +19,10 @@ export function ProjectMenu() {
   useEffect(() => {
     if (!open) return;
     fetch("/api/projects")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(r.statusText);
+        return r.json();
+      })
       .then((list: ProjectEntry[]) => setEntries(list))
       .catch(() => setError("No se pudo cargar la lista de proyectos"));
     const onClickOutside = (e: MouseEvent) => {
@@ -65,7 +68,11 @@ export function ProjectMenu() {
 
   const remove = async (name: string) => {
     if (!window.confirm(`¿Borrar el proyecto «${name}»? Esta acción no se puede deshacer.`)) return;
-    await fetch(`/api/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
+    const res = await fetch(`/api/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setError(`No se pudo borrar «${name}»`);
+      return;
+    }
     setEntries((prev) => prev.filter((e) => e.name !== name));
   };
 
@@ -109,6 +116,7 @@ export function ProjectMenu() {
               </button>
               <button
                 type="button"
+                role="menuitem"
                 onClick={() => void remove(e.name)}
                 aria-label={`Borrar proyecto ${e.name}`}
                 className="text-muted hover:text-danger px-1.5"

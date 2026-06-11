@@ -149,18 +149,34 @@ function CommonOverlayProps({ opacity, rotation, onOpacity, onRotation }: {
 function VideoProperties({ clipId }: { clipId: string }) {
   const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
   const setOriginalAudioVolume = useProjectStore((s) => s.setOriginalAudioVolume);
+  const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
   const clip = useProjectStore((s) => s.project.tracks.video.find((c) => c.id === clipId));
   if (!clip) return null;
+
+  const zoom = (patch: Partial<typeof clip.zoom>) =>
+    updateVideoClip(clip.id, { zoom: { ...clip.zoom, ...patch } });
 
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[11px] text-muted">
         Recorte: {clip.trimIn.toFixed(2)}s – {clip.trimOut.toFixed(2)}s
+        <span className="block">
+          (arrastra los bordes del bloque en la línea de tiempo para recortar)
+        </span>
       </p>
+      <Field label={`Zoom · ${clip.zoom.scale.toFixed(2)}x`} htmlFor="prop-zoom">
+        <Slider id="prop-zoom" min={1} max={4} step={0.05} value={clip.zoom.scale} onChange={(v) => zoom({ scale: v })} />
+      </Field>
+      <Field label={`Encuadre horizontal · ${Math.round(clip.zoom.x * 100)}%`} htmlFor="prop-zoom-x">
+        <Slider id="prop-zoom-x" min={0} max={1} step={0.01} value={clip.zoom.x} onChange={(v) => zoom({ x: v })} />
+      </Field>
+      <Field label={`Encuadre vertical · ${Math.round(clip.zoom.y * 100)}%`} htmlFor="prop-zoom-y">
+        <Slider id="prop-zoom-y" min={0} max={1} step={0.01} value={clip.zoom.y} onChange={(v) => zoom({ y: v })} />
+      </Field>
       <Field label={`Volumen del clip · ${Math.round(originalAudioVolume * 100)}%`} htmlFor="prop-vol">
         <Slider id="prop-vol" min={0} max={1} step={0.01} value={originalAudioVolume} onChange={setOriginalAudioVolume} />
       </Field>
-      <p className="text-[10px] text-muted">Velocidad, zoom y filtros llegan en el Hito 4.</p>
+      <p className="text-[10px] text-muted">Velocidad y filtros llegan en el Hito 4.</p>
     </div>
   );
 }

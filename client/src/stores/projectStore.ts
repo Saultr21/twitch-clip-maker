@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { ClipInfo, ImageOverlay, Project, TextOverlay } from "@clipforge/shared";
+import type { ClipInfo, ImageOverlay, Project, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
   createEmptyProject,
   createImageOverlay,
@@ -39,6 +39,7 @@ interface ProjectState {
   addVideoClip: (clip: ClipInfo) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
+  updateVideoClip: (id: string, patch: Partial<VideoClip>, opts?: MutateOptions) => void;
   splitVideoAt: (t: number) => void;
   addText: (start: number) => string;
   addImage: (assetId: string, fileName: string, start: number, w: number, h: number) => string;
@@ -114,6 +115,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           const cutSource = c.trimIn + Math.max(MIN_CLIP_DURATION, t - c.timelineStart) * c.speed;
           c.trimOut = Math.max(c.trimIn + MIN_CLIP_DURATION, cutSource);
         }
+      }, opts),
+
+    updateVideoClip: (id, patch, opts) =>
+      mutate((d) => {
+        const c = d.tracks.video.find((v) => v.id === id);
+        if (c) Object.assign(c, patch);
       }, opts),
 
     splitVideoAt: (t) =>

@@ -1,6 +1,7 @@
 import { ImagePanel } from "../features/image/ImagePanel";
 import { MediaPanel } from "../features/media/MediaPanel";
 import { PlaybackProvider, PreviewArea } from "../features/preview/PreviewArea";
+import { PropertiesPanel } from "../features/properties/PropertiesPanel";
 import { Timeline } from "../features/timeline/Timeline";
 import { useUiStore } from "../stores/uiStore";
 import { TopBar } from "./TopBar";
@@ -19,9 +20,7 @@ export function AppShell() {
             {activeTool === "image" && <ImagePanel />}
             <PreviewArea />
           </main>
-          <aside aria-label="Propiedades" className="w-72 bg-surface border-l border-border p-3 text-xs text-muted">
-            Propiedades — Task 11
-          </aside>
+          <PropertiesPanel />
         </div>
         <Timeline />
       </PlaybackProvider>

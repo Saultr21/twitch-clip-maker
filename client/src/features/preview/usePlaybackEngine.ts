@@ -43,6 +43,13 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
     [videoRef],
   );
 
+  // Ediciones del proyecto (añadir/recortar/mover clips) re-sincronizan el
+  // <video> aunque esté en pausa — p. ej. mostrar el primer fotograma al añadir
+  useEffect(() => {
+    const unsub = useProjectStore.subscribe(() => sync(false));
+    return unsub;
+  }, [sync]);
+
   // El <video> hace avanzar el playhead mientras hay clip activo
   useEffect(() => {
     const video = videoRef.current;

@@ -179,10 +179,10 @@ function TextNode({ overlay, width, height, selected }: {
 }
 
 /**
- * Recuadro invisible que cubre el lienzo y representa el clip de vídeo activo:
- * clic lo selecciona, arrastrar ajusta el encuadre (zoom.x/y) y las esquinas
- * del Transformer ajustan el zoom. El rect nunca se mueve de verdad — cada
- * gesto se traduce al modelo y el nodo se resetea.
+ * Recuadro que abraza al vídeo del clip activo (misma geometría que el <video>
+ * del lienzo): clic lo selecciona, arrastrar lo reposiciona (zoom.x/y) y las
+ * esquinas del Transformer cambian el zoom. La posición del nodo deriva del
+ * modelo en cada render, así que los gestos son updates transitorias.
  */
 function VideoFrameNode({ width, height }: { width: number; height: number }) {
   const ref = useRef<Konva.Rect>(null);
@@ -191,52 +191,54 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
   const selection = useUiStore((s) => s.selection);
   const beginTransaction = useProjectStore((s) => s.beginTransaction);
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
-  // id del clip activo: depende del playhead y de la pista
+  const clips = useClipsStore((s) => s.clips);
+  // clip activo: depende del playhead y de la pista (referencias estables)
   const videoTrack = useProjectStore((s) => s.project.tracks.video);
-  const activeClipId = useUiStore((s) => videoClipAt(videoTrack, s.playhead)?.id ?? null);
-  const selected = !!activeClipId && selection?.kind === "video" && selection.id === activeClipId;
+  const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
+  const selected =
+    !!activeClip && selection?.kind === "video" && selection.id === activeClip.id;
 
   useEffect(() => {
     if (selected && ref.current && trRef.current) {
       trRef.current.nodes([ref.current]);
     }
-  }, [selected]);
+  }, [selected, activeClip?.id]);
 
-  if (!activeClipId) return null;
+  const info = activeClip ? clips.find((c) => c.id === activeClip.clipId) : undefined;
+  if (!activeClip || !info) return null;
+
+  // Misma geometría que el <video> de PreviewCanvas (base = contain)
+  const baseScale = Math.min(width / info.width, height / info.height);
+  const w = info.width * baseScale * activeClip.zoom.scale;
+  const h = info.height * baseScale * activeClip.zoom.scale;
+  const left = activeClip.zoom.x * (width - w);
+  const top = activeClip.zoom.y * (height - h);
 
   const clipNow = () =>
-    useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClipId);
+    useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClip.id);
 
   return (
     <>
       <Rect
         ref={ref}
-        x={0}
-        y={0}
-        width={width}
-        height={height}
-        onMouseDown={() => select({ kind: "video", id: activeClipId })}
-        onTap={() => select({ kind: "video", id: activeClipId })}
+        x={left}
+        y={top}
+        width={w}
+        height={h}
+        fill="transparent"
+        onMouseDown={() => select({ kind: "video", id: activeClip.id })}
+        onTap={() => select({ kind: "video", id: activeClip.id })}
         draggable={selected}
         onDragStart={() => beginTransaction()}
         onDragMove={(e) => {
           const node = e.target;
           const clip = clipNow();
-          const info = clip
-            ? useClipsStore.getState().clips.find((c) => c.id === clip.clipId)
-            : undefined;
-          if (clip && info) {
-            // El vídeo mide src·baseScale·zoom (base = contain); su esquina es
-            // zoom.x·(lienzo − w), así que Δzoom = Δarrastre / (lienzo − w) por eje
-            const baseScale = Math.min(width / info.width, height / info.height);
-            const w = info.width * baseScale * clip.zoom.scale;
-            const h = info.height * baseScale * clip.zoom.scale;
-            const zoom = { ...clip.zoom };
-            if (Math.abs(width - w) > 1) zoom.x = clamp01(clip.zoom.x + node.x() / (width - w));
-            if (Math.abs(height - h) > 1) zoom.y = clamp01(clip.zoom.y + node.y() / (height - h));
-            updateVideoClip(clip.id, { zoom }, { transient: true });
-          }
-          node.position({ x: 0, y: 0 });
+          if (!clip) return;
+          // left = zoom.x·(lienzo − w) ⇒ zoom.x = x / (lienzo − w), por eje
+          const zoom = { ...clip.zoom };
+          if (Math.abs(width - w) > 1) zoom.x = clamp01(node.x() / (width - w));
+          if (Math.abs(height - h) > 1) zoom.y = clamp01(node.y() / (height - h));
+          updateVideoClip(clip.id, { zoom }, { transient: true });
         }}
         onTransformStart={() => beginTransaction()}
         onTransformEnd={(e) => {
@@ -245,10 +247,14 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           if (clip) {
             const factor = Math.max(node.scaleX(), node.scaleY());
             const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
-            updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
+            const w2 = info.width * baseScale * scale;
+            const h2 = info.height * baseScale * scale;
+            const zoom = { ...clip.zoom, scale };
+            if (Math.abs(width - w2) > 1) zoom.x = clamp01(node.x() / (width - w2));
+            if (Math.abs(height - h2) > 1) zoom.y = clamp01(node.y() / (height - h2));
+            updateVideoClip(clip.id, { zoom }, { transient: true });
           }
           node.scale({ x: 1, y: 1 });
-          node.position({ x: 0, y: 0 });
         }}
       />
       {selected && (

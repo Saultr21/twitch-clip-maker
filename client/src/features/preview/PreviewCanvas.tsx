@@ -97,6 +97,7 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
         >
           <video
             ref={videoRef}
+            preload="auto"
             className="absolute"
             style={{
               visibility: inGap || !videoStyle ? "hidden" : "visible",

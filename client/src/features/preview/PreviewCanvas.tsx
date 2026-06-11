@@ -1,6 +1,8 @@
 import { useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
+import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
+import { useUiStore } from "../../stores/uiStore";
 import { useElementSize } from "./useElementSize";
 
 interface PreviewCanvasProps {
@@ -15,6 +17,13 @@ const ASPECT_OPTIONS = ["9:16", "16:9", "1:1", "4:5"] as const;
 export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps) {
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
+  const select = useUiStore((s) => s.select);
+  // El objeto zoom del clip activo es estable (immer) mientras no se edite,
+  // así que esta suscripción al playhead no re-renderiza a 60fps
+  const zoom = useUiStore((s) => {
+    const project = useProjectStore.getState().project;
+    return videoClipAt(project.tracks.video, s.playhead)?.zoom ?? null;
+  });
   const containerRef = useRef<HTMLDivElement>(null);
   const container = useElementSize(containerRef);
 
@@ -53,20 +62,32 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
         </select>
       </div>
 
-      <div ref={containerRef} className="flex-1 min-h-0 grid place-items-center p-4 overflow-hidden">
-        {canvas.width > 0 && (
-          <div
-            className="relative bg-black rounded-sm shadow-[0_4px_24px_rgba(145,70,255,.15)]"
-            style={{ width: canvas.width, height: canvas.height }}
-          >
-            <video
-              ref={videoRef}
-              className="absolute inset-0 w-full h-full"
-              style={{ objectFit: "cover", visibility: inGap ? "hidden" : "visible" }}
-            />
-            {children?.(canvas)}
-          </div>
-        )}
+      <div
+        ref={containerRef}
+        onMouseDown={(e) => {
+          // clic en el fondo fuera del lienzo: deselecciona el overlay activo
+          if (e.target === e.currentTarget) select(null);
+        }}
+        className="flex-1 min-h-0 grid place-items-center p-4 overflow-hidden"
+      >
+        {/* El <video> existe SIEMPRE (aunque el lienzo mida 0 hasta el primer
+            ResizeObserver): el motor engancha sus listeners en el montaje */}
+        <div
+          className="relative bg-black rounded-sm overflow-hidden shadow-[0_4px_24px_rgba(145,70,255,.15)]"
+          style={{ width: canvas.width, height: canvas.height }}
+        >
+          <video
+            ref={videoRef}
+            className="absolute inset-0 w-full h-full"
+            style={{
+              objectFit: "cover",
+              visibility: inGap ? "hidden" : "visible",
+              transformOrigin: zoom ? `${zoom.x * 100}% ${zoom.y * 100}%` : undefined,
+              transform: zoom && zoom.scale !== 1 ? `scale(${zoom.scale})` : undefined,
+            }}
+          />
+          {canvas.width > 0 && children?.(canvas)}
+        </div>
       </div>
     </div>
   );

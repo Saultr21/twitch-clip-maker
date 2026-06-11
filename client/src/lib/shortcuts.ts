@@ -48,6 +48,9 @@ export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
   }
 
   switch (e.code) {
+    case "Escape":
+      ui.select(null);
+      return;
     case "Space":
       e.preventDefault();
       deps.togglePlay();

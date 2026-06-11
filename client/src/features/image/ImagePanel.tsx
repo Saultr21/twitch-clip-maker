@@ -61,6 +61,7 @@ export function ImagePanel() {
         ref={inputRef}
         type="file"
         accept="image/png,image/jpeg,image/webp,image/gif"
+        aria-label="Seleccionar imagen"
         className="sr-only"
         onChange={(e) => {
           const file = e.target.files?.[0];

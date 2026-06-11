@@ -17,7 +17,10 @@ function useHtmlImage(src: string): HTMLImageElement | null {
     const image = new window.Image();
     image.src = src;
     image.onload = () => setImg(image);
-    return () => setImg(null);
+    return () => {
+      image.onload = null; // un onload tardío no debe pisar la imagen del src nuevo
+      setImg(null);
+    };
   }, [src]);
   return img;
 }

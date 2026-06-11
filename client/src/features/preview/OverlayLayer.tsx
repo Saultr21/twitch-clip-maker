@@ -226,11 +226,11 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
             ? useClipsStore.getState().clips.find((c) => c.id === clip.clipId)
             : undefined;
           if (clip && info) {
-            // El vídeo mide src·coverScale·zoom; su esquina es zoom.x·(lienzo − w),
-            // así que Δzoom = Δarrastre / (lienzo − w) por cada eje
-            const coverScale = Math.max(width / info.width, height / info.height);
-            const w = info.width * coverScale * clip.zoom.scale;
-            const h = info.height * coverScale * clip.zoom.scale;
+            // El vídeo mide src·baseScale·zoom (base = contain); su esquina es
+            // zoom.x·(lienzo − w), así que Δzoom = Δarrastre / (lienzo − w) por eje
+            const baseScale = Math.min(width / info.width, height / info.height);
+            const w = info.width * baseScale * clip.zoom.scale;
+            const h = info.height * baseScale * clip.zoom.scale;
             const zoom = { ...clip.zoom };
             if (Math.abs(width - w) > 1) zoom.x = clamp01(clip.zoom.x + node.x() / (width - w));
             if (Math.abs(height - h) > 1) zoom.y = clamp01(clip.zoom.y + node.y() / (height - h));

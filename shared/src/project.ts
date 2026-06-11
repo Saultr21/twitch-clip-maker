@@ -24,7 +24,7 @@ export const videoClipSchema = z
     trimIn: z.number().min(0),
     trimOut: z.number().min(0),
     speed: z.number().min(0.25).max(4),
-    // scale < 1 encoge el vídeo dentro del lienzo (letterbox con negro alrededor)
+    // scale 1 = fotograma completo visible (contain); >1 amplía y recorta
     zoom: z.object({ x: norm, y: norm, scale: z.number().min(0.1).max(10) }),
     filters: z.object({
       brightness: z.number().min(-1).max(1),

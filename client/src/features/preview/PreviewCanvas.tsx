@@ -41,15 +41,15 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   }, [container, settings.width, settings.height]);
 
   // El vídeo se dimensiona explícitamente según el aspecto real de su fuente:
-  // zoom.scale=1 equivale a cover (recorte centrado por zoom.x/y), <1 lo encoge
-  // dejando negro alrededor (p. ej. un 16:9 completo dentro del lienzo vertical)
+  // zoom.scale=1 = fotograma completo visible (contain, con negro alrededor si
+  // el aspecto difiere); >1 amplía y recorta; zoom.x/y posicionan
   const videoStyle = useMemo(() => {
     if (!activeClip || !canvas.width) return null;
     const info = clips.find((c) => c.id === activeClip.clipId);
     if (!info) return null;
-    const coverScale = Math.max(canvas.width / info.width, canvas.height / info.height);
-    const w = info.width * coverScale * activeClip.zoom.scale;
-    const h = info.height * coverScale * activeClip.zoom.scale;
+    const baseScale = Math.min(canvas.width / info.width, canvas.height / info.height);
+    const w = info.width * baseScale * activeClip.zoom.scale;
+    const h = info.height * baseScale * activeClip.zoom.scale;
     return {
       width: w,
       height: h,

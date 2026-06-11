@@ -4,7 +4,8 @@
   "workspaces": ["client", "server", "shared"],
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w @clipforge/server\" \"npm run dev -w @clipforge/client\"",
-    "test": "npm run test -w @clipforge/server"
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

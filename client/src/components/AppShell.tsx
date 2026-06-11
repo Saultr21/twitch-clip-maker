@@ -1,16 +1,21 @@
+import { ImagePanel } from "../features/image/ImagePanel";
 import { MediaPanel } from "../features/media/MediaPanel";
 import { PreviewArea } from "../features/preview/PreviewArea";
+import { useUiStore } from "../stores/uiStore";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
 
 export function AppShell() {
+  const activeTool = useUiStore((s) => s.activeTool);
+
   return (
     <div className="h-screen flex flex-col">
       <TopBar />
       <div className="flex flex-1 min-h-0">
         <ToolRail />
         <main className="flex flex-1 min-w-0">
-          <MediaPanel />
+          {activeTool === "media" && <MediaPanel />}
+          {activeTool === "image" && <ImagePanel />}
           <PreviewArea />
         </main>
         <aside

@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { OverlayLayer } from "./OverlayLayer";
 import { PreviewCanvas } from "./PreviewCanvas";
 import { TransportBar } from "./TransportBar";
 import { usePlaybackEngine } from "./usePlaybackEngine";
@@ -10,7 +11,9 @@ export function PreviewArea() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
-      <PreviewCanvas videoRef={videoRef} inGap={inGap} />
+      <PreviewCanvas videoRef={videoRef} inGap={inGap}>
+        {(canvas) => <OverlayLayer width={canvas.width} height={canvas.height} />}
+      </PreviewCanvas>
       <TransportBar
         seek={seek}
         togglePlay={togglePlay}

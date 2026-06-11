@@ -7,12 +7,26 @@ import { usePlayback } from "../preview/PreviewArea";
 import { TimeRuler } from "./TimeRuler";
 import { TrackRow, type BlockDescriptor } from "./TrackRow";
 
+// Componente propio: el playhead cambia a 60fps durante la reproducción y
+// suscribirlo aquí evita re-renderizar el Timeline completo en cada frame
+function PlayheadLine({ pxPerSecond }: { pxPerSecond: number }) {
+  const playhead = useUiStore((s) => s.playhead);
+  return (
+    <div
+      aria-hidden="true"
+      className="absolute top-0 bottom-0 w-px bg-accent pointer-events-none"
+      style={{ left: 80 + playhead * pxPerSecond }}
+    >
+      <div className="w-2.5 h-2.5 -ml-[5px] rotate-45 bg-accent" />
+    </div>
+  );
+}
+
 export function Timeline() {
   const { seek } = usePlayback();
   const project = useProjectStore((s) => s.project);
   const moveVideoClip = useProjectStore((s) => s.moveVideoClip);
   const moveOverlay = useProjectStore((s) => s.moveOverlay);
-  const playhead = useUiStore((s) => s.playhead);
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
@@ -64,7 +78,6 @@ export function Timeline() {
           step={5}
           value={pxPerSecond}
           onChange={(e) => setZoom(parseFloat(e.target.value))}
-          aria-label="Zoom de la línea de tiempo"
           className="w-28 accent-accent h-1"
         />
       </div>
@@ -92,14 +105,7 @@ export function Timeline() {
             pxPerSecond={pxPerSecond}
             onMove={(id, t, transient) => moveOverlay("image", id, t, { transient })}
           />
-          {/* Playhead */}
-          <div
-            aria-hidden="true"
-            className="absolute top-0 bottom-0 w-px bg-accent pointer-events-none"
-            style={{ left: 80 + playhead * pxPerSecond }}
-          >
-            <div className="w-2.5 h-2.5 -ml-[5px] rotate-45 bg-accent" />
-          </div>
+          <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>
       </div>
     </footer>

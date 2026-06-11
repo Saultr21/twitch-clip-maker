@@ -187,6 +187,7 @@ function TextNode({ overlay, width, height, selected }: {
 function VideoFrameNode({ width, height }: { width: number; height: number }) {
   const ref = useRef<Konva.Rect>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const lastWheelRef = useRef(0);
   const select = useUiStore((s) => s.select);
   const selection = useUiStore((s) => s.selection);
   const beginTransaction = useProjectStore((s) => s.beginTransaction);
@@ -241,20 +242,38 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           updateVideoClip(clip.id, { zoom }, { transient: true });
         }}
         onTransformStart={() => beginTransaction()}
-        onTransformEnd={(e) => {
+        // En vivo: cada frame del gesto vuelca la escala al modelo y resetea el
+        // nodo (patrón Konva de "reset scale on transform") — el vídeo y el
+        // recuadro crecen a la vez mientras arrastras la esquina
+        onTransform={(e) => {
           const node = e.target;
           const clip = clipNow();
-          if (clip) {
-            const factor = Math.max(node.scaleX(), node.scaleY());
-            const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
-            const w2 = info.width * baseScale * scale;
-            const h2 = info.height * baseScale * scale;
-            const zoom = { ...clip.zoom, scale };
-            if (Math.abs(width - w2) > 1) zoom.x = clamp01(node.x() / (width - w2));
-            if (Math.abs(height - h2) > 1) zoom.y = clamp01(node.y() / (height - h2));
-            updateVideoClip(clip.id, { zoom }, { transient: true });
-          }
+          if (!clip) return;
+          const factor = Math.max(node.scaleX(), node.scaleY());
+          const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
+          const w2 = info.width * baseScale * scale;
+          const h2 = info.height * baseScale * scale;
+          const zoom = { ...clip.zoom, scale };
+          if (Math.abs(width - w2) > 1) zoom.x = clamp01(node.x() / (width - w2));
+          if (Math.abs(height - h2) > 1) zoom.y = clamp01(node.y() / (height - h2));
+          updateVideoClip(clip.id, { zoom }, { transient: true });
           node.scale({ x: 1, y: 1 });
+        }}
+        onTransformEnd={(e) => {
+          e.target.scale({ x: 1, y: 1 });
+        }}
+        // Rueda sobre el vídeo seleccionado: zoom sin depender de las asas
+        // (cuando el vídeo desborda el lienzo, las esquinas quedan fuera)
+        onWheel={(e) => {
+          if (!selected) return;
+          e.evt.preventDefault();
+          const clip = clipNow();
+          if (!clip) return;
+          if (Date.now() - lastWheelRef.current > 500) beginTransaction();
+          lastWheelRef.current = Date.now();
+          const dir = e.evt.deltaY > 0 ? 1 / 1.08 : 1.08;
+          const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * dir));
+          updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
         }}
       />
       {selected && (

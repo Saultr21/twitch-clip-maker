@@ -165,7 +165,7 @@ function VideoProperties({ clipId }: { clipId: string }) {
         </span>
       </p>
       <Field label={`Zoom · ${clip.zoom.scale.toFixed(2)}x`} htmlFor="prop-zoom">
-        <Slider id="prop-zoom" min={1} max={4} step={0.05} value={clip.zoom.scale} onChange={(v) => zoom({ scale: v })} />
+        <Slider id="prop-zoom" min={0.25} max={4} step={0.05} value={clip.zoom.scale} onChange={(v) => zoom({ scale: v })} />
       </Field>
       <Field label={`Encuadre horizontal · ${Math.round(clip.zoom.x * 100)}%`} htmlFor="prop-zoom-x">
         <Slider id="prop-zoom-x" min={0} max={1} step={0.01} value={clip.zoom.x} onChange={(v) => zoom({ x: v })} />

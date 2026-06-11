@@ -4,6 +4,7 @@ import { Image as KonvaImage, Layer, Rect, Stage, Text as KonvaText, Transformer
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
+import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 
@@ -221,21 +222,19 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
         onDragMove={(e) => {
           const node = e.target;
           const clip = clipNow();
-          if (clip && clip.zoom.scale > 1) {
-            // screen(p) = W·(O·(1−s) + p·s) ⇒ ΔO = Δscreen / (W·(1−s))
-            const denomX = width * (1 - clip.zoom.scale);
-            const denomY = height * (1 - clip.zoom.scale);
-            updateVideoClip(
-              clip.id,
-              {
-                zoom: {
-                  ...clip.zoom,
-                  x: clamp01(clip.zoom.x + node.x() / denomX),
-                  y: clamp01(clip.zoom.y + node.y() / denomY),
-                },
-              },
-              { transient: true },
-            );
+          const info = clip
+            ? useClipsStore.getState().clips.find((c) => c.id === clip.clipId)
+            : undefined;
+          if (clip && info) {
+            // El vídeo mide src·coverScale·zoom; su esquina es zoom.x·(lienzo − w),
+            // así que Δzoom = Δarrastre / (lienzo − w) por cada eje
+            const coverScale = Math.max(width / info.width, height / info.height);
+            const w = info.width * coverScale * clip.zoom.scale;
+            const h = info.height * coverScale * clip.zoom.scale;
+            const zoom = { ...clip.zoom };
+            if (Math.abs(width - w) > 1) zoom.x = clamp01(clip.zoom.x + node.x() / (width - w));
+            if (Math.abs(height - h) > 1) zoom.y = clamp01(clip.zoom.y + node.y() / (height - h));
+            updateVideoClip(clip.id, { zoom }, { transient: true });
           }
           node.position({ x: 0, y: 0 });
         }}
@@ -245,7 +244,7 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           const clip = clipNow();
           if (clip) {
             const factor = Math.max(node.scaleX(), node.scaleY());
-            const scale = Math.min(10, Math.max(1, clip.zoom.scale * factor));
+            const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
             updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
           }
           node.scale({ x: 1, y: 1 });

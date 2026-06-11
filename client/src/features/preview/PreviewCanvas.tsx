@@ -1,6 +1,7 @@
 import { useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
+import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useElementSize } from "./useElementSize";
@@ -19,10 +20,11 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   const setAspect = useProjectStore((s) => s.setAspect);
   const select = useUiStore((s) => s.select);
   // Doble suscripción: la pista de vídeo (ediciones de zoom en tiempo real) y el
-  // playhead (cambio de clip activo). El objeto zoom es estable (immer) mientras
+  // playhead (cambio de clip activo). El objeto clip es estable (immer) mientras
   // no se edite, así que el playhead no re-renderiza a 60fps
   const videoTrack = useProjectStore((s) => s.project.tracks.video);
-  const zoom = useUiStore((s) => videoClipAt(videoTrack, s.playhead)?.zoom ?? null);
+  const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
+  const clips = useClipsStore((s) => s.clips);
   const containerRef = useRef<HTMLDivElement>(null);
   const container = useElementSize(containerRef);
 
@@ -37,6 +39,24 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
       height: Math.floor(settings.height * scale),
     };
   }, [container, settings.width, settings.height]);
+
+  // El vídeo se dimensiona explícitamente según el aspecto real de su fuente:
+  // zoom.scale=1 equivale a cover (recorte centrado por zoom.x/y), <1 lo encoge
+  // dejando negro alrededor (p. ej. un 16:9 completo dentro del lienzo vertical)
+  const videoStyle = useMemo(() => {
+    if (!activeClip || !canvas.width) return null;
+    const info = clips.find((c) => c.id === activeClip.clipId);
+    if (!info) return null;
+    const coverScale = Math.max(canvas.width / info.width, canvas.height / info.height);
+    const w = info.width * coverScale * activeClip.zoom.scale;
+    const h = info.height * coverScale * activeClip.zoom.scale;
+    return {
+      width: w,
+      height: h,
+      left: activeClip.zoom.x * (canvas.width - w),
+      top: activeClip.zoom.y * (canvas.height - h),
+    };
+  }, [activeClip, clips, canvas]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-canvas">
@@ -77,12 +97,10 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
         >
           <video
             ref={videoRef}
-            className="absolute inset-0 w-full h-full"
+            className="absolute"
             style={{
-              objectFit: "cover",
-              visibility: inGap ? "hidden" : "visible",
-              transformOrigin: zoom ? `${zoom.x * 100}% ${zoom.y * 100}%` : undefined,
-              transform: zoom && zoom.scale !== 1 ? `scale(${zoom.scale})` : undefined,
+              visibility: inGap || !videoStyle ? "hidden" : "visible",
+              ...(videoStyle ?? { inset: 0, width: "100%", height: "100%" }),
             }}
           />
           {canvas.width > 0 && children?.(canvas)}

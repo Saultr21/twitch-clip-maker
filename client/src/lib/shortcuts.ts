@@ -11,6 +11,10 @@ function isEditableTarget(e: KeyboardEvent): boolean {
     t.tagName === "INPUT" ||
     t.tagName === "TEXTAREA" ||
     t.tagName === "SELECT" ||
+    // Space sobre un botón/enlace enfocado debe activarlo, no alternar la
+    // reproducción (WCAG 2.1.1: el manejador global no roba la interacción)
+    t.tagName === "BUTTON" ||
+    t.tagName === "A" ||
     t.isContentEditable
   );
 }

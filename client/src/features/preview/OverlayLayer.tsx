@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
-import { Image as KonvaImage, Layer, Stage, Text as KonvaText, Transformer } from "react-konva";
+import { Image as KonvaImage, Layer, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
+import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 
@@ -176,6 +177,94 @@ function TextNode({ overlay, width, height, selected }: {
   );
 }
 
+/**
+ * Recuadro invisible que cubre el lienzo y representa el clip de vídeo activo:
+ * clic lo selecciona, arrastrar ajusta el encuadre (zoom.x/y) y las esquinas
+ * del Transformer ajustan el zoom. El rect nunca se mueve de verdad — cada
+ * gesto se traduce al modelo y el nodo se resetea.
+ */
+function VideoFrameNode({ width, height }: { width: number; height: number }) {
+  const ref = useRef<Konva.Rect>(null);
+  const trRef = useRef<Konva.Transformer>(null);
+  const select = useUiStore((s) => s.select);
+  const selection = useUiStore((s) => s.selection);
+  const beginTransaction = useProjectStore((s) => s.beginTransaction);
+  const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
+  // id del clip activo: depende del playhead y de la pista
+  const videoTrack = useProjectStore((s) => s.project.tracks.video);
+  const activeClipId = useUiStore((s) => videoClipAt(videoTrack, s.playhead)?.id ?? null);
+  const selected = !!activeClipId && selection?.kind === "video" && selection.id === activeClipId;
+
+  useEffect(() => {
+    if (selected && ref.current && trRef.current) {
+      trRef.current.nodes([ref.current]);
+    }
+  }, [selected]);
+
+  if (!activeClipId) return null;
+
+  const clipNow = () =>
+    useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClipId);
+
+  return (
+    <>
+      <Rect
+        ref={ref}
+        x={0}
+        y={0}
+        width={width}
+        height={height}
+        onMouseDown={() => select({ kind: "video", id: activeClipId })}
+        onTap={() => select({ kind: "video", id: activeClipId })}
+        draggable={selected}
+        onDragStart={() => beginTransaction()}
+        onDragMove={(e) => {
+          const node = e.target;
+          const clip = clipNow();
+          if (clip && clip.zoom.scale > 1) {
+            // screen(p) = W·(O·(1−s) + p·s) ⇒ ΔO = Δscreen / (W·(1−s))
+            const denomX = width * (1 - clip.zoom.scale);
+            const denomY = height * (1 - clip.zoom.scale);
+            updateVideoClip(
+              clip.id,
+              {
+                zoom: {
+                  ...clip.zoom,
+                  x: clamp01(clip.zoom.x + node.x() / denomX),
+                  y: clamp01(clip.zoom.y + node.y() / denomY),
+                },
+              },
+              { transient: true },
+            );
+          }
+          node.position({ x: 0, y: 0 });
+        }}
+        onTransformStart={() => beginTransaction()}
+        onTransformEnd={(e) => {
+          const node = e.target;
+          const clip = clipNow();
+          if (clip) {
+            const factor = Math.max(node.scaleX(), node.scaleY());
+            const scale = Math.min(10, Math.max(1, clip.zoom.scale * factor));
+            updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
+          }
+          node.scale({ x: 1, y: 1 });
+          node.position({ x: 0, y: 0 });
+        }}
+      />
+      {selected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled={false}
+          flipEnabled={false}
+          keepRatio
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+        />
+      )}
+    </>
+  );
+}
+
 export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const playhead = useUiStore((s) => s.playhead);
   const selection = useUiStore((s) => s.selection);
@@ -196,6 +285,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
+        <VideoFrameNode width={width} height={height} />
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}

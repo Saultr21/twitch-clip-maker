@@ -18,12 +18,11 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
   const select = useUiStore((s) => s.select);
-  // El objeto zoom del clip activo es estable (immer) mientras no se edite,
-  // así que esta suscripción al playhead no re-renderiza a 60fps
-  const zoom = useUiStore((s) => {
-    const project = useProjectStore.getState().project;
-    return videoClipAt(project.tracks.video, s.playhead)?.zoom ?? null;
-  });
+  // Doble suscripción: la pista de vídeo (ediciones de zoom en tiempo real) y el
+  // playhead (cambio de clip activo). El objeto zoom es estable (immer) mientras
+  // no se edite, así que el playhead no re-renderiza a 60fps
+  const videoTrack = useProjectStore((s) => s.project.tracks.video);
+  const zoom = useUiStore((s) => videoClipAt(videoTrack, s.playhead)?.zoom ?? null);
   const containerRef = useRef<HTMLDivElement>(null);
   const container = useElementSize(containerRef);
 

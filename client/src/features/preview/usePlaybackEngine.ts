@@ -33,6 +33,7 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
         video.src = src;
       }
       video.volume = usePlayerStore.getState().volume;
+      if (video.playbackRate !== active.speed) video.playbackRate = active.speed;
       const target = sourceTimeFor(active, playhead);
       if (seeking || Math.abs(video.currentTime - target) > SYNC_TOLERANCE) {
         video.currentTime = target;

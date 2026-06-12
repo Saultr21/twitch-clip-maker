@@ -170,6 +170,9 @@ function VideoProperties({ clipId }: { clipId: string }) {
   const zoom = (patch: Partial<typeof clip.zoom>) =>
     updateVideoClip(clip.id, { zoom: { ...clip.zoom, ...patch } });
 
+  const filters = (patch: Partial<typeof clip.filters>) =>
+    updateVideoClip(clip.id, { filters: { ...clip.filters, ...patch } });
+
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[11px] text-muted">
@@ -188,10 +191,39 @@ function VideoProperties({ clipId }: { clipId: string }) {
         <Slider id="prop-zoom-y" min={0} max={1} step={0.01} value={clip.zoom.y} onChange={(v) => zoom({ y: v })} />
       </Field>
       <CenterButton onCenter={() => zoom({ x: 0.5, y: 0.5 })} />
+      <Field label={`Velocidad · ${clip.speed.toFixed(2)}x`} htmlFor="prop-speed">
+        <Slider id="prop-speed" min={0.25} max={4} step={0.05} value={clip.speed} onChange={(v) => updateVideoClip(clip.id, { speed: v })} />
+      </Field>
+      <Field label={`Brillo · ${Math.round(clip.filters.brightness * 100)}`} htmlFor="prop-bright">
+        <Slider id="prop-bright" min={-1} max={1} step={0.02} value={clip.filters.brightness} onChange={(v) => filters({ brightness: v })} />
+      </Field>
+      <Field label={`Contraste · ${clip.filters.contrast.toFixed(2)}`} htmlFor="prop-contrast">
+        <Slider id="prop-contrast" min={0} max={2} step={0.02} value={clip.filters.contrast} onChange={(v) => filters({ contrast: v })} />
+      </Field>
+      <Field label={`Saturación · ${clip.filters.saturation.toFixed(2)}`} htmlFor="prop-sat">
+        <Slider id="prop-sat" min={0} max={3} step={0.05} value={clip.filters.saturation} onChange={(v) => filters({ saturation: v })} />
+      </Field>
+      <Field label={`Tono · ${Math.round(clip.filters.hue)}°`} htmlFor="prop-hue">
+        <Slider id="prop-hue" min={-180} max={180} step={1} value={clip.filters.hue} onChange={(v) => filters({ hue: v })} />
+      </Field>
+      <Field label={`Blanco y negro · ${Math.round(clip.filters.grayscale * 100)}%`} htmlFor="prop-gray">
+        <Slider id="prop-gray" min={0} max={1} step={0.02} value={clip.filters.grayscale} onChange={(v) => filters({ grayscale: v })} />
+      </Field>
+      <button
+        type="button"
+        onClick={() =>
+          updateVideoClip(clip.id, {
+            speed: 1,
+            filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+          })
+        }
+        className="text-xs text-muted border border-border-2 rounded-md py-1.5 hover:text-text"
+      >
+        Restablecer velocidad y filtros
+      </button>
       <Field label={`Volumen del clip · ${Math.round(originalAudioVolume * 100)}%`} htmlFor="prop-vol">
         <Slider id="prop-vol" min={0} max={1} step={0.01} value={originalAudioVolume} onChange={setOriginalAudioVolume} />
       </Field>
-      <p className="text-[10px] text-muted">Velocidad y filtros llegan en el Hito 4.</p>
     </div>
   );
 }

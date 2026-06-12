@@ -50,11 +50,23 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
     const baseScale = Math.min(canvas.width / info.width, canvas.height / info.height);
     const w = info.width * baseScale * activeClip.zoom.scale;
     const h = info.height * baseScale * activeClip.zoom.scale;
+    const f = activeClip.filters;
+    const cssFilter =
+      [
+        f.brightness !== 0 ? `brightness(${1 + f.brightness})` : "",
+        f.contrast !== 1 ? `contrast(${f.contrast})` : "",
+        f.saturation !== 1 ? `saturate(${f.saturation})` : "",
+        f.hue !== 0 ? `hue-rotate(${f.hue}deg)` : "",
+        f.grayscale !== 0 ? `grayscale(${f.grayscale})` : "",
+      ]
+        .filter(Boolean)
+        .join(" ") || undefined;
     return {
       width: w,
       height: h,
       left: activeClip.zoom.x * (canvas.width - w),
       top: activeClip.zoom.y * (canvas.height - h),
+      filter: cssFilter,
     };
   }, [activeClip, clips, canvas]);
 

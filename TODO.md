@@ -1,19 +1,22 @@
 # TODO — ClipForge (editor local de clips de Twitch)
 
-> Last updated: 2026-06-10
+> Last updated: 2026-06-11
 > Current phase: development
-> Overall progress: Hito 1 completo y fusionado — Hito 2 pendiente de plan
+> Overall progress: Hito 2 implementado (15/15 tareas) — pendiente smoke test del usuario y merge
 
 ## In Progress
-- (nada — Hito 1 cerrado)
+- [ ] `TASK-002` — Hito 2: editor — **IMPLEMENTACIÓN COMPLETA, pendiente smoke test visual y merge**
+  - Plan: `docs/superpowers/plans/2026-06-10-hito-2-editor.md` (15/15 tareas, doble revisión por tarea + revisión a11y 5/5 + revisión final ✅ READY FOR PR)
+  - Rama: `feat/hito-2-editor`
+  - Verificado: 65 tests verdes (26 client + 34 server + 5 shared), typecheck limpio en los 3 workspaces, APIs de proyectos/assets funcionando por el proxy, contrastes AA computados
+  - Pendiente del usuario: smoke test visual (overlays drag/resize/rotación, timeline drag/trim/split, undo/redo, autoguardado, atajos)
 
 ## Up Next
-- Planificación del Hito 2 (writing-plans) y rama `feat/hito-2-editor`
+- Smoke test del usuario sobre la PR del Hito 2 → merge
+- Planificación del Hito 3 (exportación)
 
 ## Backlog (hitos pendientes de plan)
-- [ ] `TASK-002` — Hito 2: editor (overlays Konva drag/resize/rotación, timeline multipista a medida, panel propiedades, undo/redo, autoguardado, proyectos)
-  - Depends on: TASK-001
-- [ ] `TASK-003` — Hito 3: exportación (builder filter_complex con TDD, jobs FFmpeg, progreso SSE, presets de calidad)
+- [ ] `TASK-003` — Hito 3: exportación (builder filter_complex con TDD, jobs FFmpeg, progreso SSE, presets de calidad; API /api/fonts con TTF para paridad drawtext)
   - Depends on: TASK-002
 - [ ] `TASK-004` — Hito 4: presets de plantilla, filtros de color, velocidad por tramos, zoom/pan, música de fondo, pulido y accesibilidad final
   - Depends on: TASK-003

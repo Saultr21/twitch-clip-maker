@@ -19,3 +19,5 @@ export interface SetupStatus {
   step: "checking" | "downloading-ytdlp" | "ready" | "error";
   message?: string;
 }
+
+export * from "./project.js";

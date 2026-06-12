@@ -1,0 +1,95 @@
+import { useEffect, type RefObject } from "react";
+import { formatTimecode } from "../../lib/time";
+import { projectDuration } from "../../lib/timeline";
+import { usePlayerStore } from "../../stores/playerStore";
+import { useProjectStore } from "../../stores/projectStore";
+import { useUiStore } from "../../stores/uiStore";
+
+interface TransportBarProps {
+  seek: (t: number) => void;
+  togglePlay: () => void;
+  videoRef: RefObject<HTMLVideoElement | null>;
+  loop: boolean;
+  setLoop: (l: boolean) => void;
+}
+
+export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: TransportBarProps) {
+  const playing = useUiStore((s) => s.playing);
+  const playhead = useUiStore((s) => s.playhead);
+  const fps = useProjectStore((s) => s.project.settings.fps);
+  const duration = useProjectStore((s) => projectDuration(s.project));
+  const volume = usePlayerStore((s) => s.volume);
+  const setVolume = usePlayerStore((s) => s.setVolume);
+  const frame = 1 / fps;
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v) v.volume = volume;
+  }, [volume, videoRef]);
+
+  // Bucle: al agotar la duración con loop activo, vuelve al inicio
+  useEffect(() => {
+    if (loop && !playing && duration > 0 && playhead >= duration) {
+      seek(0);
+      useUiStore.getState().setPlaying(true);
+    }
+  }, [loop, playing, playhead, duration, seek]);
+
+  const controlClass = "text-muted hover:text-text disabled:opacity-40 px-1 text-sm";
+
+  return (
+    <div className="px-6 pb-3 pt-2 flex flex-col gap-2 shrink-0 bg-canvas">
+      <input
+        type="range"
+        min={0}
+        max={duration || 0}
+        step={0.01}
+        value={Math.min(playhead, duration)}
+        onChange={(e) => seek(parseFloat(e.target.value))}
+        disabled={duration === 0}
+        aria-label="Posición de reproducción"
+        className="w-full accent-accent h-1.5"
+      />
+      <div className="flex items-center justify-center gap-3">
+        <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}>⏮</button>
+        <button type="button" onClick={() => seek(playhead - frame)} aria-label="Fotograma anterior" className={controlClass}>◀|</button>
+        <button
+          type="button"
+          onClick={togglePlay}
+          disabled={duration === 0}
+          aria-label={playing ? "Pausar" : "Reproducir"}
+          className="w-9 h-9 rounded-full bg-accent text-white grid place-items-center text-sm hover:bg-accent-dark disabled:opacity-40"
+        >
+          {playing ? "⏸" : "▶"}
+        </button>
+        <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}>|▶</button>
+        <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}>⏭</button>
+        <button
+          type="button"
+          onClick={() => setLoop(!loop)}
+          aria-pressed={loop}
+          aria-label="Bucle"
+          className={`${controlClass} ${loop ? "text-accent" : ""}`}
+        >
+          🔁
+        </button>
+        <div className="flex items-center gap-1.5 ml-4">
+          <span aria-hidden="true" className="text-muted text-xs">🔊</span>
+          <input
+            type="range"
+            min={0}
+            max={1}
+            step={0.05}
+            value={volume}
+            onChange={(e) => setVolume(parseFloat(e.target.value))}
+            aria-label="Volumen"
+            className="w-20 accent-accent h-1"
+          />
+        </div>
+        <span className="font-mono text-[11px] text-muted ml-4">
+          {formatTimecode(playhead)} / {formatTimecode(duration)}
+        </span>
+      </div>
+    </div>
+  );
+}

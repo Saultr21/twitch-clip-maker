@@ -1517,7 +1517,7 @@ export function useElementSize(ref: RefObject<HTMLElement | null>): { width: num
 
 - [ ] **Step 3: Crear `client/src/features/preview/PreviewCanvas.tsx`**
 
-El lienzo calcula el rectángulo máximo con el aspect del proyecto que cabe en el contenedor, pinta el `<video>` dentro (object-fit: fill, porque el rect ya tiene el aspect correcto) y deja un hueco para la capa Konva (Task 8). Incluye el selector de formato encima.
+El lienzo calcula el rectángulo máximo con el aspect del proyecto que cabe en el contenedor, pinta el `<video>` dentro con `object-fit: cover` (recorte centrado, igual que hará el `scale+crop` de FFmpeg al exportar — paridad preview/export) y deja un hueco para la capa Konva (Task 8). Incluye el selector de formato encima.
 
 ```tsx
 import { useMemo, useRef, type ReactNode, type RefObject } from "react";

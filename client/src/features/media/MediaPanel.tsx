@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useClipsStore } from "../stores/clipsStore";
+import { useClipsStore } from "../../stores/clipsStore";
+import { useProjectStore } from "../../stores/projectStore";
+import { useUiStore } from "../../stores/uiStore";
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -33,7 +35,7 @@ export function MediaPanel() {
   return (
     <section
       aria-label="Medios"
-      className="w-56 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto"
+      className="flex-1 min-w-0 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto"
     >
       <h2 className="text-xs font-bold tracking-wide">MEDIOS</h2>
 
@@ -108,6 +110,16 @@ export function MediaPanel() {
               <span className="text-muted">
                 {formatDuration(clip.duration)} · {clip.width}x{clip.height}
               </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                useProjectStore.getState().addVideoClip(clip);
+                useUiStore.getState().select(null);
+              }}
+              className="mt-1 w-full text-[11px] text-accent-soft border border-border-2 rounded-md py-1 hover:border-accent"
+            >
+              + Añadir a la línea de tiempo
             </button>
           </li>
         ))}

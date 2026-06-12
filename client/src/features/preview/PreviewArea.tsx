@@ -3,6 +3,7 @@ import { OverlayLayer } from "./OverlayLayer";
 import { PreviewCanvas } from "./PreviewCanvas";
 import { TransportBar } from "./TransportBar";
 import { usePlaybackEngine } from "./usePlaybackEngine";
+import { useMusicEngine } from "./useMusicEngine";
 
 interface PlaybackApi {
   seek: (t: number) => void;
@@ -22,6 +23,7 @@ export function usePlayback(): PlaybackApi {
 export function PlaybackProvider({ children }: { children: ReactNode }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const engine = usePlaybackEngine(videoRef);
+  useMusicEngine();
   return (
     <PlaybackContext.Provider value={{ ...engine, videoRef }}>
       {children}

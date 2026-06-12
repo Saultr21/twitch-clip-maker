@@ -42,7 +42,10 @@ export function exportRoutes(app: FastifyInstance): void {
         cleanup();
       }
     };
+    let cleaned = false;
     const cleanup = () => {
+      if (cleaned) return; // nunca escribir/cerrar dos veces el stream
+      cleaned = true;
       job.listeners.delete(push);
       reply.raw.end();
     };

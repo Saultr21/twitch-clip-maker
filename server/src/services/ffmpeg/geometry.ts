@@ -28,6 +28,7 @@ export function renderRect(
   return {
     w,
     h,
+    // "+ 0" normaliza el -0 de Math.round(x·negativo) a +0
     left: Math.round(zoom.x * (canvasW - w)) + 0,
     top: Math.round(zoom.y * (canvasH - h)) + 0,
   };

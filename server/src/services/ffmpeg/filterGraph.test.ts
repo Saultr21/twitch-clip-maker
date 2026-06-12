@@ -164,6 +164,25 @@ describe("buildFilterGraph — overlays", () => {
     expect(g.filterComplex).toContain("text='Hola'");
     expect(g.videoLabel).toBe("[txt0]");
   });
+
+  it("un texto rotado se renderiza en capa transparente, se rota y se superpone", () => {
+    const p = projectWithClip();
+    p.tracks.text.push({ ...createTextOverlay(1), content: "Giro", rotation: 30, x: 0.5, y: 0.25, end: 4 });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("color=c=0x00000000:s=1080x1920");
+    expect(g.filterComplex).toContain("rotate=30*PI/180:c=none:ow=rotw(30*PI/180):oh=roth(30*PI/180)");
+    expect(g.filterComplex).toContain(
+      "overlay=x=540-overlay_w/2:y=480-overlay_h/2:enable='between(t,1,4)'[txt0]",
+    );
+  });
+
+  it("un texto sin rotación sigue usando drawtext directo", () => {
+    const p = projectWithClip();
+    p.tracks.text.push({ ...createTextOverlay(1), content: "Plano" });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("drawtext=");
+    expect(g.filterComplex).not.toContain("rotate=");
+  });
 });
 
 describe("buildFilterGraph — música", () => {

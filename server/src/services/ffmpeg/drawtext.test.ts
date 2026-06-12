@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createTextOverlay } from "@clipforge/shared";
-import { drawtextFilter, escapeDrawtextText, fontFileFor } from "./drawtext.js";
+import { drawtextFilter, drawtextFilterCentered, escapeDrawtextText, fontFileFor } from "./drawtext.js";
 
 describe("escapeDrawtextText", () => {
   it("escapa los caracteres especiales de drawtext", () => {
@@ -60,5 +60,17 @@ describe("drawtextFilter", () => {
     expect(f).toContain("bordercolor=0x000000@0.8");
     expect(f).toContain("shadowcolor=black@0.64"); // 0.8·0.8
     expect(f).toContain("shadowx=3");
+  });
+});
+
+describe("drawtextFilterCentered", () => {
+  const base = { ...createTextOverlay(2), id: "t1", content: "Hola", x: 0.5, y: 0.25 };
+
+  it("centra en la capa y no lleva enable (lo pone el overlay)", () => {
+    const f = drawtextFilterCentered({ ...base, content: "Giro" }, 1080, 1920);
+    expect(f).toContain("text='Giro'");
+    expect(f).toContain("x=(w-text_w)/2");
+    expect(f).toContain("y=(h-text_h)/2");
+    expect(f).not.toContain("enable=");
   });
 });

@@ -1,5 +1,5 @@
 import type { ClipInfo, Project, VideoClip } from "@clipforge/shared";
-import { drawtextFilter } from "./drawtext.js";
+import { drawtextFilter, drawtextFilterCentered } from "./drawtext.js";
 import { renderRect } from "./geometry.js";
 import { atempoChain } from "./speed.js";
 
@@ -127,9 +127,22 @@ export function buildFilterGraph(
     videoLabel = `[ov${j}]`;
   });
 
-  // Textos (drawtext encadenados)
+  // Textos (drawtext directo si rotation=0; capa transparente rotada si no)
   project.tracks.text.forEach((t, k) => {
-    filters.push(`${videoLabel}${drawtextFilter(t, W, H)}[txt${k}]`);
+    if (t.rotation === 0) {
+      filters.push(`${videoLabel}${drawtextFilter(t, W, H)}[txt${k}]`);
+    } else {
+      // capa transparente del lienzo con el texto centrado, rotada y superpuesta:
+      // rotate conserva el centro, así que el ancla (x,y) coincide con la preview
+      const r = `${num(t.rotation)}*PI/180`;
+      filters.push(
+        `color=c=0x00000000:s=${W}x${H}:r=${fps}:d=${num(totalDuration)},format=rgba,${drawtextFilterCentered(t, W, H)}[tl${k}]`,
+      );
+      filters.push(`[tl${k}]rotate=${r}:c=none:ow=rotw(${r}):oh=roth(${r})[tr${k}]`);
+      filters.push(
+        `${videoLabel}[tr${k}]overlay=x=${Math.round(t.x * W)}-overlay_w/2:y=${Math.round(t.y * H)}-overlay_h/2:enable='between(t,${num(t.start)},${num(t.end)})'[txt${k}]`,
+      );
+    }
     videoLabel = `[txt${k}]`;
   });
 

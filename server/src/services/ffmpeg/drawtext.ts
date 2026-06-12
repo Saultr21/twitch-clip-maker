@@ -43,8 +43,8 @@ function num(n: number): string {
   return String(Math.round(n * 1000) / 1000);
 }
 
-/** Filtro drawtext completo para un overlay de texto (sin rotación: limitación H3). */
-export function drawtextFilter(t: TextOverlay, canvasW: number, canvasH: number): string {
+/** Partes comunes (fuente, texto, color, borde, sombra) sin posición ni enable. */
+function buildParts(t: TextOverlay, canvasH: number): string[] {
   const parts = [
     `fontfile='${fontFileFor(t.fontFamily)}'`,
     `text='${escapeDrawtextText(t.content)}'`,
@@ -61,10 +61,22 @@ export function drawtextFilter(t: TextOverlay, canvasW: number, canvasH: number)
     const offset = Math.max(1, Math.round(t.fontSize * canvasH * 0.03));
     parts.push(`shadowcolor=black@${num(0.8 * t.opacity)}`, `shadowx=${offset}`, `shadowy=${offset}`);
   }
-  parts.push(
+  return parts;
+}
+
+/** Filtro drawtext completo para un overlay de texto SIN rotación. */
+export function drawtextFilter(t: TextOverlay, canvasW: number, canvasH: number): string {
+  const parts = [
+    ...buildParts(t, canvasH),
     `x=${Math.round(t.x * canvasW)}-text_w/2`,
     `y=${Math.round(t.y * canvasH)}-text_h/2`,
     `enable='between(t,${num(t.start)},${num(t.end)})'`,
-  );
+  ];
+  return `drawtext=${parts.join(":")}`;
+}
+
+/** Variante para la capa rotada: texto centrado en la capa, sin enable. */
+export function drawtextFilterCentered(t: TextOverlay, _canvasW: number, canvasH: number): string {
+  const parts = [...buildParts(t, canvasH), "x=(w-text_w)/2", "y=(h-text_h)/2"];
   return `drawtext=${parts.join(":")}`;
 }

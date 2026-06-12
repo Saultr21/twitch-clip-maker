@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
-import { Image as KonvaImage, Layer, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
+import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
@@ -17,6 +17,18 @@ interface OverlayLayerProps {
 // siendo agarrables cuando el vídeo u overlay desborda el encuadre
 const STAGE_MARGIN = 200;
 
+// Imán de las guías de centrado (px en pantalla)
+const GUIDE_SNAP_PX = 6;
+
+type GuidesCallback = (vertical: boolean, horizontal: boolean) => void;
+
+/** Si pos está a menos del imán del centro del eje, engancha al centro. */
+function snapToCenter(pos: number, dimension: number): { pos: number; snapped: boolean } {
+  return Math.abs(pos - dimension / 2) < GUIDE_SNAP_PX
+    ? { pos: dimension / 2, snapped: true }
+    : { pos, snapped: false };
+}
+
 function useHtmlImage(src: string): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(null);
   useEffect(() => {
@@ -31,8 +43,8 @@ function useHtmlImage(src: string): HTMLImageElement | null {
   return img;
 }
 
-function ImageNode({ overlay, width, height, selected }: {
-  overlay: ImageOverlay; width: number; height: number; selected: boolean;
+function ImageNode({ overlay, width, height, selected, onGuides }: {
+  overlay: ImageOverlay; width: number; height: number; selected: boolean; onGuides: GuidesCallback;
 }) {
   const img = useHtmlImage(`/assets/${overlay.fileName}`);
   const ref = useRef<Konva.Image>(null);
@@ -68,13 +80,18 @@ function ImageNode({ overlay, width, height, selected }: {
         onMouseDown={() => select({ kind: "image", id: overlay.id })}
         onTap={() => select({ kind: "image", id: overlay.id })}
         onDragStart={() => beginTransaction()}
-        onDragMove={(e) =>
+        onDragMove={(e) => {
+          const sx = snapToCenter(e.target.x(), width);
+          const sy = snapToCenter(e.target.y(), height);
+          e.target.position({ x: sx.pos, y: sy.pos });
+          onGuides(sx.snapped, sy.snapped);
           updateImage(
             overlay.id,
-            { x: clamp01(e.target.x() / width), y: clamp01(e.target.y() / height) },
+            { x: clamp01(sx.pos / width), y: clamp01(sy.pos / height) },
             { transient: true },
-          )
-        }
+          );
+        }}
+        onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
         onTransformEnd={(e) => {
           const node = e.target;
@@ -98,8 +115,8 @@ function ImageNode({ overlay, width, height, selected }: {
   );
 }
 
-function TextNode({ overlay, width, height, selected }: {
-  overlay: TextOverlay; width: number; height: number; selected: boolean;
+function TextNode({ overlay, width, height, selected, onGuides }: {
+  overlay: TextOverlay; width: number; height: number; selected: boolean; onGuides: GuidesCallback;
 }) {
   const ref = useRef<Konva.Text>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -146,13 +163,18 @@ function TextNode({ overlay, width, height, selected }: {
         onMouseDown={() => select({ kind: "text", id: overlay.id })}
         onTap={() => select({ kind: "text", id: overlay.id })}
         onDragStart={() => beginTransaction()}
-        onDragMove={(e) =>
+        onDragMove={(e) => {
+          const sx = snapToCenter(e.target.x(), width);
+          const sy = snapToCenter(e.target.y(), height);
+          e.target.position({ x: sx.pos, y: sy.pos });
+          onGuides(sx.snapped, sy.snapped);
           updateText(
             overlay.id,
-            { x: clamp01(e.target.x() / width), y: clamp01(e.target.y() / height) },
+            { x: clamp01(sx.pos / width), y: clamp01(sy.pos / height) },
             { transient: true },
-          )
-        }
+          );
+        }}
+        onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
         onTransformEnd={(e) => {
           const node = e.target;
@@ -188,7 +210,9 @@ function TextNode({ overlay, width, height, selected }: {
  * esquinas del Transformer cambian el zoom. La posición del nodo deriva del
  * modelo en cada render, así que los gestos son updates transitorias.
  */
-function VideoFrameNode({ width, height }: { width: number; height: number }) {
+function VideoFrameNode({ width, height, onGuides }: {
+  width: number; height: number; onGuides: GuidesCallback;
+}) {
   const ref = useRef<Konva.Rect>(null);
   const trRef = useRef<Konva.Transformer>(null);
   const lastWheelRef = useRef(0);
@@ -241,13 +265,30 @@ function VideoFrameNode({ width, height }: { width: number; height: number }) {
           if (!clip) return;
           // left = zoom.x·(lienzo − w) ⇒ zoom.x = x / (lienzo − w), por eje
           const zoom = { ...clip.zoom };
-          if (Math.abs(width - w) > 1) zoom.x = clamp01(node.x() / (width - w));
-          if (Math.abs(height - h) > 1) zoom.y = clamp01(node.y() / (height - h));
+          let vGuide = false;
+          let hGuide = false;
+          if (Math.abs(width - w) > 1) {
+            zoom.x = clamp01(node.x() / (width - w));
+            // imán al centro: el centro del vídeo cae sobre el centro del lienzo
+            if (Math.abs((zoom.x - 0.5) * (width - w)) < GUIDE_SNAP_PX) {
+              zoom.x = 0.5;
+              vGuide = true;
+            }
+          }
+          if (Math.abs(height - h) > 1) {
+            zoom.y = clamp01(node.y() / (height - h));
+            if (Math.abs((zoom.y - 0.5) * (height - h)) < GUIDE_SNAP_PX) {
+              zoom.y = 0.5;
+              hGuide = true;
+            }
+          }
+          onGuides(vGuide, hGuide);
           updateVideoClip(clip.id, { zoom }, { transient: true });
-          // Re-clava el nodo a la posición derivada del modelo: si el clamp lo
-          // detuvo, el recuadro no debe seguir al puntero más allá del vídeo
+          // Re-clava el nodo a la posición derivada del modelo: si el clamp o el
+          // imán lo detuvieron, el recuadro no debe seguir al puntero
           node.position({ x: zoom.x * (width - w), y: zoom.y * (height - h) });
         }}
+        onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
         // En vivo: cada frame del gesto vuelca la escala al modelo y resetea el
         // nodo (patrón Konva de "reset scale on transform") — el vídeo y el
@@ -303,6 +344,12 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const select = useUiStore((s) => s.select);
   const texts = useProjectStore((s) => s.project.tracks.text);
   const images = useProjectStore((s) => s.project.tracks.image);
+  // Guías de centrado: visibles solo mientras un arrastre engancha al centro
+  const [guides, setGuides] = useState({ vertical: false, horizontal: false });
+  const onGuides: GuidesCallback = (vertical, horizontal) =>
+    setGuides((g) =>
+      g.vertical === vertical && g.horizontal === horizontal ? g : { vertical, horizontal },
+    );
 
   const visibleTexts = texts.filter((t) => playhead >= t.start && playhead < t.end);
   const visibleImages = images.filter((i) => playhead >= i.start && playhead < i.end);
@@ -321,7 +368,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
-        <VideoFrameNode width={width} height={height} />
+        <VideoFrameNode width={width} height={height} onGuides={onGuides} />
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}
@@ -329,6 +376,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
             width={width}
             height={height}
             selected={selection?.kind === "image" && selection.id === o.id}
+            onGuides={onGuides}
           />
         ))}
         {visibleTexts.map((o) => (
@@ -338,8 +386,25 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
             width={width}
             height={height}
             selected={selection?.kind === "text" && selection.id === o.id}
+            onGuides={onGuides}
           />
         ))}
+        {guides.vertical && (
+          <Line
+            points={[width / 2, -STAGE_MARGIN, width / 2, height + STAGE_MARGIN]}
+            stroke="#ff4d6a"
+            strokeWidth={1}
+            listening={false}
+          />
+        )}
+        {guides.horizontal && (
+          <Line
+            points={[-STAGE_MARGIN, height / 2, width + STAGE_MARGIN, height / 2]}
+            stroke="#ff4d6a"
+            strokeWidth={1}
+            listening={false}
+          />
+        )}
       </Layer>
     </Stage>
   );

@@ -46,6 +46,18 @@ function Slider({ id, min, max, step, value, onChange }: {
 const inputClass =
   "bg-surface-2 border border-border-2 rounded-md px-2 py-1 text-xs focus:outline-none focus:border-accent";
 
+function CenterButton({ onCenter }: { onCenter: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onCenter}
+      className="text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent"
+    >
+      ⊕ Centrar en el lienzo
+    </button>
+  );
+}
+
 function TextProperties({ overlay }: { overlay: TextOverlay }) {
   const updateText = useProjectStore((s) => s.updateText);
   const u = (patch: Partial<TextOverlay>) => updateText(overlay.id, patch);
@@ -104,6 +116,7 @@ function TextProperties({ overlay }: { overlay: TextOverlay }) {
         onOpacity={(v) => u({ opacity: v })}
         onRotation={(v) => u({ rotation: v })}
       />
+      <CenterButton onCenter={() => u({ x: 0.5, y: 0.5 })} />
     </div>
   );
 }
@@ -127,6 +140,7 @@ function ImageProperties({ overlay }: { overlay: ImageOverlay }) {
         onOpacity={(v) => u({ opacity: v })}
         onRotation={(v) => u({ rotation: v })}
       />
+      <CenterButton onCenter={() => u({ x: 0.5, y: 0.5 })} />
     </div>
   );
 }
@@ -173,6 +187,7 @@ function VideoProperties({ clipId }: { clipId: string }) {
       <Field label={`Encuadre vertical · ${Math.round(clip.zoom.y * 100)}%`} htmlFor="prop-zoom-y">
         <Slider id="prop-zoom-y" min={0} max={1} step={0.01} value={clip.zoom.y} onChange={(v) => zoom({ y: v })} />
       </Field>
+      <CenterButton onCenter={() => zoom({ x: 0.5, y: 0.5 })} />
       <Field label={`Volumen del clip · ${Math.round(originalAudioVolume * 100)}%`} htmlFor="prop-vol">
         <Slider id="prop-vol" min={0} max={1} step={0.01} value={originalAudioVolume} onChange={setOriginalAudioVolume} />
       </Field>

@@ -77,6 +77,16 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.filterComplex).toContain("volume=0.35");
   });
 
+  it("la velocidad ajusta setpts, atempo y la duración del segmento", () => {
+    const p = createEmptyProject("demo");
+    p.tracks.video.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("setpts=(PTS-STARTPTS)/2");
+    expect(g.filterComplex).toContain("atempo=2");
+    expect(g.filterComplex).toContain("d=2:r=30[bg0]"); // 4s de material a 2x = 2s
+    expect(g.totalDuration).toBe(2);
+  });
+
   it("lanza si el proyecto no tiene clips de vídeo", () => {
     expect(() => buildFilterGraph(createEmptyProject("x"), new Map())).toThrow(
       "El proyecto no tiene clips",

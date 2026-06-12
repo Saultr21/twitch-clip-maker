@@ -1,6 +1,7 @@
 import type { ClipInfo, Project, VideoClip } from "@clipforge/shared";
 import { drawtextFilter } from "./drawtext.js";
 import { renderRect } from "./geometry.js";
+import { atempoChain } from "./speed.js";
 
 export interface GraphInput {
   kind: "video" | "image";
@@ -16,7 +17,7 @@ export interface FilterGraph {
 }
 
 function clipEnd(c: VideoClip): number {
-  return c.timelineStart + (c.trimOut - c.trimIn);
+  return c.timelineStart + (c.trimOut - c.trimIn) / c.speed;
 }
 
 function num(n: number): string {
@@ -57,18 +58,23 @@ export function buildFilterGraph(
     const inputIdx = inputs.length;
     inputs.push({ kind: "video", fileName: info.fileName });
     const rect = renderRect(W, H, info.width, info.height, clip.zoom);
-    const dur = clip.trimOut - clip.trimIn;
-
+    const dur = (clip.trimOut - clip.trimIn) / clip.speed;
+    const setpts =
+      clip.speed === 1 ? "setpts=PTS-STARTPTS" : `setpts=(PTS-STARTPTS)/${num(clip.speed)}`;
     filters.push(
-      `[${inputIdx}:v]trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},setpts=PTS-STARTPTS,scale=${rect.w}:${rect.h}[cv${segIdx}]`,
+      `[${inputIdx}:v]trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},${setpts},scale=${rect.w}:${rect.h}[cv${segIdx}]`,
     );
     filters.push(`color=black:s=${W}x${H}:d=${num(dur)}:r=${fps}[bg${segIdx}]`);
     filters.push(`[bg${segIdx}][cv${segIdx}]overlay=x=${rect.left}:y=${rect.top}:shortest=1[seg${segIdx}]`);
-    filters.push(
-      // aresample+aformat: concat exige el mismo sample rate y layout en todos
-      // los segmentos (los clips de Twitch pueden venir a 48kHz)
-      `[${inputIdx}:a]atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},asetpts=PTS-STARTPTS,volume=${num(project.originalAudioVolume)},aresample=44100,aformat=channel_layouts=stereo[sega${segIdx}]`,
-    );
+    const audioChain = [
+      `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+      "asetpts=PTS-STARTPTS",
+      ...atempoChain(clip.speed),
+      `volume=${num(project.originalAudioVolume)}`,
+      "aresample=44100",
+      "aformat=channel_layouts=stereo",
+    ];
+    filters.push(`[${inputIdx}:a]${audioChain.join(",")}[sega${segIdx}]`);
     segLabels.push(`[seg${segIdx}][sega${segIdx}]`);
     segIdx++;
     cursor = clipEnd(clip);

@@ -1,19 +1,15 @@
 # TODO — ClipForge (editor local de clips de Twitch)
 
-> Last updated: 2026-06-11
+> Last updated: 2026-06-12
 > Current phase: development
-> Overall progress: Hito 2 implementado (15/15 tareas) — pendiente smoke test del usuario y merge
+> Overall progress: Hitos 1 y 2 completos y fusionados — Hito 3 pendiente de plan
 
 ## In Progress
-- [ ] `TASK-002` — Hito 2: editor — **IMPLEMENTACIÓN COMPLETA, pendiente smoke test visual y merge**
-  - Plan: `docs/superpowers/plans/2026-06-10-hito-2-editor.md` (15/15 tareas, doble revisión por tarea + revisión a11y 5/5 + revisión final ✅ READY FOR PR)
-  - Rama: `feat/hito-2-editor`
-  - Verificado: 65 tests verdes (26 client + 34 server + 5 shared), typecheck limpio en los 3 workspaces, APIs de proyectos/assets funcionando por el proxy, contrastes AA computados
-  - Pendiente del usuario: smoke test visual (overlays drag/resize/rotación, timeline drag/trim/split, undo/redo, autoguardado, atajos)
+- (nada — Hito 2 cerrado)
 
 ## Up Next
-- Smoke test del usuario sobre la PR del Hito 2 → merge
-- Planificación del Hito 3 (exportación)
+- Planificación del Hito 3 (writing-plans) — exportación con FFmpeg
+- A partir de ahora se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
 
 ## Backlog (hitos pendientes de plan)
 - [ ] `TASK-003` — Hito 3: exportación (builder filter_complex con TDD, jobs FFmpeg, progreso SSE, presets de calidad; API /api/fonts con TTF para paridad drawtext)
@@ -30,6 +26,11 @@
   - Origin: revisión final Hito 1 | Priority: low
 
 ## Completed
+- [x] `TASK-002` — Hito 2: editor con timeline, overlays y proyectos (2026-06-12)
+  - Fusionado en master (PR #2, https://github.com/Saultr21/twitch-clip-maker/pull/2)
+  - Plan: `docs/superpowers/plans/2026-06-10-hito-2-editor.md` (15/15 tareas, doble revisión por tarea + a11y 5/5 + revisión final)
+  - Smoke test del usuario OK tras iteraciones: zoom/encuadre con recuadro en vivo (contain por defecto, letterbox, rueda), velo sobre lo que desborda el lienzo, guías de centrado con imán + botón centrar, carriles automáticos, paneles redimensionables, fix del playhead y del max-width del preflight
+  - 65+ tests verdes, verificación de UI con arnés Playwright (client/devDependencies)
 - [x] `TASK-001` — Hito 1: base, descarga y reproducción (2026-06-10)
   - Fusionado en master (PR #1, https://github.com/Saultr21/twitch-clip-maker/pull/1)
   - Plan: `docs/superpowers/plans/2026-06-09-hito-1-base-descarga.md` (10/10 tareas, doble revisión por tarea + revisión final)

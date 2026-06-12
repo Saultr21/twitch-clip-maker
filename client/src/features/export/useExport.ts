@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ExportEvent, QualityPresetId } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 
@@ -11,6 +11,10 @@ export type ExportPhase =
 export function useExport() {
   const [state, setState] = useState<ExportPhase>({ phase: "idle" });
   const sourceRef = useRef<EventSource | null>(null);
+
+  // Si el componente se desmonta con un export en marcha, cerrar el SSE
+  // (el job sigue en el servidor; se puede cancelar desde un diálogo nuevo)
+  useEffect(() => () => sourceRef.current?.close(), []);
 
   const start = useCallback(async (preset: QualityPresetId, fileName: string) => {
     const project = useProjectStore.getState().project;

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { QualityPresetId } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useExport } from "./useExport";
@@ -26,10 +27,31 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.code === "Escape" && state.phase !== "running") onClose();
+      // Trampa de foco: Tab circula dentro del diálogo (WCAG 2.4.3)
+      if (e.code === "Tab" && dialogRef.current) {
+        const focusables = dialogRef.current.querySelectorAll<HTMLElement>(
+          "button, input, [tabindex]:not([tabindex='-1'])",
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, state.phase, onClose]);
+
+  // Foco inicial dentro del diálogo al abrirlo
+  useEffect(() => {
+    if (open) dialogRef.current?.focus();
+  }, [open]);
 
   if (!open) return null;
 
@@ -39,7 +61,9 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
     onClose();
   };
 
-  return (
+  // Portal a <body>: el modal no debe vivir dentro del <header> (orden de
+  // lectura de AT y ámbito correcto de aria-modal)
+  return createPortal(
     <div
       className="fixed inset-0 z-50 bg-black/60 grid place-items-center"
       onMouseDown={(e) => {
@@ -50,10 +74,11 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Exportar vídeo"
-        className="w-96 bg-surface-2 border border-border-2 rounded-xl p-4 flex flex-col gap-3 shadow-2xl"
+        aria-labelledby="export-dialog-title"
+        tabIndex={-1}
+        className="w-96 bg-surface-2 border border-border-2 rounded-xl p-4 flex flex-col gap-3 shadow-2xl outline-none"
       >
-        <h2 className="text-sm font-bold">Exportar vídeo</h2>
+        <h2 id="export-dialog-title" className="text-sm font-bold">Exportar vídeo</h2>
 
         {!hasClips && (
           <p className="text-[11px] text-danger">
@@ -162,6 +187,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useAutosave, saveNow } from "../features/projects/useAutosave";
 import { ProjectMenu } from "../features/projects/ProjectMenu";
+import { ExportDialog } from "../features/export/ExportDialog";
 
 export function TopBar() {
   const name = useProjectStore((s) => s.project.name);
@@ -10,6 +12,7 @@ export function TopBar() {
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
   const saveState = useAutosave();
+  const [exportOpen, setExportOpen] = useState(false);
 
   return (
     <header className="flex items-center gap-3 bg-surface border-b border-border px-4 py-2">
@@ -62,13 +65,14 @@ export function TopBar() {
         </button>
         <button
           type="button"
-          disabled
-          title="Disponible en el Hito 3"
-          className="text-xs font-semibold text-white rounded-full px-4 py-1.5 bg-gradient-to-r from-accent to-accent-dark disabled:opacity-50"
+          onClick={() => setExportOpen(true)}
+          title="Exportar vídeo"
+          className="text-xs font-semibold text-white rounded-full px-4 py-1.5 bg-gradient-to-r from-accent to-accent-dark"
         >
           Exportar
         </button>
       </div>
+      <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
     </header>
   );
 }

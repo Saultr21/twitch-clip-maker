@@ -29,7 +29,7 @@ export function buildFfmpegArgs(
   const preset_ = PRESETS[preset];
   const args: string[] = ["-y"];
   for (const input of graph.inputs) {
-    const dir = input.kind === "video" ? dirs.videoDir : dirs.imageDir;
+    const dir = input.kind === "video" ? dirs.videoDir : dirs.imageDir; // imagen y audio viven en assets
     args.push("-i", path.join(dir, input.fileName).replaceAll("\\", "/"));
   }
   args.push(

@@ -4,7 +4,7 @@ import { renderRect } from "./geometry.js";
 import { atempoChain } from "./speed.js";
 
 export interface GraphInput {
-  kind: "video" | "image";
+  kind: "video" | "image" | "audio";
   fileName: string;
 }
 
@@ -133,11 +133,36 @@ export function buildFilterGraph(
     videoLabel = `[txt${k}]`;
   });
 
+  // Música de fondo: cada pista se recorta, retrasa y mezcla sobre [acat]
+  let audioLabel = "[acat]";
+  if (project.tracks.audio.length > 0) {
+    const musLabels: string[] = [];
+    project.tracks.audio.forEach((a, m) => {
+      const inputIdx = inputs.length;
+      inputs.push({ kind: "audio", fileName: a.fileName });
+      const playDur = a.end - a.start;
+      const chain = [
+        `atrim=start=${num(a.trimIn)}:end=${num(a.trimIn + playDur)}`,
+        "asetpts=PTS-STARTPTS",
+        `volume=${num(a.volume)}`,
+        "aresample=44100",
+        "aformat=channel_layouts=stereo",
+        `adelay=${Math.round(a.start * 1000)}:all=1`,
+      ];
+      filters.push(`[${inputIdx}:a]${chain.join(",")}[mus${m}]`);
+      musLabels.push(`[mus${m}]`);
+    });
+    filters.push(
+      `[acat]${musLabels.join("")}amix=inputs=${musLabels.length + 1}:duration=first:normalize=0[amix]`,
+    );
+    audioLabel = "[amix]";
+  }
+
   return {
     inputs,
     filterComplex: filters.join(";"),
     videoLabel,
-    audioLabel: "[acat]",
+    audioLabel,
     totalDuration,
   };
 }

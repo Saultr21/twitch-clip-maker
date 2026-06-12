@@ -165,3 +165,26 @@ describe("buildFilterGraph — overlays", () => {
     expect(g.videoLabel).toBe("[txt0]");
   });
 });
+
+describe("buildFilterGraph — música", () => {
+  it("la música entra como input de audio con atrim, volume, adelay y amix", () => {
+    const p = projectWithClip(); // vídeo en [0,5)
+    p.tracks.audio.push({
+      id: "m1", assetId: "a9", fileName: "song.mp3",
+      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40,
+    });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.inputs[1]).toEqual({ kind: "audio", fileName: "song.mp3" });
+    expect(g.filterComplex).toContain(
+      "[1:a]atrim=start=10:end=13,asetpts=PTS-STARTPTS,volume=0.6,aresample=44100,aformat=channel_layouts=stereo,adelay=1000:all=1[mus0]",
+    );
+    expect(g.filterComplex).toContain("[acat][mus0]amix=inputs=2:duration=first:normalize=0[amix]");
+    expect(g.audioLabel).toBe("[amix]");
+  });
+
+  it("sin música el audioLabel sigue siendo [acat]", () => {
+    const g = buildFilterGraph(projectWithClip(), new Map([["clip-1", info]]));
+    expect(g.audioLabel).toBe("[acat]");
+    expect(g.filterComplex).not.toContain("amix");
+  });
+});

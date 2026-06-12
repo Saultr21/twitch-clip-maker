@@ -23,11 +23,16 @@ export function fontFileFor(family: string): string {
 
 /** Escapa el texto del usuario para el parámetro text de drawtext. */
 export function escapeDrawtextText(raw: string): string {
-  return raw
-    .replace(/\\/g, "\\\\")
-    .replace(/:/g, "\\:")
-    .replace(/'/g, "\\'")
-    .replace(/\n/g, "\\n");
+  return (
+    raw
+      .replace(/\\/g, "\\\\")
+      .replace(/:/g, "\\:")
+      // Dentro de comillas simples del parser de filtros el backslash NO es
+      // especial, así que \' no funciona: se sustituye por el apóstrofo
+      // tipográfico, visualmente idéntico y sin riesgo de parseo
+      .replace(/'/g, "’")
+      .replace(/\n/g, "\\n")
+  );
 }
 
 function hex(color: string): string {
@@ -43,6 +48,8 @@ export function drawtextFilter(t: TextOverlay, canvasW: number, canvasH: number)
   const parts = [
     `fontfile='${fontFileFor(t.fontFamily)}'`,
     `text='${escapeDrawtextText(t.content)}'`,
+    // sin expansión %{...}: el texto del usuario es siempre literal
+    "expansion=none",
     `fontsize=${Math.round(t.fontSize * canvasH)}`,
     `fontcolor=${hex(t.fill)}@${num(t.opacity)}`,
   ];

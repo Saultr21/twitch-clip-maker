@@ -5,9 +5,15 @@ import { drawtextFilter, escapeDrawtextText, fontFileFor } from "./drawtext.js";
 describe("escapeDrawtextText", () => {
   it("escapa los caracteres especiales de drawtext", () => {
     expect(escapeDrawtextText("a:b")).toBe("a\\:b");
-    expect(escapeDrawtextText("it's")).toBe("it\\'s");
+    // la comilla simple rompería el quoting del parser de filtros:
+    // se sustituye por el apóstrofo tipográfico (visualmente idéntico)
+    expect(escapeDrawtextText("it's")).toBe("it’s");
     expect(escapeDrawtextText("a\\b")).toBe("a\\\\b");
     expect(escapeDrawtextText("100%")).toBe("100%");
+  });
+
+  it("el filtro desactiva la expansión %{...} (texto siempre literal)", () => {
+    expect(escapeDrawtextText("%{pts}")).toBe("%{pts}");
   });
 
   it("convierte saltos de línea en saltos reales de drawtext", () => {
@@ -34,6 +40,7 @@ describe("drawtextFilter", () => {
     const f = drawtextFilter({ ...base, fontFamily: "Arial", fontSize: 0.05, fill: "#ffffff", opacity: 1, strokeWidth: 0, shadow: false, end: 6 }, 1080, 1920);
     expect(f).toContain("fontfile='C\\:/Windows/Fonts/arial.ttf'");
     expect(f).toContain("text='Hola'");
+    expect(f).toContain("expansion=none");
     expect(f).toContain("fontsize=96"); // 0.05·1920
     expect(f).toContain("fontcolor=0xffffff@1");
     expect(f).toContain("x=540-text_w/2");

@@ -65,12 +65,23 @@ export function buildFilterGraph(
     filters.push(`color=black:s=${W}x${H}:d=${num(dur)}:r=${fps}[bg${segIdx}]`);
     filters.push(`[bg${segIdx}][cv${segIdx}]overlay=x=${rect.left}:y=${rect.top}:shortest=1[seg${segIdx}]`);
     filters.push(
-      `[${inputIdx}:a]atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},asetpts=PTS-STARTPTS,volume=${num(project.originalAudioVolume)}[sega${segIdx}]`,
+      // aresample+aformat: concat exige el mismo sample rate y layout en todos
+      // los segmentos (los clips de Twitch pueden venir a 48kHz)
+      `[${inputIdx}:a]atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},asetpts=PTS-STARTPTS,volume=${num(project.originalAudioVolume)},aresample=44100,aformat=channel_layouts=stereo[sega${segIdx}]`,
     );
     segLabels.push(`[seg${segIdx}][sega${segIdx}]`);
     segIdx++;
     cursor = clipEnd(clip);
   }
+
+  // Cola final: si un texto/imagen termina después del último clip, la preview
+  // muestra negro con el overlay — el export añade el mismo tramo en negro
+  const overlayEnds = [
+    ...project.tracks.text.map((t) => t.end),
+    ...project.tracks.image.map((i) => i.end),
+  ];
+  const totalDuration = Math.max(cursor, ...(overlayEnds.length ? overlayEnds : [0]));
+  if (totalDuration > cursor + 0.001) pushGap(totalDuration - cursor);
 
   filters.push(`${segLabels.join("")}concat=n=${segLabels.length}:v=1:a=1[vcat][acat]`);
   let videoLabel = "[vcat]";
@@ -98,13 +109,6 @@ export function buildFilterGraph(
     filters.push(`${videoLabel}${drawtextFilter(t, W, H)}[txt${k}]`);
     videoLabel = `[txt${k}]`;
   });
-
-  const lastClipEnd = Math.max(...clips.map(clipEnd));
-  const overlayEnds = [
-    ...project.tracks.text.map((t) => t.end),
-    ...project.tracks.image.map((i) => i.end),
-  ];
-  const totalDuration = Math.max(lastClipEnd, ...(overlayEnds.length ? overlayEnds : [0]));
 
   return {
     inputs,

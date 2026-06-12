@@ -32,7 +32,9 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.filterComplex).toContain("[0:v]trim=start=2:end=7,setpts=PTS-STARTPTS,scale=1080:608[cv0]");
     expect(g.filterComplex).toContain("color=black:s=1080x1920:d=5:r=30[bg0]");
     expect(g.filterComplex).toContain("[bg0][cv0]overlay=x=0:y=656:shortest=1[seg0]");
-    expect(g.filterComplex).toContain("[0:a]atrim=start=2:end=7,asetpts=PTS-STARTPTS,volume=1[sega0]");
+    expect(g.filterComplex).toContain(
+      "[0:a]atrim=start=2:end=7,asetpts=PTS-STARTPTS,volume=1,aresample=44100,aformat=channel_layouts=stereo[sega0]",
+    );
     expect(g.filterComplex).toContain("[seg0][sega0]concat=n=1:v=1:a=1[vcat][acat]");
     expect(g.videoLabel).toBe("[vcat]");
     expect(g.audioLabel).toBe("[acat]");
@@ -47,6 +49,15 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.filterComplex).toContain("anullsrc=r=44100:cl=stereo,atrim=duration=3[sega0]");
     expect(g.filterComplex).toContain("concat=n=2:v=1:a=1");
     expect(g.totalDuration).toBe(7);
+  });
+
+  it("un overlay que termina después del último clip añade cola en negro", () => {
+    const p = projectWithClip(); // clip en [0,5)
+    p.tracks.text.push({ ...createTextOverlay(4), end: 8 });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("color=black:s=1080x1920:d=3:r=30[seg1]");
+    expect(g.filterComplex).toContain("concat=n=2:v=1:a=1");
+    expect(g.totalDuration).toBe(8);
   });
 
   it("dos clips contiguos: dos segmentos y n=2", () => {

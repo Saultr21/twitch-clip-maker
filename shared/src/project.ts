@@ -48,8 +48,9 @@ export const textOverlaySchema = z.object({
   content: z.string(),
   fontFamily: z.string().min(1),
   fontSize: z.number().min(0.005).max(1),
-  fill: z.string().min(1),
-  stroke: z.string(),
+  // hex estricto: estos valores acaban dentro del filter_complex de FFmpeg
+  fill: z.string().regex(/^#[0-9a-f]{6}$/i),
+  stroke: z.string().regex(/^$|^#[0-9a-f]{6}$/i),
   strokeWidth: z.number().min(0).max(0.1),
   shadow: z.boolean(),
   x: norm,

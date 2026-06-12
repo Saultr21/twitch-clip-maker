@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ASPECT_PRESETS,
+  createAudioTrack,
   createEmptyProject,
   createTextOverlay,
   projectSchema,
@@ -36,6 +37,15 @@ describe("projectSchema", () => {
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
     });
     expect(projectSchema.safeParse(p).success).toBe(false);
+  });
+});
+
+describe("createAudioTrack", () => {
+  it("crea una pista válida según el esquema", () => {
+    const p = createEmptyProject("x");
+    p.tracks.audio.push(createAudioTrack("a1", "a1.mp3", 2, 30));
+    expect(projectSchema.safeParse(p).success).toBe(true);
+    expect(p.tracks.audio[0].end).toBe(32);
   });
 });
 

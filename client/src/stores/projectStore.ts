@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { ClipInfo, ImageOverlay, Project, TextOverlay, VideoClip } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, ImageOverlay, Project, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
+  createAudioTrack,
   createEmptyProject,
   createImageOverlay,
   createTextOverlay,
@@ -22,7 +23,7 @@ function pruneSelection(project: Project): void {
 const HISTORY_LIMIT = 100;
 const MIN_CLIP_DURATION = 0.1;
 
-export type ElementKind = "video" | "text" | "image";
+export type ElementKind = "video" | "text" | "image" | "audio";
 
 interface MutateOptions {
   transient?: boolean;
@@ -45,8 +46,11 @@ interface ProjectState {
   addImage: (assetId: string, fileName: string, start: number, w: number, h: number) => string;
   updateText: (id: string, patch: Partial<TextOverlay>, opts?: MutateOptions) => void;
   updateImage: (id: string, patch: Partial<ImageOverlay>, opts?: MutateOptions) => void;
-  moveOverlay: (kind: "text" | "image", id: string, newStart: number, opts?: MutateOptions) => void;
+  moveOverlay: (kind: "text" | "image" | "audio", id: string, newStart: number, opts?: MutateOptions) => void;
   trimOverlay: (kind: "text" | "image", id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
+  addAudio: (assetId: string, fileName: string, start: number, duration: number) => string;
+  trimAudio: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
+  updateAudio: (id: string, patch: Partial<AudioTrack>, opts?: MutateOptions) => void;
   removeElement: (kind: ElementKind, id: string) => void;
   setOriginalAudioVolume: (v: number) => void;
   beginTransaction: () => void;
@@ -156,9 +160,36 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         if (o) Object.assign(o, patch);
       }, opts),
 
+    addAudio: (assetId, fileName, start, duration) => {
+      const track = createAudioTrack(assetId, fileName, start, duration);
+      mutate((d) => void d.tracks.audio.push(track));
+      return track.id;
+    },
+
+    trimAudio: (id, edge, t, opts) =>
+      mutate((d) => {
+        const a = d.tracks.audio.find((x) => x.id === id);
+        if (!a) return;
+        if (edge === "start") {
+          const newStart = Math.min(Math.max(0, t), a.end - MIN_CLIP_DURATION);
+          const delta = newStart - a.start;
+          a.trimIn = Math.max(0, a.trimIn + delta);
+          a.start = newStart;
+        } else {
+          const maxEnd = a.start + (a.trimOut - a.trimIn);
+          a.end = Math.min(Math.max(a.start + MIN_CLIP_DURATION, t), maxEnd);
+        }
+      }, opts),
+
+    updateAudio: (id, patch, opts) =>
+      mutate((d) => {
+        const a = d.tracks.audio.find((x) => x.id === id);
+        if (a) Object.assign(a, patch);
+      }, opts),
+
     moveOverlay: (kind, id, newStart, opts) =>
       mutate((d) => {
-        const o = d.tracks[kind].find((x) => x.id === id);
+        const o = (d.tracks[kind] as Array<{ id: string; start: number; end: number }>).find((x) => x.id === id);
         if (!o) return;
         const dur = o.end - o.start;
         o.start = Math.max(0, newStart);

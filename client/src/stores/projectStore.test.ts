@@ -148,3 +148,33 @@ describe("historial", () => {
     expect(useUiStore.getState().selection?.id).toBe(id);
   });
 });
+
+describe("pista de música", () => {
+  it("addAudio añade la pista y trimAudio por la izquierda avanza trimIn", () => {
+    const s = useProjectStore.getState();
+    const id = s.addAudio("a1", "a1.mp3", 0, 30);
+    s.trimAudio(id, "start", 5);
+    const a = useProjectStore.getState().project.tracks.audio[0];
+    expect(a.start).toBe(5);
+    expect(a.trimIn).toBe(5);
+    expect(a.end).toBe(30);
+  });
+
+  it("trimAudio por la derecha no puede superar el material disponible", () => {
+    const s = useProjectStore.getState();
+    const id = s.addAudio("a1", "a1.mp3", 0, 10);
+    s.trimAudio(id, "end", 8);
+    expect(useProjectStore.getState().project.tracks.audio[0].end).toBe(8);
+    s.trimAudio(id, "end", 99);
+    expect(useProjectStore.getState().project.tracks.audio[0].end).toBe(10);
+  });
+
+  it("moveOverlay funciona con audio y removeElement la elimina", () => {
+    const s = useProjectStore.getState();
+    const id = s.addAudio("a1", "a1.mp3", 0, 10);
+    s.moveOverlay("audio", id, 4);
+    expect(useProjectStore.getState().project.tracks.audio[0].start).toBe(4);
+    s.removeElement("audio", id);
+    expect(useProjectStore.getState().project.tracks.audio).toHaveLength(0);
+  });
+});

@@ -153,6 +153,24 @@ export function createImageOverlay(
   };
 }
 
+export function createAudioTrack(
+  assetId: string,
+  fileName: string,
+  start: number,
+  duration: number,
+): AudioTrack {
+  return {
+    id: globalThis.crypto.randomUUID(),
+    assetId,
+    fileName,
+    volume: 0.8,
+    start,
+    end: start + duration,
+    trimIn: 0,
+    trimOut: duration,
+  };
+}
+
 export function createVideoClip(
   clipId: string,
   timelineStart: number,

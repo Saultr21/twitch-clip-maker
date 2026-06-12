@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { ElementKind } from "./projectStore";
 
-export type Tool = "media" | "text" | "image";
+export type Tool = "media" | "text" | "image" | "audio";
 
 export interface Selection {
   kind: ElementKind;

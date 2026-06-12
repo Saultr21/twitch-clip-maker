@@ -29,6 +29,7 @@ export function Timeline({ height }: { height: number }) {
   const moveOverlay = useProjectStore((s) => s.moveOverlay);
   const trimVideoClip = useProjectStore((s) => s.trimVideoClip);
   const trimOverlay = useProjectStore((s) => s.trimOverlay);
+  const trimAudio = useProjectStore((s) => s.trimAudio);
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
@@ -67,9 +68,19 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-amber-500/20 text-amber-200",
   }));
 
-  // Texto e imagen pueden solaparse en el tiempo: carriles automáticos
+  const audioBlocks: BlockDescriptor[] = project.tracks.audio.map((a) => ({
+    id: a.id,
+    kind: "audio" as const,
+    start: a.start,
+    end: a.end,
+    label: a.fileName,
+    color: "bg-sky-500/20 text-sky-200",
+  }));
+
+  // Texto, imagen y audio pueden solaparse en el tiempo: carriles automáticos
   const textLanes = assignLanes(textBlocks);
   const imageLanes = assignLanes(imageBlocks);
+  const audioLanes = assignLanes(audioBlocks);
 
   return (
     <footer className="bg-surface border-t border-border flex flex-col shrink-0" style={{ height }}>
@@ -140,6 +151,15 @@ export function Timeline({ height }: { height: number }) {
             laneCount={imageLanes.count}
             onMove={(id, t, transient) => moveOverlay("image", id, t, { transient })}
             onTrim={(id, edge, t, transient) => trimOverlay("image", id, edge, t, { transient })}
+          />
+          <TrackRow
+            title="Música"
+            blocks={audioBlocks}
+            pxPerSecond={pxPerSecond}
+            lanes={audioLanes.lanes}
+            laneCount={audioLanes.count}
+            onMove={(id, t, transient) => moveOverlay("audio", id, t, { transient })}
+            onTrim={(id, edge, t, transient) => trimAudio(id, edge, t, { transient })}
           />
           <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>

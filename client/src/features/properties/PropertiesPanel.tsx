@@ -228,6 +228,24 @@ function VideoProperties({ clipId }: { clipId: string }) {
   );
 }
 
+function AudioProperties({ trackId }: { trackId: string }) {
+  const updateAudio = useProjectStore((s) => s.updateAudio);
+  const track = useProjectStore((s) => s.project.tracks.audio.find((a) => a.id === trackId));
+  if (!track) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-[11px] text-muted truncate" title={track.fileName}>🎵 {track.fileName}</p>
+      <Field label={`Volumen · ${Math.round(track.volume * 100)}%`} htmlFor="prop-audio-vol">
+        <Slider id="prop-audio-vol" min={0} max={1} step={0.01} value={track.volume} onChange={(v) => updateAudio(track.id, { volume: v })} />
+      </Field>
+      <p className="text-[10px] text-muted">
+        Entrada en el archivo: {track.trimIn.toFixed(1)}s (arrastra el borde izquierdo del bloque)
+      </p>
+    </div>
+  );
+}
+
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
   const text = useProjectStore((s) =>
@@ -251,6 +269,7 @@ export function PropertiesPanel() {
       {text && <TextProperties overlay={text} />}
       {image && <ImageProperties overlay={image} />}
       {selection?.kind === "video" && <VideoProperties clipId={selection.id} />}
+      {selection?.kind === "audio" && <AudioProperties trackId={selection.id} />}
     </aside>
   );
 }

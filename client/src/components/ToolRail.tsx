@@ -1,13 +1,14 @@
 import { useProjectStore } from "../stores/projectStore";
 import { useUiStore, type Tool } from "../stores/uiStore";
+import { videoClipAt } from "../lib/timeline";
 
 const TOOLS: Array<{ id: string; icon: string; label: string; enabled: boolean }> = [
   { id: "media", icon: "🎬", label: "Medios", enabled: true },
   { id: "text", icon: "📝", label: "Texto", enabled: true },
   { id: "image", icon: "🖼️", label: "Imagen", enabled: true },
-  { id: "audio", icon: "🎵", label: "Audio", enabled: false },
-  { id: "filters", icon: "🎨", label: "Filtros", enabled: false },
-  { id: "speed", icon: "⚡", label: "Velocidad", enabled: false },
+  { id: "audio", icon: "🎵", label: "Audio", enabled: true },
+  { id: "filters", icon: "🎨", label: "Filtros", enabled: true },
+  { id: "speed", icon: "⚡", label: "Velocidad", enabled: true },
 ];
 
 export function ToolRail() {
@@ -16,10 +17,18 @@ export function ToolRail() {
 
   const onTool = (id: string) => {
     if (id === "text") {
-      // Texto: acción directa — crea un overlay en el playhead y lo selecciona
       const playhead = useUiStore.getState().playhead;
       const newId = useProjectStore.getState().addText(playhead);
       useUiStore.getState().select({ kind: "text", id: newId });
+      return;
+    }
+    if (id === "filters" || id === "speed") {
+      // acción directa: selecciona el clip bajo el playhead (sus sliders
+      // están en el panel de propiedades)
+      const { project } = useProjectStore.getState();
+      const playhead = useUiStore.getState().playhead;
+      const clip = videoClipAt(project.tracks.video, playhead) ?? project.tracks.video[0];
+      if (clip) useUiStore.getState().select({ kind: "video", id: clip.id });
       return;
     }
     setActiveTool(id as Tool);
@@ -35,7 +44,7 @@ export function ToolRail() {
           key={tool.id}
           type="button"
           disabled={!tool.enabled}
-          aria-pressed={tool.enabled && tool.id !== "text" ? tool.id === activeTool : undefined}
+          aria-pressed={tool.enabled && tool.id !== "text" && tool.id !== "filters" && tool.id !== "speed" ? tool.id === activeTool : undefined}
           title={tool.enabled ? tool.label : `${tool.label} — próximos hitos`}
           onClick={() => onTool(tool.id)}
           className={`w-12 rounded-lg py-1.5 text-center text-[10px] disabled:opacity-40 ${

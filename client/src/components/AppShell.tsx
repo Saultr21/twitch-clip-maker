@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { AudioPanel } from "../features/audio/AudioPanel";
 import { ImagePanel } from "../features/image/ImagePanel";
 import { MediaPanel } from "../features/media/MediaPanel";
 import { PlaybackProvider, PreviewArea, usePlayback } from "../features/preview/PreviewArea";
@@ -40,6 +41,7 @@ export function AppShell() {
             <div className="flex shrink-0" style={{ width: toolPanelWidth }}>
               {activeTool === "media" && <MediaPanel />}
               {activeTool === "image" && <ImagePanel />}
+              {activeTool === "audio" && <AudioPanel />}
             </div>
             <ResizeHandle
               orientation="vertical"

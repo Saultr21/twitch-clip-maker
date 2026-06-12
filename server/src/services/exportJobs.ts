@@ -13,7 +13,9 @@ const TIME_RE = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/;
 
 /** Segundos transcurridos según una línea de progreso de FFmpeg, o null. */
 export function parseFfmpegTime(line: string): number | null {
-  const m = TIME_RE.exec(line);
+  // Un chunk de stderr puede traer varias líneas de progreso: vale la última
+  const matches = [...line.matchAll(new RegExp(TIME_RE, "g"))];
+  const m = matches.at(-1);
   if (!m) return null;
   return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
 }
@@ -106,8 +108,11 @@ export function cancelExport(jobId: string): boolean {
   const job = jobs.get(jobId);
   if (!job || job.state !== "running") return false;
   job.state = "cancelled";
+  const outPath = path.join(EXPORTS_DIR, job.fileName);
   job.proc?.kill();
-  fs.rmSync(path.join(EXPORTS_DIR, job.fileName), { force: true });
+  // El parcial se borra cuando el proceso suelta el lock del archivo
+  // (en Windows un rmSync inmediato fallaría en silencio con force:true)
+  void job.proc?.then(() => fs.rmSync(outPath, { force: true })).catch(() => {});
   notify(job);
   return true;
 }

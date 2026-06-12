@@ -12,6 +12,10 @@ describe("parseFfmpegTime", () => {
     expect(parseFfmpegTime("time=01:02:03.25")).toBe(3723.25);
   });
 
+  it("con varias líneas en el mismo chunk se queda con el último time=", () => {
+    expect(parseFfmpegTime("time=00:00:01.00 ...\ntime=00:00:02.50 ...")).toBe(2.5);
+  });
+
   it("devuelve null si la línea no tiene time=", () => {
     expect(parseFfmpegTime("Stream mapping:")).toBeNull();
     expect(parseFfmpegTime("")).toBeNull();

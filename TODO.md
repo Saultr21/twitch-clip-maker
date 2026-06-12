@@ -2,20 +2,20 @@
 
 > Last updated: 2026-06-12
 > Current phase: development
-> Overall progress: Hitos 1 y 2 completos y fusionados — Hito 3 pendiente de plan
+> Overall progress: Hitos 1, 2 y 3 completos en master — Hito 4 pendiente de plan
 
 ## In Progress
-- (nada — Hito 2 cerrado)
+- (nada — Hito 3 cerrado, pendiente smoke test del usuario)
 
 ## Up Next
-- Planificación del Hito 3 (writing-plans) — exportación con FFmpeg
-- A partir de ahora se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
+- Smoke test del usuario del export (paridad visual preview ↔ MP4)
+- Planificación del Hito 4 (writing-plans)
+- Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
 
 ## Backlog (hitos pendientes de plan)
-- [ ] `TASK-003` — Hito 3: exportación (builder filter_complex con TDD, jobs FFmpeg, progreso SSE, presets de calidad; API /api/fonts con TTF para paridad drawtext)
-  - Depends on: TASK-002
-- [ ] `TASK-004` — Hito 4: presets de plantilla, filtros de color, velocidad por tramos, zoom/pan, música de fondo, pulido y accesibilidad final
+- [ ] `TASK-004` — Hito 4: presets de plantilla, filtros de color, velocidad por tramos, música de fondo, pulido y accesibilidad final
   - Depends on: TASK-003
+  - Incluir: rotación de TEXTOS en el export (limitación de drawtext en H3; los textos rotados se exportan sin rotación), pista de Música en timeline + amix
 
 ## Discovered / Backlog (mejoras menores del review final, para Hito 2)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)
@@ -26,6 +26,13 @@
   - Origin: revisión final Hito 1 | Priority: low
 
 ## Completed
+- [x] `TASK-003` — Hito 3: exportación con FFmpeg (2026-06-12)
+  - Directo en master (commits 33d6ba1..3ef976d aprox.)
+  - Plan: `docs/superpowers/plans/2026-06-12-hito-3-exportacion.md` (9/9 tareas, doble revisión por tarea)
+  - Builder de filter_complex con TDD (geometría contain+zoom par a la preview, multi-clip, huecos en negro, audio normalizado a 44.1kHz para el concat, cola final para overlays, drawtext con expansion=none y apóstrofo seguro, imágenes con rotación/opacidad)
+  - Jobs en memoria con progreso por stderr (último time= del chunk), SSE con guard de doble cierre, cancelación que espera el lock del archivo
+  - UI: diálogo modal con portal, foco atrapado (WCAG 2.4.3), presets TikTok/YouTube/CRF, abrir carpeta
+  - Verificado e2e con Playwright + ffprobe: MP4 1080x1920 de 32.04s exportado desde la UI, sin errores de consola
 - [x] `TASK-002` — Hito 2: editor con timeline, overlays y proyectos (2026-06-12)
   - Fusionado en master (PR #2, https://github.com/Saultr21/twitch-clip-maker/pull/2)
   - Plan: `docs/superpowers/plans/2026-06-10-hito-2-editor.md` (15/15 tareas, doble revisión por tarea + a11y 5/5 + revisión final)

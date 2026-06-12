@@ -87,6 +87,36 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.totalDuration).toBe(2);
   });
 
+  it("los filtros de color generan eq y hue tras el scale", () => {
+    const p = createEmptyProject("demo");
+    p.tracks.video.push({
+      ...createVideoClip("clip-1", 0, 10),
+      trimOut: 4,
+      filters: { brightness: 0.2, contrast: 1.3, saturation: 1.5, hue: 30, grayscale: 0 },
+    });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("eq=brightness=0.2:contrast=1.3:saturation=1.5");
+    expect(g.filterComplex).toContain("hue=h=30");
+  });
+
+  it("el blanco y negro reduce la saturación efectiva", () => {
+    const p = createEmptyProject("demo");
+    p.tracks.video.push({
+      ...createVideoClip("clip-1", 0, 10),
+      trimOut: 4,
+      filters: { brightness: 0, contrast: 1, saturation: 2, hue: 0, grayscale: 0.5 },
+    });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("eq=brightness=0:contrast=1:saturation=1"); // 2·(1−0.5)
+    expect(g.filterComplex).not.toContain("hue=h=");
+  });
+
+  it("con filtros neutros no se emite eq ni hue", () => {
+    const g = buildFilterGraph(projectWithClip(), new Map([["clip-1", info]]));
+    expect(g.filterComplex).not.toContain("eq=");
+    expect(g.filterComplex).not.toContain("hue=h=");
+  });
+
   it("lanza si el proyecto no tiene clips de vídeo", () => {
     expect(() => buildFilterGraph(createEmptyProject("x"), new Map())).toThrow(
       "El proyecto no tiene clips",

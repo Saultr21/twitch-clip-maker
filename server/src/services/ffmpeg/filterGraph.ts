@@ -24,10 +24,23 @@ function num(n: number): string {
   return String(Math.round(n * 1000) / 1000);
 }
 
+/** Filtros eq/hue del clip; array vacío si todo es neutro. */
+function colorFilters(c: VideoClip): string[] {
+  const f = c.filters;
+  const sat = f.saturation * (1 - f.grayscale);
+  const out: string[] = [];
+  // Emitir eq si alguno de los parámetros no es neutro
+  if (f.brightness !== 0 || f.contrast !== 1 || f.saturation !== 1 || f.grayscale !== 0) {
+    out.push(`eq=brightness=${num(f.brightness)}:contrast=${num(f.contrast)}:saturation=${num(sat)}`);
+  }
+  if (f.hue !== 0) out.push(`hue=h=${num(f.hue)}`);
+  return out;
+}
+
 /**
  * Construye el filter_complex completo del proyecto: segmentos de clip sobre
  * fondo negro + huecos en negro/silencio, concat, overlays de imagen y textos.
- * La velocidad y los filtros de color del modelo se ignoran (Hito 4).
+ * Aplica velocidad (setpts/atempo) y filtros de color (eq/hue) por clip.
  */
 export function buildFilterGraph(
   project: Project,
@@ -61,9 +74,13 @@ export function buildFilterGraph(
     const dur = (clip.trimOut - clip.trimIn) / clip.speed;
     const setpts =
       clip.speed === 1 ? "setpts=PTS-STARTPTS" : `setpts=(PTS-STARTPTS)/${num(clip.speed)}`;
-    filters.push(
-      `[${inputIdx}:v]trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},${setpts},scale=${rect.w}:${rect.h}[cv${segIdx}]`,
-    );
+    const videoChain = [
+      `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+      setpts,
+      `scale=${rect.w}:${rect.h}`,
+      ...colorFilters(clip),
+    ];
+    filters.push(`[${inputIdx}:v]${videoChain.join(",")}[cv${segIdx}]`);
     filters.push(`color=black:s=${W}x${H}:d=${num(dur)}:r=${fps}[bg${segIdx}]`);
     filters.push(`[bg${segIdx}][cv${segIdx}]overlay=x=${rect.left}:y=${rect.top}:shortest=1[seg${segIdx}]`);
     const audioChain = [

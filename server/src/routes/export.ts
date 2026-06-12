@@ -62,9 +62,11 @@ export function exportRoutes(app: FastifyInstance): void {
     return reply.code(204).send();
   });
 
-  // Abre la carpeta de exports en el Explorador (app local de un solo usuario)
+  // Abre la carpeta de exports en el Explorador (app local de un solo usuario).
+  // Vía cmd/start (ShellExecute): explorer.exe invocado directo desde un
+  // proceso en segundo plano no siempre llega a abrir la ventana
   app.post("/api/exports/open", async () => {
-    void execa("explorer.exe", [EXPORTS_DIR]).catch(() => {});
+    void execa("cmd", ["/c", "start", "", EXPORTS_DIR]).catch(() => {});
     return { opened: true };
   });
 }

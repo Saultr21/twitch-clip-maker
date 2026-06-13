@@ -26,20 +26,44 @@ function Field({ label, htmlFor, children }: { label: string; htmlFor: string; c
   );
 }
 
+/** Decimales a mostrar en el campo numérico según el paso del slider. */
+function decimalsFor(step: number): number {
+  if (step >= 1) return 0;
+  const s = String(step);
+  return s.includes(".") ? s.split(".")[1].length : 0;
+}
+
 function Slider({ id, min, max, step, value, onChange }: {
   id: string; min: number; max: number; step: number; value: number; onChange: (v: number) => void;
 }) {
+  const clamp = (v: number) => Math.min(max, Math.max(min, v));
   return (
-    <input
-      id={id}
-      type="range"
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={(e) => onChange(parseFloat(e.target.value))}
-      className="accent-accent h-1.5"
-    />
+    <div className="flex items-center gap-2">
+      <input
+        id={id}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="accent-accent h-1.5 flex-1 min-w-0"
+      />
+      <input
+        type="number"
+        min={min}
+        max={max}
+        step={step}
+        // valor exacto editable a mano; se redondea al paso al confirmar
+        value={Number(value.toFixed(decimalsFor(step)))}
+        aria-label="Valor exacto"
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          if (!Number.isNaN(v)) onChange(clamp(v));
+        }}
+        className="w-14 shrink-0 bg-surface-2 border border-border-2 rounded-md px-1.5 py-0.5 text-[11px] text-right focus:outline-none focus:border-accent"
+      />
+    </div>
   );
 }
 

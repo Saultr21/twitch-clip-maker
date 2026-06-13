@@ -53,12 +53,24 @@ export async function ensureWhisper(): Promise<void> {
       // bsdtar (Windows 10+) extrae zip; -C destino
       await execa("tar", ["-xf", zip, "-C", WHISPER_DIR]);
       fs.rmSync(zip, { force: true });
-      // algunos releases anidan en subcarpeta o llaman al exe "main.exe":
-      // localizar el ejecutable y normalizar a whisper-cli.exe
+      // El release anida el exe en Release/ junto a sus DLLs (whisper.dll,
+      // ggml.dll, …). Hay que dejar el exe Y sus DLLs juntos en WHISPER_DIR,
+      // porque Windows resuelve las DLLs en el directorio del ejecutable.
       if (!fs.existsSync(whisperExe)) {
         const found = findExe(WHISPER_DIR);
         if (!found) throw new Error("No se encontró el ejecutable de whisper en el zip");
-        fs.copyFileSync(found, whisperExe);
+        const srcDir = path.dirname(found);
+        if (srcDir !== WHISPER_DIR) {
+          for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+            if (entry.isFile()) {
+              fs.copyFileSync(path.join(srcDir, entry.name), path.join(WHISPER_DIR, entry.name));
+            }
+          }
+        }
+        // si el exe encontrado se llamaba main.exe, normalizar el nombre
+        if (!fs.existsSync(whisperExe)) {
+          fs.copyFileSync(path.join(WHISPER_DIR, path.basename(found)), whisperExe);
+        }
       }
     }
     if (!fs.existsSync(whisperModel)) {

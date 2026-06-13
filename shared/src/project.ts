@@ -9,11 +9,22 @@ export const ASPECT_PRESETS = {
 
 const norm = z.number().min(0).max(1);
 
+// Fondo que rellena las zonas que el vídeo no cubre (letterbox):
+// negro (defecto), color sólido o copia desenfocada del propio vídeo
+export const backgroundSchema = z
+  .object({
+    type: z.enum(["black", "color", "blur"]),
+    color: z.string().regex(/^#[0-9a-f]{6}$/i),
+    blur: norm, // intensidad del desenfoque (0–1)
+  })
+  .default({ type: "black", color: "#000000", blur: 0.5 });
+
 export const projectSettingsSchema = z.object({
   aspect: z.enum(["9:16", "16:9", "1:1", "4:5", "custom"]),
   width: z.number().int().min(16).max(7680),
   height: z.number().int().min(16).max(7680),
   fps: z.number().int().min(1).max(120),
+  background: backgroundSchema,
 });
 
 export const videoClipSchema = z
@@ -94,6 +105,7 @@ export const projectSchema = z.object({
   originalAudioVolume: norm,
 });
 
+export type Background = z.infer<typeof backgroundSchema>;
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
 export type VideoClip = z.infer<typeof videoClipSchema>;
 export type TextOverlay = z.infer<typeof textOverlaySchema>;
@@ -106,7 +118,12 @@ export function createEmptyProject(name: string): Project {
     id: globalThis.crypto.randomUUID(),
     name,
     version: 1,
-    settings: { aspect: "9:16", ...ASPECT_PRESETS["9:16"], fps: 30 },
+    settings: {
+      aspect: "9:16",
+      ...ASPECT_PRESETS["9:16"],
+      fps: 30,
+      background: { type: "black", color: "#000000", blur: 0.5 },
+    },
     tracks: { video: [], text: [], image: [], audio: [] },
     originalAudioVolume: 1,
   };

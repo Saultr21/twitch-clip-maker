@@ -11,9 +11,21 @@ describe("createEmptyProject", () => {
   it("crea un proyecto 9:16 válido según el esquema", () => {
     const p = createEmptyProject("mi proyecto");
     expect(p.name).toBe("mi proyecto");
-    expect(p.settings).toEqual({ aspect: "9:16", width: 1080, height: 1920, fps: 30 });
+    expect(p.settings.aspect).toBe("9:16");
+    expect(p.settings.width).toBe(1080);
+    expect(p.settings.height).toBe(1920);
+    expect(p.settings.fps).toBe(30);
+    expect(p.settings.background.type).toBe("black");
     expect(p.tracks).toEqual({ video: [], text: [], image: [], audio: [] });
     expect(projectSchema.safeParse(p).success).toBe(true);
+  });
+
+  it("un proyecto guardado sin background sigue validando (background por defecto)", () => {
+    const p = createEmptyProject("x") as { settings: Record<string, unknown> };
+    delete p.settings.background;
+    const parsed = projectSchema.safeParse(p);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) expect(parsed.data.settings.background.type).toBe("black");
   });
 });
 

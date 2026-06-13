@@ -82,6 +82,36 @@ describe("parseWhisperJson", () => {
     expect(cues[0].words[0].text).toBe("Hola"); // sin el guion de cambio de turno
   });
 
+  it("ancla los tiempos al offset del segmento cuando los tokens son relativos (VAD/DTW)", () => {
+    // con VAD los offsets de token empiezan en 0 aunque la voz esté a 9.76s;
+    // el offset del segmento sí es el tiempo real
+    const vad = {
+      transcription: [
+        {
+          offsets: { from: 9760, to: 13330 },
+          text: " Only one moment.",
+          tokens: [
+            { text: "[_BEG_]", offsets: { from: 0, to: 0 } },
+            { text: " Only", offsets: { from: 0, to: 370 } },
+            { text: " one", offsets: { from: 370, to: 650 } },
+            { text: " moment", offsets: { from: 650, to: 1210 } },
+          ],
+        },
+      ],
+    };
+    const cues = parseWhisperJson(JSON.stringify(vad));
+    expect(cues).toHaveLength(1);
+    const w = cues[0].words;
+    // la 1.ª palabra se ancla a 9.76s (no a 0) y se conservan las duraciones
+    expect(w[0].text).toBe("Only");
+    expect(w[0].start).toBeCloseTo(9.76, 5);
+    expect(w[0].end).toBeCloseTo(10.13, 5);
+    expect(w[1].text).toBe("one");
+    expect(w[1].start).toBeCloseTo(10.13, 5);
+    expect(w[2].text).toBe("moment");
+    expect(w[2].end).toBeCloseTo(10.97, 5);
+  });
+
   it("lanza con JSON inválido", () => {
     expect(() => parseWhisperJson("{no json")).toThrow();
   });

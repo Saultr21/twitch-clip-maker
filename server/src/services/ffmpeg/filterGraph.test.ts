@@ -88,6 +88,29 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.filterComplex).toContain("[fg0]scale=1080:608[cv0]");
   });
 
+  it("fondo de imagen: input en bucle, split por segmento y escala a cover", () => {
+    const p = projectWithClip();
+    p.settings.background = { type: "image", color: "#000000", blur: 0.5, fileName: "fondo.png" };
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    // la imagen de fondo es un input en bucle
+    expect(g.inputs[0]).toEqual({ kind: "image", fileName: "fondo.png", loop: true });
+    // el clip ahora es el input 1
+    expect(g.filterComplex).toContain("[1:v]trim=start=2:end=7");
+    expect(g.filterComplex).toContain("[0:v]split=1[ibsrc0]");
+    expect(g.filterComplex).toContain(
+      "[ibsrc0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,trim=duration=5,setpts=PTS-STARTPTS,format=yuv420p[bg0]",
+    );
+    expect(g.filterComplex).toContain("[bg0][cv0]overlay=x=0:y=656:shortest=1[seg0]");
+  });
+
+  it("fondo de imagen sin fileName cae a fondo negro", () => {
+    const p = projectWithClip();
+    p.settings.background = { type: "image", color: "#000000", blur: 0.5 };
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("color=black:s=1080x1920:d=5:r=30[bg0]");
+    expect(g.filterComplex).not.toContain("split");
+  });
+
   it("el volumen del audio original se aplica a cada clip", () => {
     const p = projectWithClip();
     p.originalAudioVolume = 0.35;

@@ -30,6 +30,7 @@ export function buildFfmpegArgs(
   const args: string[] = ["-y"];
   for (const input of graph.inputs) {
     const dir = input.kind === "video" ? dirs.videoDir : dirs.imageDir; // imagen y audio viven en assets
+    if (input.loop) args.push("-loop", "1"); // imagen de fondo en bucle
     args.push("-i", path.join(dir, input.fileName).replaceAll("\\", "/"));
   }
   args.push(

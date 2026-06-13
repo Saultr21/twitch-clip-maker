@@ -6,6 +6,7 @@ import { atempoChain } from "./speed.js";
 export interface GraphInput {
   kind: "video" | "image" | "audio";
   fileName: string;
+  loop?: boolean; // imagen de fondo decodificada en bucle
 }
 
 export interface FilterGraph {
@@ -67,9 +68,24 @@ export function buildFilterGraph(
   let segIdx = 0;
   let cursor = 0;
 
+  // Fondo de imagen: una sola decodificación en bucle, dividida luego en una
+  // copia (escalada a cover) por cada segmento que la necesita
+  const bgImage = bg.type === "image" && bg.fileName ? bg.fileName : null;
+  let bgImageInputIdx = -1;
+  const bgImageBranches: { label: string; dur: number }[] = [];
+  if (bgImage) {
+    bgImageInputIdx = inputs.length;
+    inputs.push({ kind: "image", fileName: bgImage, loop: true });
+  }
+
   const pushGap = (duration: number) => {
-    // En los huecos no hay vídeo: el fondo blur cae a negro/color
-    filters.push(solidBackground(bg, W, H, duration, fps, `seg${segIdx}`));
+    if (bgImage) {
+      // el hueco ES el fondo de imagen (escalado a cover, esa duración)
+      bgImageBranches.push({ label: `seg${segIdx}`, dur: duration });
+    } else {
+      // sin vídeo el fondo blur cae a negro/color
+      filters.push(solidBackground(bg, W, H, duration, fps, `seg${segIdx}`));
+    }
     filters.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${num(duration)}[sega${segIdx}]`);
     segLabels.push(`[seg${segIdx}][sega${segIdx}]`);
     segIdx++;
@@ -97,6 +113,9 @@ export function buildFilterGraph(
         `[bgsrc${segIdx}]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},boxblur=${blurRadius(bg)}:1[bg${segIdx}]`,
       );
       filters.push(`[fg${segIdx}]${fgScale}[cv${segIdx}]`);
+    } else if (bgImage) {
+      filters.push(`[${inputIdx}:v]${trimSetpts},${fgScale}[cv${segIdx}]`);
+      bgImageBranches.push({ label: `bg${segIdx}`, dur }); // el fondo viene del split de la imagen
     } else {
       filters.push(`[${inputIdx}:v]${trimSetpts},${fgScale}[cv${segIdx}]`);
       filters.push(solidBackground(bg, W, H, dur, fps, `bg${segIdx}`));
@@ -124,6 +143,18 @@ export function buildFilterGraph(
   ];
   const totalDuration = Math.max(cursor, ...(overlayEnds.length ? overlayEnds : [0]));
   if (totalDuration > cursor + 0.001) pushGap(totalDuration - cursor);
+
+  // Fondo de imagen: una decodificación en bucle dividida en una copia por
+  // segmento, cada una escalada a cover y recortada a su duración
+  if (bgImage && bgImageBranches.length > 0) {
+    const outs = bgImageBranches.map((_, i) => `[ibsrc${i}]`).join("");
+    filters.push(`[${bgImageInputIdx}:v]split=${bgImageBranches.length}${outs}`);
+    bgImageBranches.forEach((b, i) => {
+      filters.push(
+        `[ibsrc${i}]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},fps=${fps},trim=duration=${num(b.dur)},setpts=PTS-STARTPTS,format=yuv420p[${b.label}]`,
+      );
+    });
+  }
 
   filters.push(`${segLabels.join("")}concat=n=${segLabels.length}:v=1:a=1[vcat][acat]`);
   let videoLabel = "[vcat]";

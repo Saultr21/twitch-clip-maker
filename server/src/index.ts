@@ -11,6 +11,7 @@ import { exportRoutes } from "./routes/export.js";
 import { presetRoutes } from "./routes/presets.js";
 import { watermarkRoutes } from "./routes/watermarks.js";
 import { subtitleRoutes } from "./routes/subtitles.js";
+import { waveformRoutes } from "./routes/waveform.js";
 
 ensureDataDirs();
 
@@ -41,6 +42,7 @@ exportRoutes(app);
 presetRoutes(app);
 watermarkRoutes(app);
 subtitleRoutes(app);
+waveformRoutes(app);
 
 await app.listen({ port: 3001, host: "127.0.0.1" });
 

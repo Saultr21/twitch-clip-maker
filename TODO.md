@@ -8,8 +8,16 @@
 - (nada — proyecto funcional de punta a punta + todas las mejoras de Pendiente.txt hechas; pendiente smoke test del usuario de los subtítulos)
 
 ## Up Next
-- Smoke test del usuario de los subtítulos (transcribir, karaoke en preview, editar, exportar)
+- Smoke test del usuario del export por GPU (NVENC) y del waveform en uso real
 - Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
+
+## Mejoras de rendimiento y robustez (2026-06-13, sesión extra) — hechas
+- [x] Aceleración GPU de subtítulos: whisper.cpp CUDA (cuBLAS) con autodetección NVIDIA y fallback CPU, multihilo + flash attention, warmup PTX-JIT en setup; selector de modelo small/medium
+- [x] Export por GPU NVENC (h264_nvenc) con fallback transparente a CPU; ~8,6x más rápido medido en RTX 5070 Ti
+- [x] Karaoke en tiempo real: playhead avanza por rAF leyendo video.currentTime (60fps) en vez del evento timeupdate (~4/s)
+- [x] Waveform de audio en los carriles Vídeo y Música (endpoint con picos cacheados en data/waveforms + render canvas)
+- [x] Restauración de sesión al arrancar (último proyecto en localStorage) + flush en visibilitychange y aviso beforeunload
+- [x] Renombrar proyecto mueve el archivo (previousName) en vez de dejar un .json huérfano
 
 ## Mejoras de Pendiente.txt (post-Hito 4) — TODAS hechas
 - [x] Sliders con campo numérico editable a mano (2026-06-13)
@@ -27,6 +35,15 @@
 - [ ] Sustituir `res.body!` por guard en `clipsStore.ts`
 - [ ] Validar con Zod la respuesta de `/api/presets/:name` en el cliente antes de `applyPreset`
 - [ ] Jobs de export en memoria sin poda (crecen por sesión; aceptable en local)
+- [ ] Poda de la caché de waveforms (`data/waveforms`) cuando se borran clips/assets
+
+## Ideas de producto no empezadas (sin compromiso)
+- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16)
+- [ ] Eliminar silencios / cortes automáticos por audio
+- [ ] Audio ducking (bajar música cuando hay voz)
+- [ ] Estilos/animaciones de subtítulo (pop/bounce, caja, emojis, filtro de palabrotas)
+- [ ] Export extra: miniatura, GIF, cola de exports
+- [ ] Revisión de atajos de teclado y acciones de timeline (ripple delete, etc.)
 
 ## Completed
 - [x] `TASK-004` — Hito 4: filtros, velocidad, música, plantillas y pulido (2026-06-13)

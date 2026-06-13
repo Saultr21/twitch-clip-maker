@@ -10,12 +10,13 @@ export const ASPECT_PRESETS = {
 const norm = z.number().min(0).max(1);
 
 // Fondo que rellena las zonas que el vídeo no cubre (letterbox):
-// negro (defecto), color sólido o copia desenfocada del propio vídeo
+// negro (defecto), color sólido, copia desenfocada del propio vídeo o imagen
 export const backgroundSchema = z
   .object({
-    type: z.enum(["black", "color", "blur"]),
+    type: z.enum(["black", "color", "blur", "image"]),
     color: z.string().regex(/^#[0-9a-f]{6}$/i),
     blur: norm, // intensidad del desenfoque (0–1)
+    fileName: z.string().optional(), // imagen de fondo (en data/assets)
   })
   .default({ type: "black", color: "#000000", blur: 0.5 });
 

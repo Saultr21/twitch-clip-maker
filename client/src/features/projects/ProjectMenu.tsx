@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import type { Project } from "@clipforge/shared";
 import { createEmptyProject } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
@@ -87,9 +88,10 @@ export function ProjectMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
+        className="flex items-center gap-1 text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
       >
-        Proyectos ▾
+        Proyectos
+        <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
         <div
@@ -100,9 +102,10 @@ export function ProjectMenu() {
             type="button"
             role="menuitem"
             onClick={() => void createNew()}
-            className="text-left text-xs text-accent-soft px-2 py-1.5 rounded-md hover:bg-surface-3"
+            className="flex items-center gap-1.5 text-left text-xs text-accent-soft px-2 py-1.5 rounded-md hover:bg-surface-3"
           >
-            + Nuevo proyecto
+            <Plus size={14} aria-hidden="true" />
+            Nuevo proyecto
           </button>
           {error && <p role="alert" className="text-[11px] text-danger px-2">{error}</p>}
           {entries.length === 0 && !error && (
@@ -125,7 +128,7 @@ export function ProjectMenu() {
                 aria-label={`Borrar proyecto ${e.name}`}
                 className="text-muted hover:text-danger px-1.5"
               >
-                🗑
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             </div>
           ))}

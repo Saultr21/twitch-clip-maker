@@ -1,16 +1,20 @@
+import { Film, Type, Image, Music, Captions, SlidersHorizontal, type LucideIcon } from "lucide-react";
 import { useProjectStore } from "../stores/projectStore";
 import { useUiStore, type Tool } from "../stores/uiStore";
 import { videoClipAt } from "../lib/timeline";
 
-const TOOLS: Array<{ id: string; icon: string; label: string; enabled: boolean }> = [
-  { id: "media", icon: "🎬", label: "Medios", enabled: true },
-  { id: "text", icon: "📝", label: "Texto", enabled: true },
-  { id: "image", icon: "🖼️", label: "Imagen", enabled: true },
-  { id: "audio", icon: "🎵", label: "Audio", enabled: true },
-  { id: "subtitles", icon: "💬", label: "Subtítulos", enabled: true },
-  { id: "filters", icon: "🎨", label: "Filtros", enabled: true },
-  { id: "speed", icon: "⚡", label: "Velocidad", enabled: true },
+// "text" y "filters" son acciones (seleccionan un elemento), el resto abren panel.
+// "Velocidad" se quitó: su control vive en Propiedades junto a los filtros del clip.
+const TOOLS: Array<{ id: string; Icon: LucideIcon; label: string }> = [
+  { id: "media", Icon: Film, label: "Medios" },
+  { id: "text", Icon: Type, label: "Texto" },
+  { id: "image", Icon: Image, label: "Imagen" },
+  { id: "audio", Icon: Music, label: "Audio" },
+  { id: "subtitles", Icon: Captions, label: "Subtítulos" },
+  { id: "filters", Icon: SlidersHorizontal, label: "Filtros" },
 ];
+
+const PANEL_TOOLS = new Set(["media", "image", "audio", "subtitles"]);
 
 export function ToolRail() {
   const activeTool = useUiStore((s) => s.activeTool);
@@ -23,9 +27,9 @@ export function ToolRail() {
       useUiStore.getState().select({ kind: "text", id: newId });
       return;
     }
-    if (id === "filters" || id === "speed") {
-      // acción directa: selecciona el clip bajo el playhead (sus sliders
-      // están en el panel de propiedades)
+    if (id === "filters") {
+      // acción directa: selecciona el clip bajo el playhead (sus sliders de
+      // color y velocidad están en el panel de propiedades)
       const { project } = useProjectStore.getState();
       const playhead = useUiStore.getState().playhead;
       const clip = videoClipAt(project.tracks.video, playhead) ?? project.tracks.video[0];
@@ -40,22 +44,21 @@ export function ToolRail() {
       aria-label="Herramientas"
       className="w-16 bg-surface border-r border-border flex flex-col items-center gap-1 py-2"
     >
-      {TOOLS.map((tool) => (
+      {TOOLS.map(({ id, Icon, label }) => (
         <button
-          key={tool.id}
+          key={id}
           type="button"
-          disabled={!tool.enabled}
-          aria-pressed={tool.enabled && tool.id !== "text" && tool.id !== "filters" && tool.id !== "speed" ? activeTool === tool.id : undefined}
-          title={tool.enabled ? tool.label : `${tool.label} — próximos hitos`}
-          onClick={() => onTool(tool.id)}
-          className={`w-12 rounded-lg py-1.5 text-center text-[10px] disabled:opacity-40 ${
-            tool.id === activeTool
+          aria-pressed={PANEL_TOOLS.has(id) ? activeTool === id : undefined}
+          title={label}
+          onClick={() => onTool(id)}
+          className={`w-12 rounded-lg py-1.5 flex flex-col items-center gap-0.5 text-[10px] ${
+            id === activeTool
               ? "bg-accent/15 border border-accent text-accent-soft"
               : "text-muted hover:text-text"
           }`}
         >
-          <span className="block text-base" aria-hidden="true">{tool.icon}</span>
-          {tool.label}
+          <Icon size={18} strokeWidth={1.75} aria-hidden="true" />
+          {label}
         </button>
       ))}
     </nav>

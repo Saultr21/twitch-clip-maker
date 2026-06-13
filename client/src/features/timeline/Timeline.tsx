@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Scissors, Trash2 } from "lucide-react";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -37,6 +38,8 @@ export function Timeline({ height }: { height: number }) {
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
+  const hasSelection = useUiStore((s) => s.selection !== null);
+  const canSplit = project.tracks.video.length > 0;
 
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
@@ -109,15 +112,18 @@ export function Timeline({ height }: { height: number }) {
         <span className="text-[10px] text-muted">Línea de tiempo</span>
         <button
           type="button"
+          disabled={!canSplit}
           onClick={() => useProjectStore.getState().splitVideoAt(useUiStore.getState().playhead)}
           title="Dividir en el playhead (S)"
           aria-label="Dividir clip en el playhead"
-          className="text-muted hover:text-text text-xs px-1.5"
+          className="flex items-center gap-1 text-muted hover:text-text disabled:opacity-40 disabled:hover:text-muted text-xs px-1.5"
         >
-          ✂ Dividir
+          <Scissors size={14} aria-hidden="true" />
+          Dividir
         </button>
         <button
           type="button"
+          disabled={!hasSelection}
           onClick={() => {
             const sel = useUiStore.getState().selection;
             if (!sel) return;
@@ -126,9 +132,10 @@ export function Timeline({ height }: { height: number }) {
           }}
           title="Eliminar seleccionado (Supr)"
           aria-label="Eliminar elemento seleccionado"
-          className="text-muted hover:text-danger text-xs px-1.5"
+          className="flex items-center gap-1 text-muted hover:text-danger disabled:opacity-40 disabled:hover:text-muted text-xs px-1.5"
         >
-          🗑 Eliminar
+          <Trash2 size={14} aria-hidden="true" />
+          Eliminar
         </button>
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input

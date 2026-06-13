@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -104,7 +105,7 @@ export function SubtitlesPanel() {
                   aria-label="Texto de la frase"
                   className="flex-1 min-w-0 bg-surface-2 border border-border-2 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-accent"
                 />
-                <button type="button" onClick={() => removeCue(c.id)} aria-label="Borrar frase" className="text-muted hover:text-danger px-1">🗑</button>
+                <button type="button" onClick={() => removeCue(c.id)} aria-label="Borrar frase" className="text-muted hover:text-danger px-1"><Trash2 size={14} aria-hidden="true" /></button>
               </li>
             ))}
           </ul>

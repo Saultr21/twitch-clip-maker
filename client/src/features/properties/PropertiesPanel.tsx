@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
+import { Music } from "lucide-react";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -356,7 +357,10 @@ function AudioProperties({ trackId }: { trackId: string }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-[11px] text-muted truncate" title={track.fileName}>🎵 {track.fileName}</p>
+      <p className="flex items-center gap-1.5 text-[11px] text-muted truncate" title={track.fileName}>
+        <Music size={14} aria-hidden="true" className="shrink-0" />
+        <span className="truncate">{track.fileName}</span>
+      </p>
       <Field label={`Volumen · ${Math.round(track.volume * 100)}%`} htmlFor="prop-audio-vol">
         <Slider id="prop-audio-vol" min={0} max={1} step={0.01} value={track.volume} onChange={(v) => updateAudio(track.id, { volume: v })} />
       </Field>

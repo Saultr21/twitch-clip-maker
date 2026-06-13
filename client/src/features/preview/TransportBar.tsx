@@ -1,4 +1,5 @@
 import { useEffect, type RefObject } from "react";
+import { SkipBack, StepBack, Play, Pause, StepForward, SkipForward, Repeat, Volume2 } from "lucide-react";
 import { formatTimecode } from "../../lib/time";
 import { projectDuration } from "../../lib/timeline";
 import { usePlayerStore } from "../../stores/playerStore";
@@ -51,19 +52,19 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
         className="w-full accent-accent h-1.5"
       />
       <div className="flex items-center justify-center gap-3">
-        <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}>⏮</button>
-        <button type="button" onClick={() => seek(playhead - frame)} aria-label="Fotograma anterior" className={controlClass}>◀|</button>
+        <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}><SkipBack size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => seek(playhead - frame)} aria-label="Fotograma anterior" className={controlClass}><StepBack size={16} aria-hidden="true" /></button>
         <button
           type="button"
           onClick={togglePlay}
           disabled={duration === 0}
           aria-label={playing ? "Pausar" : "Reproducir"}
-          className="w-9 h-9 rounded-full bg-accent text-white grid place-items-center text-sm hover:bg-accent-dark disabled:opacity-40"
+          className="w-9 h-9 rounded-full bg-accent text-white grid place-items-center hover:bg-accent-dark disabled:opacity-40"
         >
-          {playing ? "⏸" : "▶"}
+          {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
         </button>
-        <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}>|▶</button>
-        <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}>⏭</button>
+        <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}><StepForward size={16} aria-hidden="true" /></button>
+        <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}><SkipForward size={16} aria-hidden="true" /></button>
         <button
           type="button"
           onClick={() => setLoop(!loop)}
@@ -71,10 +72,10 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
           aria-label="Bucle"
           className={`${controlClass} ${loop ? "text-accent" : ""}`}
         >
-          🔁
+          <Repeat size={16} aria-hidden="true" />
         </button>
         <div className="flex items-center gap-1.5 ml-4">
-          <span aria-hidden="true" className="text-muted text-xs">🔊</span>
+          <Volume2 size={16} aria-hidden="true" className="text-muted" />
           <input
             type="range"
             min={0}

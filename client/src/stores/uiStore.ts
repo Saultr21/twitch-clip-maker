@@ -36,7 +36,7 @@ export const useUiStore = create<UiState>((set) => ({
   playing: false,
   pxPerSecond: 40,
   activeTool: "media",
-  timelineHeight: 176,
+  timelineHeight: 248, // suficiente para los 5 carriles base sin scroll interno
   toolPanelWidth: 224,
   propertiesWidth: 288,
   helpOpen: false,

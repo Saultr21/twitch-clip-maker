@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Undo2, Redo2, HelpCircle, Save, Download } from "lucide-react";
 import { useProjectStore } from "../stores/projectStore";
 import { useAutosave, saveNow } from "../features/projects/useAutosave";
 import { ProjectMenu } from "../features/projects/ProjectMenu";
@@ -41,9 +42,9 @@ export function TopBar() {
           disabled={!canUndo}
           aria-label="Deshacer (Ctrl+Z)"
           title="Deshacer (Ctrl+Z)"
-          className="text-muted hover:text-text disabled:opacity-40 px-1.5 text-sm"
+          className="text-muted hover:text-text disabled:opacity-40 px-1.5"
         >
-          ↩
+          <Undo2 size={16} aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -51,9 +52,9 @@ export function TopBar() {
           disabled={!canRedo}
           aria-label="Rehacer (Ctrl+Y)"
           title="Rehacer (Ctrl+Y)"
-          className="text-muted hover:text-text disabled:opacity-40 px-1.5 text-sm"
+          className="text-muted hover:text-text disabled:opacity-40 px-1.5"
         >
-          ↪
+          <Redo2 size={16} aria-hidden="true" />
         </button>
       </div>
       <div className="ml-auto flex items-center gap-2">
@@ -62,9 +63,9 @@ export function TopBar() {
           onClick={() => useUiStore.getState().setHelpOpen(true)}
           aria-label="Ayuda de atajos de teclado"
           title="Atajos de teclado (?)"
-          className="text-xs text-muted border border-border-2 rounded-full w-7 h-7 hover:text-text"
+          className="text-muted border border-border-2 rounded-full w-7 h-7 grid place-items-center hover:text-text"
         >
-          ?
+          <HelpCircle size={15} aria-hidden="true" />
         </button>
         <ProjectMenu />
         <TemplatesMenu />
@@ -72,16 +73,18 @@ export function TopBar() {
           type="button"
           onClick={() => void saveNow()}
           title="Guardar ahora (Ctrl+S)"
-          className="text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
+          className="flex items-center gap-1.5 text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
         >
+          <Save size={14} aria-hidden="true" />
           Guardar
         </button>
         <button
           type="button"
           onClick={() => setExportOpen(true)}
           title="Exportar vídeo"
-          className="text-xs font-semibold text-white rounded-full px-4 py-1.5 bg-gradient-to-r from-accent to-accent-dark"
+          className="flex items-center gap-1.5 text-xs font-semibold text-white rounded-full px-4 py-1.5 bg-gradient-to-r from-accent to-accent-dark"
         >
+          <Download size={14} aria-hidden="true" />
           Exportar
         </button>
       </div>

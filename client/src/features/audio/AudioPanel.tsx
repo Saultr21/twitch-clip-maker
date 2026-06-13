@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Music } from "lucide-react";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 
@@ -85,9 +86,10 @@ export function AudioPanel() {
             <button
               type="button"
               onClick={() => insert(a)}
-              className="w-full text-left bg-surface-2 rounded-md px-2 py-1.5 text-[11px] border border-transparent hover:border-accent truncate"
+              className="flex items-center gap-1.5 w-full text-left bg-surface-2 rounded-md px-2 py-1.5 text-[11px] border border-transparent hover:border-accent"
             >
-              🎵 {a.fileName}
+              <Music size={14} aria-hidden="true" className="shrink-0" />
+              <span className="truncate">{a.fileName}</span>
             </button>
           </li>
         ))}

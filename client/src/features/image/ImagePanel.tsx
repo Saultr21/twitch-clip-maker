@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Star, Trash2 } from "lucide-react";
 import type { Watermark } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -160,9 +161,10 @@ export function ImagePanel() {
       <button
         type="button"
         onClick={() => wmInputRef.current?.click()}
-        className="text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent"
+        className="flex items-center justify-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent"
       >
-        ★ Guardar marca de agua
+        <Star size={14} aria-hidden="true" />
+        Guardar marca de agua
       </button>
       <ul className="flex flex-col gap-1.5" aria-label="Marcas de agua guardadas">
         {watermarks.length === 0 && (
@@ -184,7 +186,7 @@ export function ImagePanel() {
               aria-label={`Borrar marca de agua ${w.name}`}
               className="text-muted hover:text-danger px-1.5 shrink-0"
             >
-              🗑
+              <Trash2 size={14} aria-hidden="true" />
             </button>
           </li>
         ))}

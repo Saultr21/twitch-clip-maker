@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, FolderOpen } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { QualityPresetId } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
@@ -157,12 +158,14 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
 
         {state.phase === "done" && (
           <>
-            <p role="status" className="text-xs">
-              ✅ Exportado como <span className="font-mono text-accent-soft">{state.fileName}</span>
+            <p role="status" className="flex items-center gap-1.5 text-xs">
+              <CheckCircle2 size={16} aria-hidden="true" className="shrink-0 text-accent-soft" />
+              <span>Exportado como <span className="font-mono text-accent-soft">{state.fileName}</span></span>
             </p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={openFolder} className="text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
-                📂 Abrir carpeta
+              <button type="button" onClick={openFolder} className="flex items-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
+                <FolderOpen size={14} aria-hidden="true" />
+                Abrir carpeta
               </button>
               <button type="button" onClick={close} className="text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text">
                 Cerrar

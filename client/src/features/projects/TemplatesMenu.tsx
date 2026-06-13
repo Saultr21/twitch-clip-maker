@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import type { Preset } from "@clipforge/shared";
 import { projectToPreset } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
@@ -80,9 +81,10 @@ export function TemplatesMenu() {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
+        className="flex items-center gap-1 text-xs text-muted border border-border-2 rounded-full px-3 py-1.5 hover:text-text"
       >
-        Plantillas ▾
+        Plantillas
+        <ChevronDown size={14} aria-hidden="true" />
       </button>
       {open && (
         <div
@@ -93,9 +95,10 @@ export function TemplatesMenu() {
             type="button"
             role="menuitem"
             onClick={() => void saveCurrent()}
-            className="text-left text-xs text-accent-soft px-2 py-1.5 rounded-md hover:bg-surface-3"
+            className="flex items-center gap-1.5 text-left text-xs text-accent-soft px-2 py-1.5 rounded-md hover:bg-surface-3"
           >
-            + Guardar la actual como plantilla
+            <Plus size={14} aria-hidden="true" />
+            Guardar la actual como plantilla
           </button>
           {error && <p role="alert" className="text-[11px] text-danger px-2">{error}</p>}
           {entries.length === 0 && !error && (
@@ -118,7 +121,7 @@ export function TemplatesMenu() {
                 aria-label={`Borrar plantilla ${e.name}`}
                 className="text-muted hover:text-danger px-1.5"
               >
-                🗑
+                <Trash2 size={14} aria-hidden="true" />
               </button>
             </div>
           ))}

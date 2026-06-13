@@ -7,6 +7,9 @@ import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { execa } from "execa";
 import { BIN_DIR } from "../../lib/paths.js";
 import { ffmpegBin } from "../binaries.js";
+import { hasNvidiaGpu } from "../gpu.js";
+
+export { hasNvidiaGpu };
 
 // Builds de whisper.cpp (v1.8.6, verificados en runtime). El cuBLAS trae las
 // DLLs de CUDA; el CPU es ligero. Se elige según haya GPU NVIDIA o no.
@@ -34,18 +37,6 @@ export function whisperModelPath(model: WhisperModelId): string {
 
 /** Hilos a usar: todos los lógicos disponibles. */
 export const whisperThreads = Math.max(1, os.cpus().length);
-
-let gpuChecked = false;
-let gpu = false;
-/** True si hay una GPU NVIDIA utilizable (nvidia-smi responde). */
-export async function hasNvidiaGpu(): Promise<boolean> {
-  if (gpuChecked) return gpu;
-  gpu = await execa("nvidia-smi", ["-L"], { reject: false })
-    .then((r) => r.exitCode === 0 && /GPU \d+:/.test(r.stdout))
-    .catch(() => false);
-  gpuChecked = true;
-  return gpu;
-}
 
 /** Ruta del whisper-cli a usar (cuda si hay GPU y está instalado, si no cpu). */
 export function whisperExeFor(useGpu: boolean): string {

@@ -1,4 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
+import { Trash2 } from "lucide-react";
+import type { ClipInfo } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -19,8 +21,22 @@ export function MediaPanel() {
     fetchClips,
     selectClip,
     downloadClip,
+    removeClip,
   } = useClipsStore();
   const [url, setUrl] = useState("");
+
+  const onDelete = async (clip: ClipInfo) => {
+    const inTimeline = useProjectStore.getState().project.tracks.video.some((v) => v.clipId === clip.id);
+    const msg = inTimeline
+      ? `¿Borrar «${clip.title}»? Se quitará también de la línea de tiempo.`
+      : `¿Borrar «${clip.title}»? Esta acción no se puede deshacer.`;
+    if (!window.confirm(msg)) return;
+    const ok = await removeClip(clip.id);
+    if (ok && inTimeline) {
+      useProjectStore.getState().removeVideoClipsBySource(clip.id);
+      useUiStore.getState().select(null);
+    }
+  };
 
   useEffect(() => {
     void fetchClips();
@@ -95,32 +111,52 @@ export function MediaPanel() {
           </li>
         )}
         {clips.map((clip) => (
-          <li key={clip.id}>
+          <li
+            key={clip.id}
+            className={`bg-surface-2 rounded-md overflow-hidden border ${
+              clip.id === selectedClipId ? "border-accent" : "border-transparent"
+            }`}
+          >
             <button
               type="button"
               onClick={() => selectClip(clip.id)}
               aria-pressed={clip.id === selectedClipId}
-              className={`w-full text-left bg-surface-2 rounded-md px-2 py-1.5 text-[11px] border ${
-                clip.id === selectedClipId
-                  ? "border-accent text-text"
-                  : "border-transparent text-muted hover:border-border-2"
-              }`}
+              className="w-full text-left text-[11px]"
             >
-              <span className="block truncate font-medium">{clip.title}</span>
-              <span className="text-muted">
+              <img
+                src={`/api/clips/${clip.id}/thumbnail`}
+                alt=""
+                loading="lazy"
+                className="w-full aspect-video object-cover bg-black"
+              />
+              <span className={`block truncate font-medium px-2 pt-1.5 ${clip.id === selectedClipId ? "text-text" : ""}`}>
+                {clip.title}
+              </span>
+              <span className="block px-2 pb-1 text-muted">
                 {formatDuration(clip.duration)} · {clip.width}x{clip.height}
               </span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                useProjectStore.getState().addVideoClip(clip);
-                useUiStore.getState().select(null);
-              }}
-              className="mt-1 w-full text-[11px] text-accent-soft border border-border-2 rounded-md py-1 hover:border-accent"
-            >
-              + Añadir a la línea de tiempo
-            </button>
+            <div className="flex items-stretch gap-1 px-1 pb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  useProjectStore.getState().addVideoClip(clip);
+                  useUiStore.getState().select(null);
+                }}
+                className="flex-1 text-[11px] text-accent-soft border border-border-2 rounded-md py-1 hover:border-accent"
+              >
+                + Añadir a la línea de tiempo
+              </button>
+              <button
+                type="button"
+                onClick={() => void onDelete(clip)}
+                aria-label={`Borrar clip ${clip.title}`}
+                title="Borrar clip"
+                className="shrink-0 px-2 text-muted hover:text-danger border border-border-2 rounded-md grid place-items-center"
+              >
+                <Trash2 size={14} aria-hidden="true" />
+              </button>
+            </div>
           </li>
         ))}
       </ul>

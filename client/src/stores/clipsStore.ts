@@ -10,6 +10,7 @@ interface ClipsState {
   fetchClips: () => Promise<void>;
   selectClip: (id: string) => void;
   downloadClip: (url: string) => Promise<void>;
+  removeClip: (id: string) => Promise<boolean>;
 }
 
 export const useClipsStore = create<ClipsState>((set) => ({
@@ -30,6 +31,21 @@ export const useClipsStore = create<ClipsState>((set) => ({
   },
 
   selectClip: (id) => set({ selectedClipId: id }),
+
+  removeClip: async (id) => {
+    try {
+      const res = await fetch(`/api/clips/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) throw new Error();
+      set((s) => ({
+        clips: s.clips.filter((c) => c.id !== id),
+        selectedClipId: s.selectedClipId === id ? null : s.selectedClipId,
+      }));
+      return true;
+    } catch {
+      set({ downloadError: "No se pudo borrar el clip" });
+      return false;
+    }
+  },
 
   downloadClip: async (url) => {
     set({ downloading: true, downloadProgress: 0, downloadError: null });

@@ -46,6 +46,7 @@ interface ProjectState {
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   addVideoClip: (clip: ClipInfo) => void;
+  removeVideoClipsBySource: (clipId: string) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   updateVideoClip: (id: string, patch: Partial<VideoClip>, opts?: MutateOptions) => void;
@@ -116,6 +117,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           ? Math.max(...d.tracks.video.map(clipEnd))
           : 0;
         d.tracks.video.push(createVideoClip(clip.id, lastEnd, clip.duration));
+      }),
+
+    // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente
+    removeVideoClipsBySource: (clipId) =>
+      mutate((d) => {
+        d.tracks.video = d.tracks.video.filter((v) => v.clipId !== clipId);
       }),
 
     moveVideoClip: (id, newStart, opts) =>

@@ -70,6 +70,24 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.totalDuration).toBe(7);
   });
 
+  it("fondo de color sólido genera un color source con el hex del proyecto", () => {
+    const p = projectWithClip();
+    p.settings.background = { type: "color", color: "#ff0066", blur: 0.5 };
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("color=c=0xff0066:s=1080x1920:d=5:r=30[bg0]");
+  });
+
+  it("fondo blur divide el clip y desenfoca la rama de fondo a cover", () => {
+    const p = projectWithClip();
+    p.settings.background = { type: "blur", color: "#000000", blur: 0.5 };
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("split=2[fg0][bgsrc0]");
+    expect(g.filterComplex).toContain(
+      "[bgsrc0]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:1[bg0]",
+    );
+    expect(g.filterComplex).toContain("[fg0]scale=1080:608[cv0]");
+  });
+
   it("el volumen del audio original se aplica a cada clip", () => {
     const p = projectWithClip();
     p.originalAudioVolume = 0.35;

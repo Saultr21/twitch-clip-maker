@@ -1,4 +1,4 @@
-import type { ClipInfo, Project, VideoClip } from "@clipforge/shared";
+import type { Background, ClipInfo, Project, VideoClip } from "@clipforge/shared";
 import { drawtextFilter, drawtextFilterCentered } from "./drawtext.js";
 import { renderRect } from "./geometry.js";
 import { atempoChain } from "./speed.js";
@@ -24,6 +24,17 @@ function num(n: number): string {
   return String(Math.round(n * 1000) / 1000);
 }
 
+/** Generador de fondo sólido (negro o color) que produce la etiqueta dada. */
+function solidBackground(bg: Background, W: number, H: number, dur: number, fps: number, label: string): string {
+  const src = bg.type === "color" ? `color=c=0x${bg.color.slice(1)}` : "color=black";
+  return `${src}:s=${W}x${H}:d=${num(dur)}:r=${fps}[${label}]`;
+}
+
+/** Radio de boxblur (px) a partir de la intensidad normalizada 0–1. */
+function blurRadius(bg: Background): number {
+  return Math.max(1, Math.round(bg.blur * 40));
+}
+
 /** Filtros eq/hue del clip; array vacío si todo es neutro. */
 function colorFilters(c: VideoClip): string[] {
   const f = c.filters;
@@ -46,7 +57,7 @@ export function buildFilterGraph(
   project: Project,
   clipInfos: Map<string, ClipInfo>,
 ): FilterGraph {
-  const { width: W, height: H, fps } = project.settings;
+  const { width: W, height: H, fps, background: bg } = project.settings;
   const clips = [...project.tracks.video].sort((a, b) => a.timelineStart - b.timelineStart);
   if (clips.length === 0) throw new Error("El proyecto no tiene clips de vídeo");
 
@@ -57,7 +68,8 @@ export function buildFilterGraph(
   let cursor = 0;
 
   const pushGap = (duration: number) => {
-    filters.push(`color=black:s=${W}x${H}:d=${num(duration)}:r=${fps}[seg${segIdx}]`);
+    // En los huecos no hay vídeo: el fondo blur cae a negro/color
+    filters.push(solidBackground(bg, W, H, duration, fps, `seg${segIdx}`));
     filters.push(`anullsrc=r=44100:cl=stereo,atrim=duration=${num(duration)}[sega${segIdx}]`);
     segLabels.push(`[seg${segIdx}][sega${segIdx}]`);
     segIdx++;
@@ -74,14 +86,21 @@ export function buildFilterGraph(
     const dur = (clip.trimOut - clip.trimIn) / clip.speed;
     const setpts =
       clip.speed === 1 ? "setpts=PTS-STARTPTS" : `setpts=(PTS-STARTPTS)/${num(clip.speed)}`;
-    const videoChain = [
-      `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
-      setpts,
-      `scale=${rect.w}:${rect.h}`,
-      ...colorFilters(clip),
-    ];
-    filters.push(`[${inputIdx}:v]${videoChain.join(",")}[cv${segIdx}]`);
-    filters.push(`color=black:s=${W}x${H}:d=${num(dur)}:r=${fps}[bg${segIdx}]`);
+    const trimSetpts = `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},${setpts}`;
+    const fgScale = [`scale=${rect.w}:${rect.h}`, ...colorFilters(clip)].join(",");
+
+    if (bg.type === "blur") {
+      // un solo decode dividido: rama nítida (contain) + rama de fondo
+      // (cover + desenfoque) del propio clip
+      filters.push(`[${inputIdx}:v]${trimSetpts},split=2[fg${segIdx}][bgsrc${segIdx}]`);
+      filters.push(
+        `[bgsrc${segIdx}]scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},boxblur=${blurRadius(bg)}:1[bg${segIdx}]`,
+      );
+      filters.push(`[fg${segIdx}]${fgScale}[cv${segIdx}]`);
+    } else {
+      filters.push(`[${inputIdx}:v]${trimSetpts},${fgScale}[cv${segIdx}]`);
+      filters.push(solidBackground(bg, W, H, dur, fps, `bg${segIdx}`));
+    }
     filters.push(`[bg${segIdx}][cv${segIdx}]overlay=x=${rect.left}:y=${rect.top}:shortest=1[seg${segIdx}]`);
     const audioChain = [
       `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,

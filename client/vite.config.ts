@@ -8,6 +8,8 @@ export default defineConfig({
     proxy: {
       "/api": "http://127.0.0.1:3001",
       "/files": "http://127.0.0.1:3001",
+      // imágenes/audio subidos (overlays, marcas de agua, música) los sirve el backend
+      "/assets": "http://127.0.0.1:3001",
     },
   },
 });

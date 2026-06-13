@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
+import { SubtitlesLayer } from "./SubtitlesLayer";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
@@ -389,6 +390,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
             onGuides={onGuides}
           />
         ))}
+        <SubtitlesLayer width={width} height={height} />
         {guides.vertical && (
           <Line
             points={[width / 2, -STAGE_MARGIN, width / 2, height + STAGE_MARGIN]}

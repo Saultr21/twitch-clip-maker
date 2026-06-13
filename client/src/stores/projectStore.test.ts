@@ -30,6 +30,26 @@ describe("addVideoClip", () => {
   });
 });
 
+describe("addCue", () => {
+  it("inserta una frase en el instante dado y mantiene la lista ordenada por tiempo", () => {
+    const s = useProjectStore.getState();
+    s.addCue(10);
+    s.addCue(4); // se inserta antes que la de 10
+    const cues = useProjectStore.getState().project.subtitles.cues;
+    expect(cues).toHaveLength(2);
+    expect(cues[0].words[0].start).toBe(4);
+    expect(cues[1].words[0].start).toBe(10);
+    // dura 2s por defecto y trae texto editable
+    expect(cues[0].words[0].end).toBe(6);
+    expect(cues[0].words[0].text).toBeTruthy();
+  });
+
+  it("devuelve el id de la frase creada", () => {
+    const id = useProjectStore.getState().addCue(2);
+    expect(useProjectStore.getState().project.subtitles.cues.some((c) => c.id === id)).toBe(true);
+  });
+});
+
 describe("moveVideoClip", () => {
   it("mueve el bloque si no hay solapamiento y lo rechaza si lo hay", () => {
     const s = useProjectStore.getState();

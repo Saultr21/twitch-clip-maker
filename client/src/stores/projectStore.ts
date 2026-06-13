@@ -61,6 +61,7 @@ interface ProjectState {
   updateAudio: (id: string, patch: Partial<AudioTrack>, opts?: MutateOptions) => void;
   removeElement: (kind: ElementKind, id: string) => void;
   setSubtitleCues: (cues: SubtitleCue[]) => void;
+  addCue: (start: number) => string;
   updateCueText: (id: string, text: string) => void;
   moveCue: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimCue: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
@@ -238,6 +239,17 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }),
 
     setSubtitleCues: (cues) => mutate((d) => void (d.subtitles.cues = cues)),
+
+    // Inserta una frase nueva (2s) en el playhead para rellenar a mano lo que la
+    // transcripción no pilló; se mantiene la lista ordenada por tiempo de inicio
+    addCue: (start) => {
+      const id = globalThis.crypto.randomUUID();
+      mutate((d) => {
+        d.subtitles.cues.push({ id, words: [{ text: "Nueva frase", start, end: start + 2 }] });
+        d.subtitles.cues.sort((a, b) => cueStart(a) - cueStart(b));
+      });
+      return id;
+    },
 
     updateCueText: (id, text) =>
       mutate((d) => {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -88,6 +88,24 @@ export function SubtitlesPanel() {
       )}
       {state.phase === "error" && (
         <p role="alert" className="text-[11px] text-danger whitespace-pre-wrap max-h-32 overflow-y-auto">{state.message}</p>
+      )}
+
+      <button
+        type="button"
+        onClick={() => {
+          const id = useProjectStore.getState().addCue(useUiStore.getState().playhead);
+          useUiStore.getState().select({ kind: "subtitle", id });
+        }}
+        title="Añadir una frase en la posición del cursor"
+        className="flex items-center justify-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:bg-surface-3"
+      >
+        <Plus size={14} aria-hidden="true" />
+        Añadir frase en el cursor
+      </button>
+      {cues.length === 0 && (
+        <p className="text-[10px] text-muted">
+          Para los trozos que la transcripción no pilla (canto, voz sobre música), añade la frase a mano aquí.
+        </p>
       )}
 
       {cues.length > 0 && (

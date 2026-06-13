@@ -9,6 +9,7 @@ import { setupRoutes } from "./routes/setup.js";
 import { assetRoutes } from "./routes/assets.js";
 import { exportRoutes } from "./routes/export.js";
 import { presetRoutes } from "./routes/presets.js";
+import { watermarkRoutes } from "./routes/watermarks.js";
 
 ensureDataDirs();
 
@@ -37,6 +38,7 @@ projectRoutes(app);
 assetRoutes(app);
 exportRoutes(app);
 presetRoutes(app);
+watermarkRoutes(app);
 
 await app.listen({ port: 3001, host: "127.0.0.1" });
 

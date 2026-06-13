@@ -1,4 +1,5 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { Watermark } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 
@@ -7,11 +8,43 @@ interface UploadedAsset {
   fileName: string;
 }
 
+/** Inserta una imagen (por fileName) en el playhead y la selecciona.
+ *  El tamaño se calcula con la proporción real; opcionalmente en una esquina. */
+function insertImageOverlay(fileName: string, corner: boolean) {
+  const img = new Image();
+  img.src = `/assets/${fileName}`;
+  img.onload = () => {
+    const store = useProjectStore.getState();
+    const project = store.project;
+    const canvasRatio = project.settings.width / project.settings.height;
+    const imageRatio = img.naturalWidth / img.naturalHeight;
+    const width = corner ? 0.2 : 0.3;
+    const height = Math.min(1, (width / imageRatio) * canvasRatio);
+    const playhead = useUiStore.getState().playhead;
+    // assetId == fileName sin extensión para imágenes subidas; usamos fileName como ambos
+    const id = store.addImage(fileName, fileName, playhead, width, height);
+    if (corner) {
+      // esquina inferior derecha con margen, semitransparente (marca de agua)
+      store.updateImage(id, { x: 0.85, y: 0.85, opacity: 0.85 });
+    }
+    useUiStore.getState().select({ kind: "image", id });
+  };
+}
+
 export function ImagePanel() {
   const inputRef = useRef<HTMLInputElement>(null);
+  const wmInputRef = useRef<HTMLInputElement>(null);
   const [assets, setAssets] = useState<UploadedAsset[]>([]);
+  const [watermarks, setWatermarks] = useState<Watermark[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/watermarks")
+      .then((r) => (r.ok ? r.json() : []))
+      .then((list: Watermark[]) => setWatermarks(list))
+      .catch(() => {});
+  }, []);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -33,22 +66,30 @@ export function ImagePanel() {
     }
   };
 
-  const insert = (asset: UploadedAsset) => {
-    const img = new Image();
-    img.src = `/assets/${asset.fileName}`;
-    img.onload = () => {
-      const project = useProjectStore.getState().project;
-      const canvasRatio = project.settings.width / project.settings.height;
-      const imageRatio = img.naturalWidth / img.naturalHeight;
-      // ancho por defecto 30% del lienzo, alto según la proporción real
-      const width = 0.3;
-      const height = Math.min(1, (width / imageRatio) * canvasRatio);
-      const playhead = useUiStore.getState().playhead;
-      const id = useProjectStore
-        .getState()
-        .addImage(asset.assetId, asset.fileName, playhead, width, height);
-      useUiStore.getState().select({ kind: "image", id });
-    };
+  const saveWatermark = async (file: File) => {
+    const name = window.prompt("Nombre de la marca de agua:", file.name);
+    if (name === null) return;
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("name", name.trim()); // antes del archivo: el campo debe leerse primero
+      body.append("file", file);
+      const res = await fetch("/api/watermarks", { method: "POST", body });
+      if (!res.ok) {
+        const data = (await res.json()) as { error: string };
+        throw new Error(data.error);
+      }
+      const wm = (await res.json()) as Watermark;
+      setWatermarks((prev) => [wm, ...prev]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Error al guardar la marca de agua");
+    }
+  };
+
+  const removeWatermark = async (id: string) => {
+    if (!window.confirm("¿Borrar esta marca de agua guardada?")) return;
+    const res = await fetch(`/api/watermarks/${id}`, { method: "DELETE" });
+    if (res.ok) setWatermarks((prev) => prev.filter((w) => w.id !== id));
   };
 
   return (
@@ -90,10 +131,60 @@ export function ImagePanel() {
           <li key={a.assetId}>
             <button
               type="button"
-              onClick={() => insert(a)}
+              onClick={() => insertImageOverlay(a.fileName, false)}
               className="w-full aspect-square bg-surface-2 rounded-md overflow-hidden border border-transparent hover:border-accent"
             >
               <img src={`/assets/${a.fileName}`} alt="Insertar imagen en el lienzo" className="w-full h-full object-cover" />
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      <hr className="border-border" />
+      <h3 className="text-[11px] font-bold tracking-wide text-muted">MARCAS DE AGUA</h3>
+      <p className="text-[11px] text-muted">
+        Guarda un logo para reutilizarlo en cualquier proyecto. Se inserta en una esquina.
+      </p>
+      <input
+        ref={wmInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        aria-label="Seleccionar marca de agua"
+        className="sr-only"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void saveWatermark(file);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        onClick={() => wmInputRef.current?.click()}
+        className="text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent"
+      >
+        ★ Guardar marca de agua
+      </button>
+      <ul className="flex flex-col gap-1.5" aria-label="Marcas de agua guardadas">
+        {watermarks.length === 0 && (
+          <li className="text-[11px] text-muted">Aún no hay marcas de agua.</li>
+        )}
+        {watermarks.map((w) => (
+          <li key={w.id} className="flex items-center gap-1.5 bg-surface-2 rounded-md p-1">
+            <button
+              type="button"
+              onClick={() => insertImageOverlay(w.fileName, true)}
+              className="flex items-center gap-2 flex-1 min-w-0 text-left rounded-md px-1 py-0.5 hover:bg-surface-3"
+            >
+              <img src={`/assets/${w.fileName}`} alt="" className="w-8 h-8 object-contain rounded bg-black/30 shrink-0" />
+              <span className="text-[11px] truncate">{w.name}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => void removeWatermark(w.id)}
+              aria-label={`Borrar marca de agua ${w.name}`}
+              className="text-muted hover:text-danger px-1.5 shrink-0"
+            >
+              🗑
             </button>
           </li>
         ))}

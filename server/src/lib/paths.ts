@@ -10,9 +10,10 @@ export const PROJECTS_DIR = path.join(DATA_DIR, "projects");
 export const ASSETS_DIR = path.join(DATA_DIR, "assets");
 export const EXPORTS_DIR = path.join(DATA_DIR, "exports");
 export const PRESETS_DIR = path.join(DATA_DIR, "presets");
+export const WATERMARKS_DIR = path.join(DATA_DIR, "watermarks");
 
 export function ensureDataDirs(): void {
-  for (const dir of [DATA_DIR, CLIPS_DIR, BIN_DIR, PROJECTS_DIR, ASSETS_DIR, EXPORTS_DIR, PRESETS_DIR]) {
+  for (const dir of [DATA_DIR, CLIPS_DIR, BIN_DIR, PROJECTS_DIR, ASSETS_DIR, EXPORTS_DIR, PRESETS_DIR, WATERMARKS_DIR]) {
     fs.mkdirSync(dir, { recursive: true });
   }
 }

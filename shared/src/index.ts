@@ -14,6 +14,13 @@ export type DownloadEvent =
   | { type: "done"; clip: ClipInfo }
   | { type: "error"; message: string };
 
+export interface Watermark {
+  id: string;
+  fileName: string;
+  name: string;
+  createdAt: string;
+}
+
 export interface SetupStatus {
   ready: boolean;
   step: "checking" | "downloading-ytdlp" | "ready" | "error";

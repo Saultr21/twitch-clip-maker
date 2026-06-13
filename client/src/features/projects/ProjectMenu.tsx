@@ -4,6 +4,7 @@ import { createEmptyProject } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { saveNow } from "./useAutosave";
+import { setLastProject } from "./lastProject";
 
 interface ProjectEntry {
   name: string;
@@ -46,6 +47,7 @@ export function ProjectMenu() {
       if (!res.ok) throw new Error();
       const project = (await res.json()) as Project;
       useProjectStore.getState().loadProject(project);
+      setLastProject(name);
       useUiStore.getState().select(null);
       useUiStore.getState().setPlayhead(0);
       setOpen(false);
@@ -60,7 +62,9 @@ export function ProjectMenu() {
     } catch {
       // si falla el guardado seguimos: el usuario decidió crear uno nuevo
     }
-    useProjectStore.getState().loadProject(createEmptyProject(`proyecto-${Date.now() % 100000}`));
+    const fresh = createEmptyProject(`proyecto-${Date.now() % 100000}`);
+    useProjectStore.getState().loadProject(fresh);
+    setLastProject(fresh.name);
     useUiStore.getState().select(null);
     useUiStore.getState().setPlayhead(0);
     setOpen(false);

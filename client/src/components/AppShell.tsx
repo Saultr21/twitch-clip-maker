@@ -8,6 +8,8 @@ import { PropertiesPanel } from "../features/properties/PropertiesPanel";
 import { Timeline } from "../features/timeline/Timeline";
 import { useUiStore } from "../stores/uiStore";
 import { handleShortcut } from "../lib/shortcuts";
+import { useSessionRestore } from "../features/projects/useSessionRestore";
+import { useUnloadGuard } from "../features/projects/useAutosave";
 import { ResizeHandle } from "./ResizeHandle";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
@@ -23,6 +25,8 @@ function GlobalShortcuts() {
 }
 
 export function AppShell() {
+  useSessionRestore(); // reabre el último proyecto al arrancar
+  useUnloadGuard(); // vacía y avisa ante cambios sin guardar al cerrar
   const activeTool = useUiStore((s) => s.activeTool);
   const toolPanelWidth = useUiStore((s) => s.toolPanelWidth);
   const propertiesWidth = useUiStore((s) => s.propertiesWidth);

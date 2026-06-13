@@ -22,6 +22,7 @@ export function SubtitlesPanel() {
   const clearSubtitles = useProjectStore((s) => s.clearSubtitles);
   const setSubtitleStyle = useProjectStore((s) => s.setSubtitleStyle);
   const [language, setLanguage] = useState("auto");
+  const [model, setModel] = useState<"small" | "medium">("small");
   const { state, start, cancel } = useTranscribe(setSubtitleCues);
 
   const generate = () => {
@@ -30,7 +31,7 @@ export function SubtitlesPanel() {
     // clip bajo el playhead, o el primero si el playhead está en un hueco
     const clip = videoClipAt(project.tracks.video, playhead) ?? project.tracks.video[0];
     if (!clip) return;
-    void start(clip, language);
+    void start(clip, language, model);
   };
 
   const hasClips = useProjectStore((s) => s.project.tracks.video.length > 0);
@@ -51,6 +52,21 @@ export function SubtitlesPanel() {
         >
           {LANGS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
         </select>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label htmlFor="sub-model" className="text-[11px] text-muted">Modelo</label>
+        <select
+          id="sub-model"
+          value={model}
+          onChange={(e) => setModel(e.target.value as "small" | "medium")}
+          className="bg-surface-2 border border-border-2 rounded-md px-2 py-1 text-xs"
+        >
+          <option value="small">Rápido (small)</option>
+          <option value="medium">Preciso (medium)</option>
+        </select>
+        <p className="text-[10px] text-muted">
+          Medium transcribe mejor pero tarda más y descarga ~1,5 GB la primera vez.
+        </p>
       </div>
       {state.phase === "running" ? (
         <div className="flex flex-col gap-2">

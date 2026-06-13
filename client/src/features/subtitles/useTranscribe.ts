@@ -12,12 +12,12 @@ export function useTranscribe(onCues: (cues: SubtitleCue[]) => void) {
   useEffect(() => () => sourceRef.current?.close(), []);
 
   const start = useCallback(
-    async (clip: VideoClip, language: string) => {
+    async (clip: VideoClip, language: string, model: "small" | "medium" = "small") => {
       try {
         const res = await fetch("/api/subtitles", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ clip, language }),
+          body: JSON.stringify({ clip, language, model }),
         });
         if (!res.ok) {
           const b = (await res.json()) as { error: string };

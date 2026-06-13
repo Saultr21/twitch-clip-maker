@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
+import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -30,6 +31,9 @@ export function Timeline({ height }: { height: number }) {
   const trimVideoClip = useProjectStore((s) => s.trimVideoClip);
   const trimOverlay = useProjectStore((s) => s.trimOverlay);
   const trimAudio = useProjectStore((s) => s.trimAudio);
+  const moveCue = useProjectStore((s) => s.moveCue);
+  const trimCue = useProjectStore((s) => s.trimCue);
+  const subtitleCues = useProjectStore((s) => s.project.subtitles.cues);
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
@@ -77,10 +81,20 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-sky-500/20 text-sky-200",
   }));
 
-  // Texto, imagen y audio pueden solaparse en el tiempo: carriles automáticos
+  const subtitleBlocks: BlockDescriptor[] = subtitleCues.map((c) => ({
+    id: c.id,
+    kind: "subtitle" as const,
+    start: cueStart(c),
+    end: cueEnd(c),
+    label: c.words.map((w) => w.text).join(" "),
+    color: "bg-pink-500/20 text-pink-200",
+  }));
+
+  // Texto, imagen, audio y subtítulos pueden solaparse en el tiempo: carriles automáticos
   const textLanes = assignLanes(textBlocks);
   const imageLanes = assignLanes(imageBlocks);
   const audioLanes = assignLanes(audioBlocks);
+  const subtitleLanes = assignLanes(subtitleBlocks);
 
   return (
     <footer className="bg-surface border-t border-border flex flex-col shrink-0" style={{ height }}>
@@ -160,6 +174,15 @@ export function Timeline({ height }: { height: number }) {
             laneCount={audioLanes.count}
             onMove={(id, t, transient) => moveOverlay("audio", id, t, { transient })}
             onTrim={(id, edge, t, transient) => trimAudio(id, edge, t, { transient })}
+          />
+          <TrackRow
+            title="Subtítulos"
+            blocks={subtitleBlocks}
+            pxPerSecond={pxPerSecond}
+            lanes={subtitleLanes.lanes}
+            laneCount={subtitleLanes.count}
+            onMove={(id, t, transient) => moveCue(id, t, { transient })}
+            onTrim={(id, edge, t, transient) => trimCue(id, edge, t, { transient })}
           />
           <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>

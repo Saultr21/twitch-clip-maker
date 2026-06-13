@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { ClipInfo } from "@clipforge/shared";
-import { addClip, listClips } from "./clipsRegistry.js";
+import { addClip, listClips, removeClip } from "./clipsRegistry.js";
 
 function makeClip(id: string): ClipInfo {
   return {
@@ -50,5 +50,18 @@ describe("clipsRegistry", () => {
     addClip({ ...makeClip("a"), title: "Actualizado" }, dir);
     expect(listClips(dir)).toHaveLength(1);
     expect(listClips(dir)[0].title).toBe("Actualizado");
+  });
+
+  it("removeClip quita la entrada y borra el archivo del vídeo", () => {
+    const clip = makeClip("a");
+    addClip(clip, dir);
+    fs.writeFileSync(path.join(dir, clip.fileName), "x"); // vídeo simulado
+    expect(removeClip("a", dir)).toBe(true);
+    expect(listClips(dir)).toHaveLength(0);
+    expect(fs.existsSync(path.join(dir, clip.fileName))).toBe(false);
+  });
+
+  it("removeClip devuelve false si el id no existe", () => {
+    expect(removeClip("inexistente", dir)).toBe(false);
   });
 });

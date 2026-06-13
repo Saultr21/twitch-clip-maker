@@ -4,6 +4,8 @@ import { useAutosave, saveNow } from "../features/projects/useAutosave";
 import { ProjectMenu } from "../features/projects/ProjectMenu";
 import { TemplatesMenu } from "../features/projects/TemplatesMenu";
 import { ExportDialog } from "../features/export/ExportDialog";
+import { ShortcutsHelp } from "./ShortcutsHelp";
+import { useUiStore } from "../stores/uiStore";
 
 export function TopBar() {
   const name = useProjectStore((s) => s.project.name);
@@ -55,6 +57,15 @@ export function TopBar() {
         </button>
       </div>
       <div className="ml-auto flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => useUiStore.getState().setHelpOpen(true)}
+          aria-label="Ayuda de atajos de teclado"
+          title="Atajos de teclado (?)"
+          className="text-xs text-muted border border-border-2 rounded-full w-7 h-7 hover:text-text"
+        >
+          ?
+        </button>
         <ProjectMenu />
         <TemplatesMenu />
         <button
@@ -75,6 +86,7 @@ export function TopBar() {
         </button>
       </div>
       <ExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
+      <ShortcutsHelp />
     </header>
   );
 }

@@ -29,6 +29,13 @@ export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
   const ui = useUiStore.getState();
   const store = useProjectStore.getState();
 
+  // "?" (Shift+/ en la mayoría de layouts) abre la ayuda de atajos
+  if (e.key === "?") {
+    e.preventDefault();
+    ui.setHelpOpen(true);
+    return;
+  }
+
   // Edición con modificadores
   if (e.ctrlKey || e.metaKey) {
     if (e.code === "KeyZ" && e.shiftKey) {

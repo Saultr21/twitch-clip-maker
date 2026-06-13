@@ -18,6 +18,7 @@ interface UiState {
   timelineHeight: number;
   toolPanelWidth: number;
   propertiesWidth: number;
+  helpOpen: boolean;
   select: (sel: Selection | null) => void;
   setPlayhead: (t: number) => void;
   setPlaying: (p: boolean) => void;
@@ -26,6 +27,7 @@ interface UiState {
   setTimelineHeight: (px: number) => void;
   setToolPanelWidth: (px: number) => void;
   setPropertiesWidth: (px: number) => void;
+  setHelpOpen: (v: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -37,6 +39,7 @@ export const useUiStore = create<UiState>((set) => ({
   timelineHeight: 176,
   toolPanelWidth: 224,
   propertiesWidth: 288,
+  helpOpen: false,
   select: (selection) => set({ selection }),
   setPlayhead: (t) => set({ playhead: Math.max(0, t) }),
   setPlaying: (playing) => set({ playing }),
@@ -45,4 +48,5 @@ export const useUiStore = create<UiState>((set) => ({
   setTimelineHeight: (px) => set({ timelineHeight: Math.min(480, Math.max(96, px)) }),
   setToolPanelWidth: (px) => set({ toolPanelWidth: Math.min(420, Math.max(170, px)) }),
   setPropertiesWidth: (px) => set({ propertiesWidth: Math.min(480, Math.max(200, px)) }),
+  setHelpOpen: (helpOpen) => set({ helpOpen }),
 }));

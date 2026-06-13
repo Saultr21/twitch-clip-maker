@@ -1,0 +1,12 @@
+PENDIENTE / IDEAS
+
+Hechas:
+[x] Valores de los sliders editables a mano (campo numérico junto a cada barra)
+[x] Fondo para rellenar lo negro: color sólido o desenfoque del propio vídeo (blur)
+[x] Marcas de agua reutilizables (guardar un logo y reinsertarlo en una esquina)
+
+Pendientes:
+[ ] Fondo de IMAGEN (subir una imagen como fondo) — pendiente: el export necesita
+    inputs de imagen en bucle en FFmpeg; el color y el blur ya están
+[ ] Subtítulos automáticos — necesita su propio diseño (motor de voz-a-texto local
+    tipo Whisper, nueva dependencia pesada); hacer brainstorming aparte

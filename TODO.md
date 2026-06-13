@@ -8,9 +8,15 @@
 - (nada — los 4 hitos del plan están cerrados; pendiente smoke test del usuario del Hito 4)
 
 ## Up Next
-- Smoke test del usuario del Hito 4 (filtros/velocidad/música/texto rotado/plantillas)
-- Ideas de mejora futuras en `Pendiente.txt` (valores de slider a mano, fondo blur/color/imagen, subtítulos automáticos, marcas de agua reutilizables)
+- Mejoras de `Pendiente.txt` pendientes: fondo de IMAGEN (export con inputs en bucle) y subtítulos automáticos (necesita brainstorming: motor voz-a-texto local)
 - Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
+
+## Mejoras de Pendiente.txt (post-Hito 4)
+- [x] Sliders con campo numérico editable a mano (2026-06-13)
+- [x] Fondo de proyecto color/blur en preview y export (2026-06-13)
+- [x] Marcas de agua reutilizables: guardar logo + insertar en esquina (2026-06-13)
+- [ ] Fondo de IMAGEN (el color y el blur ya están; el export necesita inputs de imagen en bucle)
+- [ ] Subtítulos automáticos (brainstorming aparte: Whisper u otro STT local)
 
 ## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)

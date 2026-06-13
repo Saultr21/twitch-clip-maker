@@ -5,10 +5,18 @@ import { execa, type ResultPromise } from "execa";
 import type { ExportJobState, Project, QualityPresetId } from "@clipforge/shared";
 import { ASSETS_DIR, CLIPS_DIR, EXPORTS_DIR } from "../lib/paths.js";
 import { ffmpegBin } from "./binaries.js";
+import { hasNvidiaGpu } from "./gpu.js";
 import { listClips } from "./clipsRegistry.js";
 import { buildAss } from "./subtitles/assSubtitles.js";
-import { buildFilterGraph } from "./ffmpeg/filterGraph.js";
+import { buildFilterGraph, type FilterGraph } from "./ffmpeg/filterGraph.js";
 import { buildFfmpegArgs } from "./ffmpeg/presets.js";
+
+/** True si el error de FFmpeg apunta a NVENC/CUDA y procede reintentar en CPU. */
+export function isNvencFailure(stderr: string): boolean {
+  return /nvenc|cuda|cuvid|openencode|no\s+capable\s+devices|driver does not support|cannot load nvcuda|InitializeEncoder/i.test(
+    stderr,
+  );
+}
 
 const TIME_RE = /time=(\d+):(\d+):(\d+(?:\.\d+)?)/;
 
@@ -50,6 +58,11 @@ function notify(job: ExportJob): void {
   for (const fn of job.listeners) fn();
 }
 
+/** Relee el estado fuera del flujo de narrowing (cancelExport lo muta aparte). */
+function isCancelled(job: ExportJob): boolean {
+  return job.state === "cancelled";
+}
+
 export function getJob(jobId: string): ExportJob | undefined {
   return jobs.get(jobId);
 }
@@ -81,10 +94,6 @@ export function startExport(
   }
 
   const graph = buildFilterGraph(project, clipInfos, assPath);
-  const args = buildFfmpegArgs(graph, preset, project.settings.fps, outPath, {
-    videoDir: CLIPS_DIR,
-    imageDir: ASSETS_DIR,
-  });
 
   const job: ExportJob = {
     jobId: crypto.randomUUID(),
@@ -96,32 +105,72 @@ export function startExport(
   };
   jobs.set(job.jobId, job);
 
+  // La detección de GPU es asíncrona: el job se devuelve ya, el render corre aparte
+  void runExport(job, graph, preset, project.settings.fps, outPath);
+
+  return job;
+}
+
+/** Lanza un FFmpeg y resuelve con su salida; emite progreso por stderr. */
+function runFfmpeg(
+  job: ExportJob,
+  args: string[],
+  totalDuration: number,
+): Promise<{ exitCode: number | undefined; stderr: string }> {
   const proc = execa(ffmpegBin, args, { reject: false });
   job.proc = proc;
-
   proc.stderr?.on("data", (chunk: Buffer) => {
     const t = parseFfmpegTime(chunk.toString());
-    if (t !== null && graph.totalDuration > 0) {
-      job.percent = Math.min(99, (t / graph.totalDuration) * 100);
+    if (t !== null && totalDuration > 0) {
+      job.percent = Math.min(99, (t / totalDuration) * 100);
       notify(job);
     }
   });
+  return proc.then((r) => ({ exitCode: r.exitCode, stderr: r.stderr ?? "" }));
+}
 
-  void proc.then((result) => {
-    if (job.state === "cancelled") return;
-    if (result.exitCode === 0) {
+/** Render con NVENC si hay GPU; si NVENC falla, reintenta una vez en CPU. */
+async function runExport(
+  job: ExportJob,
+  graph: FilterGraph,
+  preset: QualityPresetId,
+  fps: number,
+  outPath: string,
+): Promise<void> {
+  const dirs = { videoDir: CLIPS_DIR, imageDir: ASSETS_DIR };
+  try {
+    if (isCancelled(job)) return;
+    const useGpu = await hasNvidiaGpu();
+    if (isCancelled(job)) return;
+
+    let res = await runFfmpeg(job, buildFfmpegArgs(graph, preset, fps, outPath, dirs, useGpu), graph.totalDuration);
+
+    // NVENC no disponible/saturado: reintento transparente en CPU
+    if (res.exitCode !== 0 && useGpu && !isCancelled(job) && isNvencFailure(res.stderr)) {
+      fs.rmSync(outPath, { force: true });
+      job.percent = 0;
+      notify(job);
+      res = await runFfmpeg(job, buildFfmpegArgs(graph, preset, fps, outPath, dirs, false), graph.totalDuration);
+    }
+
+    if (isCancelled(job)) return;
+    if (res.exitCode === 0) {
       job.state = "done";
       job.percent = 100;
     } else {
       job.state = "error";
-      job.error = (result.stderr ?? "").split("\n").slice(-8).join("\n");
+      job.error = res.stderr.split("\n").slice(-8).join("\n");
       fs.rmSync(outPath, { force: true });
     }
+  } catch (err) {
+    if (isCancelled(job)) return;
+    job.state = "error";
+    job.error = err instanceof Error ? err.message : "Error en el export";
+    fs.rmSync(outPath, { force: true });
+  } finally {
     if (job.assPath) fs.rmSync(job.assPath, { force: true });
     notify(job);
-  });
-
-  return job;
+  }
 }
 
 export function cancelExport(jobId: string): boolean {

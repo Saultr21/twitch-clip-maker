@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseFfmpegTime, sanitizeFileName } from "./exportJobs.js";
+import { isNvencFailure, parseFfmpegTime, sanitizeFileName } from "./exportJobs.js";
 
 describe("parseFfmpegTime", () => {
   it("extrae los segundos de una línea de progreso de stderr", () => {
@@ -31,5 +31,19 @@ describe("sanitizeFileName", () => {
 
   it("lanza con nombres vacíos tras sanear", () => {
     expect(() => sanitizeFileName("../..")).toThrow();
+  });
+});
+
+describe("isNvencFailure", () => {
+  it("detecta errores típicos de NVENC/CUDA para reintentar en CPU", () => {
+    expect(isNvencFailure("[h264_nvenc @ 0x..] No capable devices found")).toBe(true);
+    expect(isNvencFailure("Cannot load nvcuda.dll")).toBe(true);
+    expect(isNvencFailure("OpenEncodeSessionEx failed: out of memory")).toBe(true);
+    expect(isNvencFailure("Driver does not support the required nvenc API version")).toBe(true);
+  });
+
+  it("no confunde errores genéricos con fallos de NVENC", () => {
+    expect(isNvencFailure("No such file or directory")).toBe(false);
+    expect(isNvencFailure("Invalid filtergraph")).toBe(false);
   });
 });

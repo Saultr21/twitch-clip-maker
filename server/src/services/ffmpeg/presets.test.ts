@@ -46,4 +46,20 @@ describe("buildFfmpegArgs", () => {
     expect(args[args.indexOf("-movflags") + 1]).toBe("+faststart");
     expect(args[args.indexOf("-c:a") + 1]).toBe("aac");
   });
+
+  it("con useGpu usa h264_nvenc conservando el bitrate objetivo", () => {
+    const args = buildFfmpegArgs(graph, "tiktok", 30, "out.mp4", { videoDir: "v", imageDir: "i" }, true);
+    expect(args[args.indexOf("-c:v") + 1]).toBe("h264_nvenc");
+    expect(args[args.indexOf("-preset") + 1]).toBe("p5");
+    expect(args[args.indexOf("-b:v") + 1]).toBe("8M");
+    expect(args).not.toContain("libx264");
+  });
+
+  it("con useGpu mapea CRF a cq (calidad constante) en NVENC", () => {
+    const args = buildFfmpegArgs(graph, "custom", 30, "out.mp4", { videoDir: "v", imageDir: "i" }, true);
+    expect(args[args.indexOf("-c:v") + 1]).toBe("h264_nvenc");
+    expect(args[args.indexOf("-rc") + 1]).toBe("vbr");
+    expect(args[args.indexOf("-cq") + 1]).toBe("19"); // crf 18 + 1
+    expect(args).not.toContain("-crf");
+  });
 });

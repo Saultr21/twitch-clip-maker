@@ -50,8 +50,16 @@ export async function ensureWhisper(): Promise<void> {
     if (!fs.existsSync(whisperExe)) {
       const zip = path.join(WHISPER_DIR, "whisper.zip");
       await download(WHISPER_ZIP_URL, zip);
-      // bsdtar (Windows 10+) extrae zip; -C destino
-      await execa("tar", ["-xf", zip, "-C", WHISPER_DIR]);
+      // bsdtar del sistema (Windows 10+) extrae zip y entiende rutas con unidad.
+      // Se invoca por ruta absoluta para NO coger el GNU tar de Git Bash, que
+      // interpreta "C:\..." como host:ruta y falla.
+      const systemTar = path.join(
+        process.env.SystemRoot ?? "C:\\Windows",
+        "System32",
+        "tar.exe",
+      );
+      const tarBin = fs.existsSync(systemTar) ? systemTar : "tar";
+      await execa(tarBin, ["-xf", zip, "-C", WHISPER_DIR]);
       fs.rmSync(zip, { force: true });
       // El release anida el exe en Release/ junto a sus DLLs (whisper.dll,
       // ggml.dll, …). Hay que dejar el exe Y sus DLLs juntos en WHISPER_DIR,

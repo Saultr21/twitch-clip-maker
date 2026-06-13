@@ -51,30 +51,9 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
     return unsub;
   }, [sync]);
 
-  // El <video> hace avanzar el playhead mientras hay clip activo
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    const onTimeUpdate = () => {
-      const { playhead, playing } = useUiStore.getState();
-      if (!playing) return;
-      const project = useProjectStore.getState().project;
-      const active = videoClipAt(project.tracks.video, playhead);
-      if (!active) return;
-      const t = active.timelineStart + (video.currentTime - active.trimIn) / active.speed;
-      if (video.currentTime >= active.trimOut) {
-        // fin del bloque: saltar justo después y dejar que el rAF/sync decidan
-        useUiStore.getState().setPlayhead(clipEnd(active) + 0.0001);
-        sync(true);
-      } else {
-        useUiStore.getState().setPlayhead(t);
-      }
-    };
-    video.addEventListener("timeupdate", onTimeUpdate);
-    return () => video.removeEventListener("timeupdate", onTimeUpdate);
-  }, [videoRef, sync]);
-
-  // rAF: avanza por los huecos y detiene al final del proyecto
+  // rAF: única fuente de avance del playhead mientras reproduce. Leer
+  // video.currentTime por frame (60fps) — en vez del evento "timeupdate", que
+  // solo dispara ~4 veces/seg — mantiene el resaltado karaoke al ritmo real.
   useEffect(() => {
     const unsub = useUiStore.subscribe((s, prev) => {
       if (s.playing === prev.playing) return;
@@ -95,8 +74,19 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
           return;
         }
         const active = videoClipAt(project.tracks.video, playhead);
-        if (!active) {
-          // hueco: avanza con el reloj
+        const video = videoRef.current;
+        if (active && video) {
+          if (video.currentTime >= active.trimOut) {
+            // fin del bloque recortado: saltar justo después y resincronizar
+            useUiStore.getState().setPlayhead(clipEnd(active) + 0.0001);
+            sync(true);
+          } else {
+            // posición real del <video> mapeada a tiempo de proyecto
+            const t = active.timelineStart + (video.currentTime - active.trimIn) / active.speed;
+            useUiStore.getState().setPlayhead(t);
+          }
+        } else {
+          // hueco: avanza con el reloj de pared
           const delta = (now - lastTickRef.current) / 1000;
           useUiStore.getState().setPlayhead(playhead + delta);
           sync(false);
@@ -111,7 +101,7 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
       unsub();
       cancelAnimationFrame(rafRef.current);
     };
-  }, [sync]);
+  }, [sync, videoRef]);
 
   /** Mueve el playhead (scrub, clic en regla, transporte). */
   const seek = useCallback(

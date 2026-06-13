@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { DEFAULT_SUBTITLE_STYLE, subtitlesSchema } from "./subtitles.js";
 
 export const ASPECT_PRESETS = {
   "9:16": { width: 1080, height: 1920 },
@@ -104,6 +105,7 @@ export const projectSchema = z.object({
     audio: z.array(audioTrackSchema),
   }),
   originalAudioVolume: norm,
+  subtitles: subtitlesSchema,
 });
 
 export type Background = z.infer<typeof backgroundSchema>;
@@ -127,6 +129,7 @@ export function createEmptyProject(name: string): Project {
     },
     tracks: { video: [], text: [], image: [], audio: [] },
     originalAudioVolume: 1,
+    subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE } },
   };
 }
 

@@ -3,6 +3,8 @@ import type { Project } from "@clipforge/shared";
 import { findSnapPoints, snapTime } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore, type Selection } from "../../stores/uiStore";
+import { WaveformCanvas } from "./WaveformCanvas";
+import type { WaveformKind } from "./useWaveform";
 
 export interface BlockDescriptor {
   id: string;
@@ -11,7 +13,11 @@ export interface BlockDescriptor {
   end: number;
   label: string;
   color: string; // clases tailwind del bloque
+  /** Audio a dibujar como waveform dentro del bloque (vídeo y música). */
+  waveform?: { kind: WaveformKind; fileName: string; trimIn: number; trimOut: number };
 }
+
+const BLOCK_HEIGHT_PX = 28; // h-7
 
 interface TrackRowProps {
   title: string;
@@ -114,9 +120,20 @@ export function TrackRow({
                 dragRef.current = null;
               }}
             >
+              {b.waveform && (
+                <WaveformCanvas
+                  kind={b.waveform.kind}
+                  fileName={b.waveform.fileName}
+                  trimIn={b.waveform.trimIn}
+                  trimOut={b.waveform.trimOut}
+                  width={Math.max(8, (b.end - b.start) * pxPerSecond)}
+                  height={BLOCK_HEIGHT_PX}
+                  color="currentColor"
+                />
+              )}
               <span aria-hidden="true" className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize rounded-l-md bg-white/10" />
               <span aria-hidden="true" className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize rounded-r-md bg-white/10" />
-              {b.label}
+              <span className="relative">{b.label}</span>
             </button>
           );
         })}

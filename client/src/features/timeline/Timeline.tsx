@@ -43,14 +43,20 @@ export function Timeline({ height }: { height: number }) {
 
   const videoBlocks: BlockDescriptor[] = useMemo(
     () =>
-      project.tracks.video.map((c) => ({
-        id: c.id,
-        kind: "video" as const,
-        start: c.timelineStart,
-        end: clipEnd(c),
-        label: clips.find((i) => i.id === c.clipId)?.title ?? "clip",
-        color: "bg-accent/25 text-accent-soft",
-      })),
+      project.tracks.video.map((c) => {
+        const info = clips.find((i) => i.id === c.clipId);
+        return {
+          id: c.id,
+          kind: "video" as const,
+          start: c.timelineStart,
+          end: clipEnd(c),
+          label: info?.title ?? "clip",
+          color: "bg-accent/25 text-accent-soft",
+          waveform: info
+            ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut }
+            : undefined,
+        };
+      }),
     [project.tracks.video, clips],
   );
 
@@ -79,6 +85,7 @@ export function Timeline({ height }: { height: number }) {
     end: a.end,
     label: a.fileName,
     color: "bg-sky-500/20 text-sky-200",
+    waveform: { kind: "asset" as const, fileName: a.fileName, trimIn: a.trimIn, trimOut: a.trimOut },
   }));
 
   const subtitleBlocks: BlockDescriptor[] = subtitleCues.map((c) => ({

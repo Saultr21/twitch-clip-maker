@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
+import type { SubtitleCue } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -116,15 +117,7 @@ export function SubtitlesPanel() {
           </div>
           <ul className="flex flex-col gap-1.5">
             {cues.map((c) => (
-              <li key={c.id} className="flex items-center gap-1">
-                <input
-                  value={c.words.map((w) => w.text).join(" ")}
-                  onChange={(e) => updateCueText(c.id, e.target.value)}
-                  aria-label="Texto de la frase"
-                  className="flex-1 min-w-0 bg-surface-2 border border-border-2 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-accent"
-                />
-                <button type="button" onClick={() => removeCue(c.id)} aria-label="Borrar frase" className="text-muted hover:text-danger px-1"><Trash2 size={14} aria-hidden="true" /></button>
-              </li>
+              <CueRow key={c.id} cue={c} onChangeText={updateCueText} onRemove={removeCue} />
             ))}
           </ul>
 
@@ -146,5 +139,37 @@ export function SubtitlesPanel() {
         </>
       )}
     </section>
+  );
+}
+
+/** Fila de una frase con estado de texto LOCAL: el store recolapsa los espacios
+ *  (split por palabras) en cada cambio, así que un input controlado por el store
+ *  borraría el espacio recién tecleado. El texto crudo vive aquí; el store recibe
+ *  las palabras redistribuidas para el render. */
+function CueRow({
+  cue,
+  onChangeText,
+  onRemove,
+}: {
+  cue: SubtitleCue;
+  onChangeText: (id: string, text: string) => void;
+  onRemove: (id: string) => void;
+}) {
+  const [text, setText] = useState(() => cue.words.map((w) => w.text).join(" "));
+  return (
+    <li className="flex items-center gap-1">
+      <input
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          onChangeText(cue.id, e.target.value);
+        }}
+        aria-label="Texto de la frase"
+        className="flex-1 min-w-0 bg-surface-2 border border-border-2 rounded-md px-2 py-1 text-[11px] focus:outline-none focus:border-accent"
+      />
+      <button type="button" onClick={() => onRemove(cue.id)} aria-label="Borrar frase" className="text-muted hover:text-danger px-1">
+        <Trash2 size={14} aria-hidden="true" />
+      </button>
+    </li>
   );
 }

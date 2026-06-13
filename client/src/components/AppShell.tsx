@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { AudioPanel } from "../features/audio/AudioPanel";
+import { SubtitlesPanel } from "../features/subtitles/SubtitlesPanel";
 import { ImagePanel } from "../features/image/ImagePanel";
 import { MediaPanel } from "../features/media/MediaPanel";
 import { PlaybackProvider, PreviewArea, usePlayback } from "../features/preview/PreviewArea";
@@ -42,6 +43,7 @@ export function AppShell() {
               {activeTool === "media" && <MediaPanel />}
               {activeTool === "image" && <ImagePanel />}
               {activeTool === "audio" && <AudioPanel />}
+              {activeTool === "subtitles" && <SubtitlesPanel />}
             </div>
             <ResizeHandle
               orientation="vertical"

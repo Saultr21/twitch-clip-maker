@@ -7,6 +7,7 @@ const TOOLS: Array<{ id: string; icon: string; label: string; enabled: boolean }
   { id: "text", icon: "📝", label: "Texto", enabled: true },
   { id: "image", icon: "🖼️", label: "Imagen", enabled: true },
   { id: "audio", icon: "🎵", label: "Audio", enabled: true },
+  { id: "subtitles", icon: "💬", label: "Subtítulos", enabled: true },
   { id: "filters", icon: "🎨", label: "Filtros", enabled: true },
   { id: "speed", icon: "⚡", label: "Velocidad", enabled: true },
 ];
@@ -44,7 +45,7 @@ export function ToolRail() {
           key={tool.id}
           type="button"
           disabled={!tool.enabled}
-          aria-pressed={tool.enabled && tool.id !== "text" && tool.id !== "filters" && tool.id !== "speed" ? tool.id === activeTool : undefined}
+          aria-pressed={tool.enabled && tool.id !== "text" && tool.id !== "filters" && tool.id !== "speed" ? activeTool === tool.id : undefined}
           title={tool.enabled ? tool.label : `${tool.label} — próximos hitos`}
           onClick={() => onTool(tool.id)}
           className={`w-12 rounded-lg py-1.5 text-center text-[10px] disabled:opacity-40 ${

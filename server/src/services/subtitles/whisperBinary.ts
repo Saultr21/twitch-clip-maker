@@ -26,13 +26,6 @@ const MODEL_FILES: Record<WhisperModelId, string> = {
 const MODEL_URL = (m: WhisperModelId) =>
   `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_FILES[m]}`;
 
-// Modelo VAD (Silero) para detectar voz: ~885 KB. Procesar solo los tramos con
-// voz fija el onset (el 1.er subtítulo entra cuando hablan, no al inicio) y de
-// paso acelera (se salta música/silencios).
-const VAD_MODEL_FILE = "ggml-silero-v5.1.2.bin";
-const VAD_MODEL_URL =
-  "https://huggingface.co/ggml-org/whisper-vad/resolve/main/ggml-silero-v5.1.2.bin";
-
 const WHISPER_DIR = path.join(BIN_DIR, "whisper");
 const CPU_DIR = path.join(WHISPER_DIR, "cpu");
 const CUDA_DIR = path.join(WHISPER_DIR, "cuda");
@@ -42,10 +35,6 @@ const WARM_SENTINEL = path.join(WHISPER_DIR, ".cuda-warmed-v2");
 
 export function whisperModelPath(model: WhisperModelId): string {
   return path.join(WHISPER_DIR, MODEL_FILES[model]);
-}
-
-export function vadModelPath(): string {
-  return path.join(WHISPER_DIR, VAD_MODEL_FILE);
 }
 
 /** Hilos a usar: todos los lógicos disponibles. */
@@ -130,13 +119,7 @@ export async function ensureWhisper(model: WhisperModelId = "small"): Promise<vo
   try {
     const useGpu = await hasNvidiaGpu();
     const modelFile = whisperModelPath(model);
-    const vadFile = vadModelPath();
-    if (
-      fs.existsSync(whisperExeFor(useGpu)) &&
-      fs.existsSync(modelFile) &&
-      fs.existsSync(vadFile) &&
-      (!useGpu || fs.existsSync(WARM_SENTINEL))
-    ) {
+    if (fs.existsSync(whisperExeFor(useGpu)) && fs.existsSync(modelFile) && (!useGpu || fs.existsSync(WARM_SENTINEL))) {
       status = { ready: true, gpu: useGpu };
       return;
     }
@@ -144,7 +127,6 @@ export async function ensureWhisper(model: WhisperModelId = "small"): Promise<vo
     status = { ready: false, step: "downloading" };
     await ensureBuild(useGpu ? CUDA_ZIP_URL : CPU_ZIP_URL, useGpu ? CUDA_DIR : CPU_DIR);
     if (!fs.existsSync(modelFile)) await download(MODEL_URL(model), modelFile);
-    if (!fs.existsSync(vadFile)) await download(VAD_MODEL_URL, vadFile);
     if (useGpu) await warmCudaJit(model);
     status = { ready: true, gpu: useGpu };
   } catch (err) {

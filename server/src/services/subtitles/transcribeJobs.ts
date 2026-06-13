@@ -8,7 +8,6 @@ import { ffmpegBin } from "../binaries.js";
 import {
   ensureWhisper,
   hasNvidiaGpu,
-  vadModelPath,
   whisperExeFor,
   whisperModelPath,
   whisperThreads,
@@ -83,14 +82,13 @@ async function run(
     if (job.cancelled) return;
 
     // 2) whisper.cpp → JSON completo (segmentos + tokens).
-    //  -nfa + -dtw: timestamps por palabra precisos (DTW exige desactivar flash
-    //    attention) → el karaoke deja de ir a tirones de ~1s.
-    //  --vad: procesa solo los tramos con voz → el 1.er subtítulo entra cuando
-    //    hablan (no al inicio) y de paso acelera al saltarse música/silencios.
+    //  -nfa + -dtw: timestamps por palabra precisos y absolutos (DTW exige
+    //    desactivar flash attention) → el karaoke deja de ir a tirones de ~1s.
+    //  Sin VAD a propósito: el VAD se saltaba voz sobre música fuerte y faltaban
+    //    subtítulos; la música ya se descarta como anotación en el parser.
     const args = [
       "-m", whisperModelPath(model), "-f", wav, "-oj", "-ojf", "-of", outPrefix,
       "-t", String(whisperThreads), "-nfa", "-dtw", model,
-      "--vad", "-vm", vadModelPath(),
       ...(language && language !== "auto" ? ["-l", language] : ["-l", "auto"]),
     ];
     await execa(whisperExeFor(useGpu), args);

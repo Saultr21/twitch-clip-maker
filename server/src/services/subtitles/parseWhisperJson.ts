@@ -43,18 +43,7 @@ export function parseWhisperJson(raw: string): SubtitleCue[] {
       const first = cleaned[0].text.replace(/^[-–—]\s*/, "");
       cleaned = first === "" ? cleaned.slice(1) : [{ ...cleaned[0], text: first }, ...cleaned.slice(1)];
     }
-    if (cleaned.length > 0) {
-      // Con VAD/DTW los offsets de TOKEN son relativos a los tramos de voz
-      // (empiezan en 0), pero el offset del SEGMENTO sí es tiempo real. Anclamos
-      // la 1.ª palabra al inicio del segmento y conservamos las duraciones de
-      // DTW (no estiramos) → onset correcto + ritmo real por palabra. Sin VAD
-      // los offsets ya coinciden, así que el desplazamiento es 0 (idéntico).
-      const shift = seg.offsets.from / 1000 - cleaned[0].start;
-      if (Number.isFinite(shift) && shift !== 0) {
-        cleaned = cleaned.map((w) => ({ text: w.text, start: w.start + shift, end: w.end + shift }));
-      }
-      cues.push({ id: `cue-${i}`, words: cleaned });
-    }
+    if (cleaned.length > 0) cues.push({ id: `cue-${i}`, words: cleaned });
   });
 
   return cues;

@@ -5,7 +5,14 @@ import { execa } from "execa";
 import type { SubtitleCue, VideoClip } from "@clipforge/shared";
 import { CLIPS_DIR, EXPORTS_DIR } from "../../lib/paths.js";
 import { ffmpegBin } from "../binaries.js";
-import { ensureWhisper, whisperExe, whisperModel } from "./whisperBinary.js";
+import {
+  ensureWhisper,
+  hasNvidiaGpu,
+  whisperExeFor,
+  whisperModelPath,
+  whisperThreads,
+  type WhisperModelId,
+} from "./whisperBinary.js";
 import { parseWhisperJson } from "./parseWhisperJson.js";
 import { cuesToProjectTime } from "./cuesToProjectTime.js";
 
@@ -29,7 +36,12 @@ function notify(j: SubtitleJob): void {
 }
 
 /** Transcribe el audio del clip y devuelve cues en tiempo de proyecto. */
-export function startTranscription(clip: VideoClip, fileName: string, language?: string): SubtitleJob {
+export function startTranscription(
+  clip: VideoClip,
+  fileName: string,
+  language?: string,
+  model: WhisperModelId = "small",
+): SubtitleJob {
   const job: SubtitleJob = {
     jobId: crypto.randomUUID(),
     state: "running",
@@ -38,7 +50,7 @@ export function startTranscription(clip: VideoClip, fileName: string, language?:
   };
   jobs.set(job.jobId, job);
 
-  void run(job, clip, fileName, language).catch((err) => {
+  void run(job, clip, fileName, language, model).catch((err) => {
     if (job.cancelled) return;
     job.state = "error";
     job.error = err instanceof Error ? err.message : "Error en la transcripción";
@@ -48,9 +60,16 @@ export function startTranscription(clip: VideoClip, fileName: string, language?:
   return job;
 }
 
-async function run(job: SubtitleJob, clip: VideoClip, fileName: string, language?: string): Promise<void> {
-  await ensureWhisper();
+async function run(
+  job: SubtitleJob,
+  clip: VideoClip,
+  fileName: string,
+  language: string | undefined,
+  model: WhisperModelId,
+): Promise<void> {
+  await ensureWhisper(model);
   if (job.cancelled) return;
+  const useGpu = await hasNvidiaGpu();
 
   const wav = path.join(EXPORTS_DIR, `subs-${job.jobId}.wav`);
   const outPrefix = path.join(EXPORTS_DIR, `subs-${job.jobId}`);
@@ -62,12 +81,14 @@ async function run(job: SubtitleJob, clip: VideoClip, fileName: string, language
     ]);
     if (job.cancelled) return;
 
-    // 2) whisper.cpp → JSON completo (segmentos + tokens con tiempos)
+    // 2) whisper.cpp → JSON completo (segmentos + tokens). Todos los hilos y
+    // flash attention (-fa) aceleran tanto en GPU como en CPU.
     const args = [
-      "-m", whisperModel, "-f", wav, "-oj", "-ojf", "-of", outPrefix,
+      "-m", whisperModelPath(model), "-f", wav, "-oj", "-ojf", "-of", outPrefix,
+      "-t", String(whisperThreads), "-fa",
       ...(language && language !== "auto" ? ["-l", language] : ["-l", "auto"]),
     ];
-    await execa(whisperExe, args);
+    await execa(whisperExeFor(useGpu), args);
     if (job.cancelled) return;
 
     // 3) parsear y mapear al tiempo de proyecto

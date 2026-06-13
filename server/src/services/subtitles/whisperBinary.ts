@@ -1,26 +1,60 @@
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import type { ReadableStream as WebReadableStream } from "node:stream/web";
 import { execa } from "execa";
 import { BIN_DIR } from "../../lib/paths.js";
+import { ffmpegBin } from "../binaries.js";
 
-// Release verificado en runtime: v1.8.6 contiene whisper-cli.exe en Release/
-const WHISPER_ZIP_URL =
+// Builds de whisper.cpp (v1.8.6, verificados en runtime). El cuBLAS trae las
+// DLLs de CUDA; el CPU es ligero. Se elige según haya GPU NVIDIA o no.
+const CPU_ZIP_URL =
   "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-bin-x64.zip";
-// Modelo "small": mejor que "base" separando voz de música de fondo, a costa
-// de ~466MB de descarga (clips cortos → la velocidad sigue siendo aceptable)
-const MODEL_URL =
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
+const CUDA_ZIP_URL =
+  "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-cublas-12.4.0-bin-x64.zip";
+
+export type WhisperModelId = "small" | "medium";
+const MODEL_FILES: Record<WhisperModelId, string> = {
+  small: "ggml-small.bin",
+  medium: "ggml-medium.bin",
+};
+const MODEL_URL = (m: WhisperModelId) =>
+  `https://huggingface.co/ggerganov/whisper.cpp/resolve/main/${MODEL_FILES[m]}`;
 
 const WHISPER_DIR = path.join(BIN_DIR, "whisper");
-export const whisperExe = path.join(WHISPER_DIR, "whisper-cli.exe");
-export const whisperModel = path.join(WHISPER_DIR, "ggml-small.bin");
+const CPU_DIR = path.join(WHISPER_DIR, "cpu");
+const CUDA_DIR = path.join(WHISPER_DIR, "cuda");
+const WARM_SENTINEL = path.join(WHISPER_DIR, ".cuda-warmed");
+
+export function whisperModelPath(model: WhisperModelId): string {
+  return path.join(WHISPER_DIR, MODEL_FILES[model]);
+}
+
+/** Hilos a usar: todos los lógicos disponibles. */
+export const whisperThreads = Math.max(1, os.cpus().length);
+
+let gpuChecked = false;
+let gpu = false;
+/** True si hay una GPU NVIDIA utilizable (nvidia-smi responde). */
+export async function hasNvidiaGpu(): Promise<boolean> {
+  if (gpuChecked) return gpu;
+  gpu = await execa("nvidia-smi", ["-L"], { reject: false })
+    .then((r) => r.exitCode === 0 && /GPU \d+:/.test(r.stdout))
+    .catch(() => false);
+  gpuChecked = true;
+  return gpu;
+}
+
+/** Ruta del whisper-cli a usar (cuda si hay GPU y está instalado, si no cpu). */
+export function whisperExeFor(useGpu: boolean): string {
+  return path.join(useGpu ? CUDA_DIR : CPU_DIR, "whisper-cli.exe");
+}
 
 export type WhisperStatus =
-  | { ready: true }
-  | { ready: false; step: "missing" | "downloading" | "error"; message?: string };
+  | { ready: true; gpu: boolean }
+  | { ready: false; step: "missing" | "downloading" | "warming" | "error"; message?: string };
 
 let status: WhisperStatus = { ready: false, step: "missing" };
 export function getWhisperStatus(): WhisperStatus {
@@ -40,60 +74,70 @@ async function download(url: string, dest: string): Promise<void> {
   }
 }
 
-/** Asegura whisper-cli.exe + modelo. Idempotente; seguro llamar varias veces. */
-export async function ensureWhisper(): Promise<void> {
-  if (fs.existsSync(whisperExe) && fs.existsSync(whisperModel)) {
-    status = { ready: true };
-    return;
-  }
-  try {
-    status = { ready: false, step: "downloading" };
-    fs.mkdirSync(WHISPER_DIR, { recursive: true });
-    if (!fs.existsSync(whisperExe)) {
-      const zip = path.join(WHISPER_DIR, "whisper.zip");
-      await download(WHISPER_ZIP_URL, zip);
-      // bsdtar del sistema (Windows 10+) extrae zip y entiende rutas con unidad.
-      // Se invoca por ruta absoluta para NO coger el GNU tar de Git Bash, que
-      // interpreta "C:\..." como host:ruta y falla.
-      const systemTar = path.join(
-        process.env.SystemRoot ?? "C:\\Windows",
-        "System32",
-        "tar.exe",
-      );
-      const tarBin = fs.existsSync(systemTar) ? systemTar : "tar";
-      await execa(tarBin, ["-xf", zip, "-C", WHISPER_DIR]);
-      fs.rmSync(zip, { force: true });
-      // El release anida el exe en Release/ junto a sus DLLs (whisper.dll,
-      // ggml.dll, …). Hay que dejar el exe Y sus DLLs juntos en WHISPER_DIR,
-      // porque Windows resuelve las DLLs en el directorio del ejecutable.
-      if (!fs.existsSync(whisperExe)) {
-        const found = findExe(WHISPER_DIR);
-        if (!found) throw new Error("No se encontró el ejecutable de whisper en el zip");
-        const srcDir = path.dirname(found);
-        if (srcDir !== WHISPER_DIR) {
-          for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
-            if (entry.isFile()) {
-              fs.copyFileSync(path.join(srcDir, entry.name), path.join(WHISPER_DIR, entry.name));
-            }
-          }
-        }
-        // si el exe encontrado se llamaba main.exe, normalizar el nombre
-        if (!fs.existsSync(whisperExe)) {
-          fs.copyFileSync(path.join(WHISPER_DIR, path.basename(found)), whisperExe);
-        }
+/** Descarga y extrae un build de whisper en destDir, dejando exe + DLLs juntos. */
+async function ensureBuild(url: string, destDir: string): Promise<void> {
+  const exe = path.join(destDir, "whisper-cli.exe");
+  if (fs.existsSync(exe)) return;
+  fs.mkdirSync(destDir, { recursive: true });
+  const zip = path.join(destDir, "build.zip");
+  await download(url, zip);
+  // bsdtar del sistema por ruta absoluta (no el GNU tar de Git Bash, que
+  // interpreta "C:\..." como host:ruta)
+  const systemTar = path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "tar.exe");
+  await execa(fs.existsSync(systemTar) ? systemTar : "tar", ["-xf", zip, "-C", destDir]);
+  fs.rmSync(zip, { force: true });
+  if (!fs.existsSync(exe)) {
+    // el zip anida el exe en Release/ con sus DLLs: se copian todas juntas
+    const found = findExe(destDir);
+    if (!found) throw new Error("No se encontró el ejecutable de whisper en el zip");
+    const srcDir = path.dirname(found);
+    if (srcDir !== destDir) {
+      for (const entry of fs.readdirSync(srcDir, { withFileTypes: true })) {
+        if (entry.isFile()) fs.copyFileSync(path.join(srcDir, entry.name), path.join(destDir, entry.name));
       }
     }
-    if (!fs.existsSync(whisperModel)) {
-      await download(MODEL_URL, whisperModel);
+    if (!fs.existsSync(exe)) fs.copyFileSync(path.join(destDir, path.basename(found)), exe);
+  }
+}
+
+/** Compila la caché PTX-JIT de CUDA una vez (Blackwell no tiene kernels nativos
+ *  en CUDA 12.4): absorbe los ~70s de la primera vez aquí, no en la 1ª transcripción. */
+async function warmCudaJit(model: WhisperModelId): Promise<void> {
+  if (fs.existsSync(WARM_SENTINEL)) return;
+  status = { ready: false, step: "warming" };
+  const wav = path.join(WHISPER_DIR, "warm.wav");
+  try {
+    await execa(ffmpegBin, ["-y", "-f", "lavfi", "-i", "anullsrc=r=16000:cl=mono", "-t", "0.5", wav]);
+    await execa(whisperExeFor(true), ["-m", whisperModelPath(model), "-f", wav, "-t", String(whisperThreads)], {
+      reject: false,
+    });
+    fs.writeFileSync(WARM_SENTINEL, new Date().toISOString());
+  } finally {
+    fs.rmSync(wav, { force: true });
+  }
+}
+
+/** Asegura el build adecuado (GPU/CPU) y el modelo pedido. Idempotente. */
+export async function ensureWhisper(model: WhisperModelId = "small"): Promise<void> {
+  try {
+    const useGpu = await hasNvidiaGpu();
+    const modelFile = whisperModelPath(model);
+    if (fs.existsSync(whisperExeFor(useGpu)) && fs.existsSync(modelFile) && (!useGpu || fs.existsSync(WARM_SENTINEL))) {
+      status = { ready: true, gpu: useGpu };
+      return;
     }
-    status = { ready: true };
+    fs.mkdirSync(WHISPER_DIR, { recursive: true });
+    status = { ready: false, step: "downloading" };
+    await ensureBuild(useGpu ? CUDA_ZIP_URL : CPU_ZIP_URL, useGpu ? CUDA_DIR : CPU_DIR);
+    if (!fs.existsSync(modelFile)) await download(MODEL_URL(model), modelFile);
+    if (useGpu) await warmCudaJit(model);
+    status = { ready: true, gpu: useGpu };
   } catch (err) {
     status = { ready: false, step: "error", message: err instanceof Error ? err.message : "Error" };
     throw err;
   }
 }
 
-/** Busca recursivamente whisper-cli.exe o main.exe dentro de dir. */
 function findExe(dir: string): string | null {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const full = path.join(dir, entry.name);

@@ -20,6 +20,7 @@ const startBody = z.object({
     }),
   }),
   language: z.string().optional(),
+  model: z.enum(["small", "medium"]).optional(),
 });
 
 type SubtitleEvent =
@@ -32,7 +33,12 @@ export function subtitleRoutes(app: FastifyInstance): void {
     if (!parsed.success) return reply.code(400).send({ error: "Petición no válida" });
     const info = listClips().find((c) => c.id === parsed.data.clip.clipId);
     if (!info) return reply.code(404).send({ error: "Clip no encontrado" });
-    const job = startTranscription(parsed.data.clip, info.fileName, parsed.data.language);
+    const job = startTranscription(
+      parsed.data.clip,
+      info.fileName,
+      parsed.data.language,
+      parsed.data.model ?? "small",
+    );
     return { jobId: job.jobId };
   });
 

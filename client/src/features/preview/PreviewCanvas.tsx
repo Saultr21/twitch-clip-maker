@@ -1,4 +1,4 @@
-import { useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -25,8 +25,30 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   const videoTrack = useProjectStore((s) => s.project.tracks.video);
   const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
   const clips = useClipsStore((s) => s.clips);
+  const background = settings.background;
   const containerRef = useRef<HTMLDivElement>(null);
+  const bgVideoRef = useRef<HTMLVideoElement>(null);
   const container = useElementSize(containerRef);
+
+  // Fondo blur: un <video> espejo del principal, escalado a cover y desenfocado
+  useEffect(() => {
+    if (background.type !== "blur") return;
+    let raf = 0;
+    const tick = () => {
+      const main = videoRef.current;
+      const bgv = bgVideoRef.current;
+      if (main && bgv) {
+        const src = main.getAttribute("src");
+        if (src && bgv.getAttribute("src") !== src) bgv.src = src;
+        if (Math.abs(bgv.currentTime - main.currentTime) > 0.2) bgv.currentTime = main.currentTime;
+        if (!main.paused && bgv.paused) void bgv.play().catch(() => {});
+        if (main.paused && !bgv.paused) bgv.pause();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [background.type, videoRef]);
 
   const canvas = useMemo(() => {
     if (!container.width || !container.height) return { width: 0, height: 0 };
@@ -106,9 +128,31 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
             Sin overflow-hidden: lo que desborda el lienzo se ve atenuado por el
             velo de abajo, para saber qué parte queda fuera del encuadre */}
         <div
-          className="relative bg-black rounded-sm shadow-[0_4px_24px_rgba(145,70,255,.15)]"
-          style={{ width: canvas.width, height: canvas.height }}
+          className="relative rounded-sm shadow-[0_4px_24px_rgba(145,70,255,.15)]"
+          style={{
+            width: canvas.width,
+            height: canvas.height,
+            backgroundColor: background.type === "color" ? background.color : "#000000",
+          }}
         >
+          {background.type === "blur" && (
+            // capa propia recortada: el scale 1.1 tapa el borde del blur sin
+            // recortar el vídeo principal, el velo ni las asas de Konva
+            <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
+              <video
+                ref={bgVideoRef}
+                muted
+                aria-hidden="true"
+                className="absolute inset-0 w-full h-full max-w-none"
+                style={{
+                  objectFit: "cover",
+                  filter: `blur(${Math.max(2, Math.round(background.blur * 24))}px)`,
+                  transform: "scale(1.1)",
+                  visibility: inGap ? "hidden" : "visible",
+                }}
+              />
+            </div>
+          )}
           <video
             ref={videoRef}
             preload="auto"

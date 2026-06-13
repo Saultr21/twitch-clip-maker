@@ -37,6 +37,7 @@ interface ProjectState {
   loadProject: (p: Project) => void;
   renameProject: (name: string) => void;
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
+  setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   addVideoClip: (clip: ClipInfo) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
@@ -86,6 +87,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         d.settings.aspect = aspect;
         d.settings.width = width;
         d.settings.height = height;
+      }),
+
+    setBackground: (patch) =>
+      mutate((d) => {
+        Object.assign(d.settings.background, patch);
       }),
 
     addVideoClip: (clip) =>

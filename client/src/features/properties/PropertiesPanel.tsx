@@ -252,6 +252,55 @@ function VideoProperties({ clipId }: { clipId: string }) {
   );
 }
 
+const BG_LABELS: Record<"black" | "color" | "blur", string> = {
+  black: "Negro",
+  color: "Color sólido",
+  blur: "Desenfoque del vídeo",
+};
+
+/** Fondo del proyecto (rellena las zonas que el vídeo no cubre). */
+function BackgroundProperties() {
+  const background = useProjectStore((s) => s.project.settings.background);
+  const setBackground = useProjectStore((s) => s.setBackground);
+
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="text-[11px] font-bold text-muted tracking-wide">FONDO DEL PROYECTO</h3>
+      <p className="text-[11px] text-muted">
+        Rellena las franjas que el vídeo no cubre (p. ej. un 16:9 en formato vertical).
+      </p>
+      <Field label="Tipo de fondo" htmlFor="prop-bg-type">
+        <select
+          id="prop-bg-type"
+          value={background.type}
+          onChange={(e) => setBackground({ type: e.target.value as "black" | "color" | "blur" })}
+          className={inputClass}
+        >
+          {(Object.keys(BG_LABELS) as Array<keyof typeof BG_LABELS>).map((t) => (
+            <option key={t} value={t}>{BG_LABELS[t]}</option>
+          ))}
+        </select>
+      </Field>
+      {background.type === "color" && (
+        <Field label="Color" htmlFor="prop-bg-color">
+          <input
+            id="prop-bg-color"
+            type="color"
+            value={background.color}
+            onChange={(e) => setBackground({ color: e.target.value })}
+            className="h-8 w-full bg-surface-2 rounded-md border border-border-2"
+          />
+        </Field>
+      )}
+      {background.type === "blur" && (
+        <Field label={`Intensidad del desenfoque · ${Math.round(background.blur * 100)}%`} htmlFor="prop-bg-blur">
+          <Slider id="prop-bg-blur" min={0} max={1} step={0.05} value={background.blur} onChange={(v) => setBackground({ blur: v })} />
+        </Field>
+      )}
+    </div>
+  );
+}
+
 function AudioProperties({ trackId }: { trackId: string }) {
   const updateAudio = useProjectStore((s) => s.updateAudio);
   const track = useProjectStore((s) => s.project.tracks.audio.find((a) => a.id === trackId));
@@ -286,9 +335,12 @@ export function PropertiesPanel() {
     >
       <h2 className="text-xs font-bold tracking-wide mb-3">PROPIEDADES</h2>
       {!selection && (
-        <p className="text-[11px] text-muted">
-          Selecciona un elemento en el lienzo o en la línea de tiempo.
-        </p>
+        <div className="flex flex-col gap-4">
+          <p className="text-[11px] text-muted">
+            Selecciona un elemento en el lienzo o en la línea de tiempo.
+          </p>
+          <BackgroundProperties />
+        </div>
       )}
       {text && <TextProperties overlay={text} />}
       {image && <ImageProperties overlay={image} />}

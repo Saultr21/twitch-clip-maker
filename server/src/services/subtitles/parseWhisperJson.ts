@@ -35,7 +35,15 @@ export function parseWhisperJson(raw: string): SubtitleCue[] {
         last.end = tok.offsets.to / 1000;
       }
     }
-    if (words.length > 0) cues.push({ id: `cue-${i}`, words });
+    // Las anotaciones no-habla a veces llegan partidas en varios tokens
+    // ("(", "música", ")") y se reensamblan como una palabra: se filtran aquí.
+    let cleaned = words.filter((w) => !/^[[(].*[\])]$/.test(w.text.trim()));
+    // whisper antepone un guion de cambio de turno a la primera palabra
+    if (cleaned.length > 0) {
+      const first = cleaned[0].text.replace(/^[-–—]\s*/, "");
+      cleaned = first === "" ? cleaned.slice(1) : [{ ...cleaned[0], text: first }, ...cleaned.slice(1)];
+    }
+    if (cleaned.length > 0) cues.push({ id: `cue-${i}`, words: cleaned });
   });
 
   return cues;

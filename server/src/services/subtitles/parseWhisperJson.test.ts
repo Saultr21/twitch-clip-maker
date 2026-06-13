@@ -58,6 +58,30 @@ describe("parseWhisperJson", () => {
     expect(parseWhisperJson(JSON.stringify(music))).toEqual([]);
   });
 
+  it("descarta una anotación reensamblada desde varios tokens y quita el guion de turno", () => {
+    const split = {
+      transcription: [
+        {
+          offsets: { from: 0, to: 8000 },
+          text: " (música)",
+          tokens: [
+            { text: " (", offsets: { from: 0, to: 100 } },
+            { text: "música", offsets: { from: 100, to: 7000 } },
+            { text: ")", offsets: { from: 7000, to: 8000 } },
+          ],
+        },
+        {
+          offsets: { from: 8000, to: 9000 },
+          text: " -Hola",
+          tokens: [{ text: " -Hola", offsets: { from: 8000, to: 9000 } }],
+        },
+      ],
+    };
+    const cues = parseWhisperJson(JSON.stringify(split));
+    expect(cues).toHaveLength(1); // la (música) se descarta
+    expect(cues[0].words[0].text).toBe("Hola"); // sin el guion de cambio de turno
+  });
+
   it("lanza con JSON inválido", () => {
     expect(() => parseWhisperJson("{no json")).toThrow();
   });

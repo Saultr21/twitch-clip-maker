@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createEmptyProject, projectToPreset } from "@clipforge/shared";
-import type { ClipInfo } from "@clipforge/shared";
+import type { ClipInfo, SubtitleCue } from "@clipforge/shared";
 import { useProjectStore } from "./projectStore";
 import { useUiStore } from "./uiStore";
 
@@ -176,6 +176,52 @@ describe("pista de música", () => {
     expect(useProjectStore.getState().project.tracks.audio[0].start).toBe(4);
     s.removeElement("audio", id);
     expect(useProjectStore.getState().project.tracks.audio).toHaveLength(0);
+  });
+});
+
+describe("subtítulos", () => {
+  const cues: SubtitleCue[] = [
+    { id: "c1", words: [{ text: "Hola", start: 0, end: 1 }] },
+    { id: "c2", words: [{ text: "mundo", start: 1, end: 2 }] },
+  ];
+
+  it("setSubtitleCues reemplaza todas las cues (con undo)", () => {
+    const s = useProjectStore.getState();
+    s.setSubtitleCues(cues);
+    expect(useProjectStore.getState().project.subtitles.cues).toHaveLength(2);
+    s.setSubtitleCues([cues[0]]);
+    expect(useProjectStore.getState().project.subtitles.cues).toHaveLength(1);
+    s.undo();
+    expect(useProjectStore.getState().project.subtitles.cues).toHaveLength(2);
+  });
+
+  it("updateCueText redistribuye los tiempos entre las palabras nuevas", () => {
+    const s = useProjectStore.getState();
+    s.setSubtitleCues(cues);
+    s.updateCueText("c1", "a b");
+    const cue = useProjectStore.getState().project.subtitles.cues[0];
+    expect(cue.words.map((w) => w.text)).toEqual(["a", "b"]);
+    expect(cue.words[0].start).toBe(0);
+    expect(cue.words[1].end).toBe(1);
+  });
+
+  it("moveCue desplaza las palabras y removeCue la elimina", () => {
+    const s = useProjectStore.getState();
+    s.setSubtitleCues(cues);
+    s.moveCue("c2", 5);
+    const c2 = useProjectStore.getState().project.subtitles.cues[1];
+    expect(c2.words[0].start).toBe(5); // estaba en 1 → +4
+    s.removeCue("c1");
+    expect(useProjectStore.getState().project.subtitles.cues.map((c) => c.id)).toEqual(["c2"]);
+  });
+
+  it("setSubtitleStyle y clearSubtitles", () => {
+    const s = useProjectStore.getState();
+    s.setSubtitleCues(cues);
+    s.setSubtitleStyle({ uppercase: false });
+    expect(useProjectStore.getState().project.subtitles.style.uppercase).toBe(false);
+    s.clearSubtitles();
+    expect(useProjectStore.getState().project.subtitles.cues).toEqual([]);
   });
 });
 

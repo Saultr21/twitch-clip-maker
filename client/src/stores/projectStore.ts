@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, ImageOverlay, Preset, Project, TextOverlay, VideoClip } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
   createAudioTrack,
   createEmptyProject,
@@ -9,6 +9,7 @@ import {
   createVideoClip,
 } from "@clipforge/shared";
 import { clipDuration, clipEnd, hasOverlap, splitVideoClip, videoClipAt } from "../lib/timeline";
+import { cueEnd, cueStart, redistributeWordTimes, scaleCueWords, shiftCueWords } from "../lib/subtitles";
 import { useUiStore } from "./uiStore";
 
 // Tras undo/redo el elemento seleccionado puede haber dejado de existir;
@@ -16,14 +17,18 @@ import { useUiStore } from "./uiStore";
 function pruneSelection(project: Project): void {
   const sel = useUiStore.getState().selection;
   if (!sel) return;
-  const track = project.tracks[sel.kind] as Array<{ id: string }>;
+  if (sel.kind === "subtitle") {
+    if (!project.subtitles.cues.some((c) => c.id === sel.id)) useUiStore.getState().select(null);
+    return;
+  }
+  const track = project.tracks[sel.kind as Exclude<typeof sel.kind, "subtitle">] as Array<{ id: string }>;
   if (!track.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
 }
 
 const HISTORY_LIMIT = 100;
 const MIN_CLIP_DURATION = 0.1;
 
-export type ElementKind = "video" | "text" | "image" | "audio";
+export type ElementKind = "video" | "text" | "image" | "audio" | "subtitle";
 
 interface MutateOptions {
   transient?: boolean;
@@ -53,6 +58,13 @@ interface ProjectState {
   trimAudio: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   updateAudio: (id: string, patch: Partial<AudioTrack>, opts?: MutateOptions) => void;
   removeElement: (kind: ElementKind, id: string) => void;
+  setSubtitleCues: (cues: SubtitleCue[]) => void;
+  updateCueText: (id: string, text: string) => void;
+  moveCue: (id: string, newStart: number, opts?: MutateOptions) => void;
+  trimCue: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
+  removeCue: (id: string) => void;
+  setSubtitleStyle: (patch: Partial<SubtitleStyle>) => void;
+  clearSubtitles: () => void;
   applyPreset: (preset: Preset) => void;
   setOriginalAudioVolume: (v: number) => void;
   beginTransaction: () => void;
@@ -213,10 +225,50 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     removeElement: (kind, id) =>
       mutate((d) => {
-        const track = d.tracks[kind] as Array<{ id: string }>;
+        if (kind === "subtitle") {
+          d.subtitles.cues = d.subtitles.cues.filter((c) => c.id !== id);
+          return;
+        }
+        const track = d.tracks[kind as Exclude<ElementKind, "subtitle">] as Array<{ id: string }>;
         const idx = track.findIndex((x) => x.id === id);
         if (idx !== -1) track.splice(idx, 1);
       }),
+
+    setSubtitleCues: (cues) => mutate((d) => void (d.subtitles.cues = cues)),
+
+    updateCueText: (id, text) =>
+      mutate((d) => {
+        const i = d.subtitles.cues.findIndex((c) => c.id === id);
+        if (i !== -1) d.subtitles.cues[i] = redistributeWordTimes(d.subtitles.cues[i], text);
+      }),
+
+    moveCue: (id, newStart, opts) =>
+      mutate((d) => {
+        const i = d.subtitles.cues.findIndex((c) => c.id === id);
+        if (i === -1) return;
+        const delta = Math.max(0, newStart) - cueStart(d.subtitles.cues[i]);
+        d.subtitles.cues[i] = shiftCueWords(d.subtitles.cues[i], delta);
+      }, opts),
+
+    trimCue: (id, edge, t, opts) =>
+      mutate((d) => {
+        const i = d.subtitles.cues.findIndex((c) => c.id === id);
+        if (i === -1) return;
+        const c = d.subtitles.cues[i];
+        const start = edge === "start" ? Math.min(t, cueEnd(c) - 0.1) : cueStart(c);
+        const end = edge === "end" ? Math.max(t, cueStart(c) + 0.1) : cueEnd(c);
+        d.subtitles.cues[i] = scaleCueWords(c, start, end);
+      }, opts),
+
+    removeCue: (id) =>
+      mutate((d) => {
+        d.subtitles.cues = d.subtitles.cues.filter((c) => c.id !== id);
+      }),
+
+    setSubtitleStyle: (patch) =>
+      mutate((d) => void Object.assign(d.subtitles.style, patch)),
+
+    clearSubtitles: () => mutate((d) => void (d.subtitles.cues = [])),
 
     applyPreset: (preset) =>
       mutate((d) => {

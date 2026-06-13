@@ -9,12 +9,14 @@ import { BIN_DIR } from "../../lib/paths.js";
 // Release verificado en runtime: v1.8.6 contiene whisper-cli.exe en Release/
 const WHISPER_ZIP_URL =
   "https://github.com/ggml-org/whisper.cpp/releases/download/v1.8.6/whisper-bin-x64.zip";
+// Modelo "small": mejor que "base" separando voz de música de fondo, a costa
+// de ~466MB de descarga (clips cortos → la velocidad sigue siendo aceptable)
 const MODEL_URL =
-  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin";
+  "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin";
 
 const WHISPER_DIR = path.join(BIN_DIR, "whisper");
 export const whisperExe = path.join(WHISPER_DIR, "whisper-cli.exe");
-export const whisperModel = path.join(WHISPER_DIR, "ggml-base.bin");
+export const whisperModel = path.join(WHISPER_DIR, "ggml-small.bin");
 
 export type WhisperStatus =
   | { ready: true }

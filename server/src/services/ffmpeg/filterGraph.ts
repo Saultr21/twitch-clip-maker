@@ -57,6 +57,7 @@ function colorFilters(c: VideoClip): string[] {
 export function buildFilterGraph(
   project: Project,
   clipInfos: Map<string, ClipInfo>,
+  assPath?: string,
 ): FilterGraph {
   const { width: W, height: H, fps, background: bg } = project.settings;
   const clips = [...project.tracks.video].sort((a, b) => a.timelineStart - b.timelineStart);
@@ -195,6 +196,13 @@ export function buildFilterGraph(
     }
     videoLabel = `[txt${k}]`;
   });
+
+  // Subtítulos ASS quemados con libass. Ruta escapada como las fuentes drawtext.
+  if (project.subtitles.cues.length > 0 && assPath) {
+    const escaped = assPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+    filters.push(`${videoLabel}ass='${escaped}'[subs]`);
+    videoLabel = "[subs]";
+  }
 
   // Música de fondo: cada pista se recorta, retrasa y mezcla sobre [acat]
   let audioLabel = "[acat]";

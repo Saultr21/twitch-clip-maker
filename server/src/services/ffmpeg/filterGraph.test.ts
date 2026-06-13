@@ -226,6 +226,20 @@ describe("buildFilterGraph — overlays", () => {
   });
 });
 
+describe("buildFilterGraph — subtítulos ASS", () => {
+  it("añade el filtro ass cuando se pasa la ruta del .ass y hay cues", () => {
+    const p = projectWithClip();
+    p.subtitles.cues.push({ id: "c1", words: [{ text: "Hola", start: 0, end: 1 }] });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]), "C:/data/exports/subs.ass");
+    expect(g.filterComplex).toContain("ass='C\\:/data/exports/subs.ass'");
+  });
+
+  it("sin cues no añade filtro ass aunque se pase ruta", () => {
+    const g = buildFilterGraph(projectWithClip(), new Map([["clip-1", info]]), "C:/x/subs.ass");
+    expect(g.filterComplex).not.toContain("ass=");
+  });
+});
+
 describe("buildFilterGraph — música", () => {
   it("la música entra como input de audio con atrim, volume, adelay y amix", () => {
     const p = projectWithClip(); // vídeo en [0,5)

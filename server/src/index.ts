@@ -8,6 +8,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { setupRoutes } from "./routes/setup.js";
 import { assetRoutes } from "./routes/assets.js";
 import { exportRoutes } from "./routes/export.js";
+import { presetRoutes } from "./routes/presets.js";
 
 ensureDataDirs();
 
@@ -35,6 +36,7 @@ clipRoutes(app);
 projectRoutes(app);
 assetRoutes(app);
 exportRoutes(app);
+presetRoutes(app);
 
 await app.listen({ port: 3001, host: "127.0.0.1" });
 

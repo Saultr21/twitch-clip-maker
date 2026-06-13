@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useProjectStore } from "../stores/projectStore";
 import { useAutosave, saveNow } from "../features/projects/useAutosave";
 import { ProjectMenu } from "../features/projects/ProjectMenu";
+import { TemplatesMenu } from "../features/projects/TemplatesMenu";
 import { ExportDialog } from "../features/export/ExportDialog";
 
 export function TopBar() {
@@ -55,6 +56,7 @@ export function TopBar() {
       </div>
       <div className="ml-auto flex items-center gap-2">
         <ProjectMenu />
+        <TemplatesMenu />
         <button
           type="button"
           onClick={() => void saveNow()}

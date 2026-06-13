@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createEmptyProject } from "@clipforge/shared";
+import { createEmptyProject, projectToPreset } from "@clipforge/shared";
 import type { ClipInfo } from "@clipforge/shared";
 import { useProjectStore } from "./projectStore";
 import { useUiStore } from "./uiStore";
@@ -176,5 +176,22 @@ describe("pista de música", () => {
     expect(useProjectStore.getState().project.tracks.audio[0].start).toBe(4);
     s.removeElement("audio", id);
     expect(useProjectStore.getState().project.tracks.audio).toHaveLength(0);
+  });
+});
+
+describe("applyPreset", () => {
+  it("sustituye formato, textos e imágenes conservando vídeo, con ids nuevos y undo", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip(clipInfo);
+    s.addText(0);
+    const preset = projectToPreset("tpl", useProjectStore.getState().project);
+    s.removeElement("text", useProjectStore.getState().project.tracks.text[0].id);
+    s.applyPreset(preset);
+    const p = useProjectStore.getState().project;
+    expect(p.tracks.text).toHaveLength(1);
+    expect(p.tracks.text[0].id).not.toBe(preset.text[0].id); // id regenerado
+    expect(p.tracks.video).toHaveLength(1); // el vídeo no se toca
+    s.undo();
+    expect(useProjectStore.getState().project.tracks.text).toHaveLength(0);
   });
 });

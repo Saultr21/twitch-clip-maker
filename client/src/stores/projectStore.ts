@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, ImageOverlay, Project, TextOverlay, VideoClip } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, ImageOverlay, Preset, Project, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
   createAudioTrack,
   createEmptyProject,
@@ -52,6 +52,7 @@ interface ProjectState {
   trimAudio: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   updateAudio: (id: string, patch: Partial<AudioTrack>, opts?: MutateOptions) => void;
   removeElement: (kind: ElementKind, id: string) => void;
+  applyPreset: (preset: Preset) => void;
   setOriginalAudioVolume: (v: number) => void;
   beginTransaction: () => void;
   undo: () => void;
@@ -209,6 +210,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const track = d.tracks[kind] as Array<{ id: string }>;
         const idx = track.findIndex((x) => x.id === id);
         if (idx !== -1) track.splice(idx, 1);
+      }),
+
+    applyPreset: (preset) =>
+      mutate((d) => {
+        d.settings = { ...preset.settings };
+        // ids regenerados: aplicar dos veces la misma plantilla no colisiona
+        d.tracks.text = preset.text.map((t) => ({ ...t, id: globalThis.crypto.randomUUID() }));
+        d.tracks.image = preset.image.map((i) => ({ ...i, id: globalThis.crypto.randomUUID() }));
       }),
 
     setOriginalAudioVolume: (v) => mutate((d) => void (d.originalAudioVolume = v)),

@@ -21,3 +21,30 @@ body {
   color: var(--color-text);
   font-family: "Segoe UI", system-ui, sans-serif;
 }
+
+/* Scrollbars finas integradas con el tema oscuro (las nativas blancas/grises
+   destacaban feo, sobre todo en la línea de tiempo) */
+* {
+  scrollbar-width: thin; /* Firefox */
+  scrollbar-color: var(--color-border-2) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--color-border-2);
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-3);
+  background-clip: padding-box;
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

@@ -12,13 +12,13 @@ interface UploadedAsset {
 /** Inserta una imagen (por fileName) en el playhead y la selecciona.
  *  El tamaño se calcula con la proporción real; opcionalmente en una esquina. */
 function insertImageOverlay(fileName: string, corner: boolean) {
-  const img = new Image();
-  img.src = `/assets/${fileName}`;
-  img.onload = () => {
+  let placed = false;
+  const place = (imageRatio: number) => {
+    if (placed) return; // una sola inserción aunque load y complete coincidan
+    placed = true;
     const store = useProjectStore.getState();
     const project = store.project;
     const canvasRatio = project.settings.width / project.settings.height;
-    const imageRatio = img.naturalWidth / img.naturalHeight;
     const width = corner ? 0.2 : 0.3;
     const height = Math.min(1, (width / imageRatio) * canvasRatio);
     const playhead = useUiStore.getState().playhead;
@@ -30,6 +30,15 @@ function insertImageOverlay(fileName: string, corner: boolean) {
     }
     useUiStore.getState().select({ kind: "image", id });
   };
+
+  const img = new Image();
+  // los handlers ANTES de src: si la imagen está cacheada (la miniatura ya la
+  // cargó), el evento load se dispararía antes de asignar onload y se perdería
+  img.onload = () => place(img.naturalWidth / img.naturalHeight);
+  img.onerror = () => place(1); // si no carga, cuadrada por defecto
+  img.src = `/assets/${fileName}`;
+  // por si ya estaba completa en caché y el evento no vuelve a dispararse
+  if (img.complete && img.naturalWidth > 0) place(img.naturalWidth / img.naturalHeight);
 }
 
 export function ImagePanel() {

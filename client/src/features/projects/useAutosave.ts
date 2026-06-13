@@ -7,8 +7,13 @@ export type SaveState = "saved" | "dirty" | "saving" | "error";
 const AUTOSAVE_MS = 5000;
 
 export function saveNow(): Promise<void> {
-  const { project, markSaved } = useProjectStore.getState();
-  return fetch(`/api/projects/${encodeURIComponent(project.name)}`, {
+  const { project, savedName, markSaved } = useProjectStore.getState();
+  // si se renombró, el server mueve el archivo viejo en vez de dejarlo huérfano
+  const renamed = savedName !== project.name;
+  const url =
+    `/api/projects/${encodeURIComponent(project.name)}` +
+    (renamed ? `?previousName=${encodeURIComponent(savedName)}` : "");
+  return fetch(url, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(project),

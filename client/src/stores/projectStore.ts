@@ -39,6 +39,8 @@ interface ProjectState {
   past: Project[];
   future: Project[];
   dirty: boolean;
+  /** Nombre con el que el proyecto existe en disco; difiere de project.name tras renombrar. */
+  savedName: string;
   loadProject: (p: Project) => void;
   renameProject: (name: string) => void;
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
@@ -89,8 +91,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     past: [],
     future: [],
     dirty: false,
+    savedName: "proyecto-sin-titulo",
 
-    loadProject: (p) => set({ project: p, past: [], future: [], dirty: false }),
+    loadProject: (p) => set({ project: p, past: [], future: [], dirty: false, savedName: p.name }),
 
     renameProject: (name) => mutate((d) => void (d.name = name)),
 
@@ -316,6 +319,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     canUndo: () => get().past.length > 0,
     canRedo: () => get().future.length > 0,
-    markSaved: () => set({ dirty: false }),
+    markSaved: () => set((s) => ({ dirty: false, savedName: s.project.name })),
   };
 });

@@ -22,8 +22,13 @@ export function toAssTime(s: number): string {
 }
 
 function escapeAssText(t: string): string {
-  // en ASS las llaves abren overrides; se neutralizan
-  return t.replace(/\\/g, "\\\\").replace(/\{/g, "(").replace(/\}/g, ")");
+  // en ASS las llaves abren overrides; se neutralizan. Los saltos de línea
+  // romperían la línea Dialogue, así que se reemplazan por espacio.
+  return t
+    .replace(/\\/g, "\\\\")
+    .replace(/\{/g, "(")
+    .replace(/\}/g, ")")
+    .replace(/[\r\n]+/g, " ");
 }
 
 /** Genera un fichero .ass completo con karaoke discreto (palabra activa resaltada). */

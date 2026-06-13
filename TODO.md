@@ -15,8 +15,8 @@
 - [x] Sliders con campo numérico editable a mano (2026-06-13)
 - [x] Fondo de proyecto color/blur en preview y export (2026-06-13)
 - [x] Marcas de agua reutilizables: guardar logo + insertar en esquina (2026-06-13)
-- [ ] Fondo de IMAGEN (el color y el blur ya están; el export necesita inputs de imagen en bucle)
-- [ ] Subtítulos automáticos (brainstorming aparte: Whisper u otro STT local)
+- [x] Fondo de IMAGEN (export con input en bucle + split, preview y UI) (2026-06-13)
+- [ ] Subtítulos automáticos (en brainstorming: Whisper u otro STT local)
 
 ## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)

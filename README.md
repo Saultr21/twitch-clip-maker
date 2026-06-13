@@ -3,9 +3,10 @@
 Editor local de clips de Twitch: descarga un clip por su URL y edítalo en una
 línea de tiempo multipista — recorte, multi-clip, zoom/encuadre, texto e imágenes
 superpuestas (arrastrables, redimensionables y rotables), música de fondo,
-velocidad y filtros de color por clip — y expórtalo con FFmpeg a vídeo vertical
-(9:16), horizontal (16:9), cuadrado (1:1) o 4:5, listo para TikTok, Reels,
-Shorts o YouTube.
+velocidad y filtros de color por clip, fondo de relleno (color/desenfoque/imagen),
+marcas de agua reutilizables y subtítulos automáticos karaoke — y expórtalo con
+FFmpeg a vídeo vertical (9:16), horizontal (16:9), cuadrado (1:1) o 4:5, listo
+para TikTok, Reels, Shorts o YouTube.
 
 Aplicación de un solo usuario, sin autenticación y sin despliegue: se arranca en
 local y se abre en el navegador. Pensada para Windows.
@@ -37,11 +38,20 @@ En el primer arranque el servidor descarga `yt-dlp` (canal nightly) en
 3. Edita: arrastra/recorta los bloques del timeline, añade **Texto** e **Imagen**
    (arrástralos, redimensiónalos por las esquinas y rótalos en el lienzo),
    sube **Música**, y ajusta **Velocidad** y **Filtros** del clip en el panel
-   de propiedades.
-4. **Guardar** / menú **Proyectos** conservan el trabajo (autoguardado cada 5 s).
+   de propiedades. Sin nada seleccionado, el panel ofrece el **fondo** del
+   proyecto (negro/color/desenfoque/imagen) para rellenar las franjas.
+4. **Subtítulos** → elige idioma (o autodetectar) y *Generar subtítulos*:
+   transcribe el audio con whisper.cpp y crea subtítulos karaoke (palabra
+   resaltada) editables en texto, tiempos (bloques en el timeline) y estilo.
+5. **Guardar** / menú **Proyectos** conservan el trabajo (autoguardado cada 5 s).
    El menú **Plantillas** guarda y reaplica formato + textos + imágenes.
-5. **Exportar** → elige calidad (TikTok / YouTube / Máxima) y genera el MP4 en
+   En **Imagen** puedes guardar **marcas de agua** reutilizables.
+6. **Exportar** → elige calidad (TikTok / YouTube / Máxima) y genera el MP4 en
    `data/exports/`.
+
+> La primera vez que generes subtítulos, ClipForge descarga whisper.cpp y su
+> modelo (~150 MB) en `data/bin/`. Requiere el Microsoft Visual C++
+> Redistributable (presente en la mayoría de Windows).
 
 ## Atajos de teclado
 

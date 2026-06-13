@@ -5,18 +5,21 @@
 > Overall progress: Hitos 1–4 completos en master — proyecto funcional de punta a punta
 
 ## In Progress
-- (nada — los 4 hitos del plan están cerrados; pendiente smoke test del usuario del Hito 4)
+- (nada — proyecto funcional de punta a punta + todas las mejoras de Pendiente.txt hechas; pendiente smoke test del usuario de los subtítulos)
 
 ## Up Next
-- Mejoras de `Pendiente.txt` pendientes: fondo de IMAGEN (export con inputs en bucle) y subtítulos automáticos (necesita brainstorming: motor voz-a-texto local)
+- Smoke test del usuario de los subtítulos (transcribir, karaoke en preview, editar, exportar)
 - Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
 
-## Mejoras de Pendiente.txt (post-Hito 4)
+## Mejoras de Pendiente.txt (post-Hito 4) — TODAS hechas
 - [x] Sliders con campo numérico editable a mano (2026-06-13)
 - [x] Fondo de proyecto color/blur en preview y export (2026-06-13)
 - [x] Marcas de agua reutilizables: guardar logo + insertar en esquina (2026-06-13)
 - [x] Fondo de IMAGEN (export con input en bucle + split, preview y UI) (2026-06-13)
-- [ ] Subtítulos automáticos (en brainstorming: Whisper u otro STT local)
+- [x] Subtítulos automáticos karaoke (whisper.cpp + ASS/libass) (2026-06-13)
+  - Spec: `docs/superpowers/specs/2026-06-13-subtitulos-automaticos-design.md`; Plan: `docs/superpowers/plans/2026-06-13-subtitulos-automaticos.md` (13/13 tareas)
+  - whisper.cpp auto-descargado (zip+bsdtar del sistema, modelo base), transcripción con SSE y mapeo de tiempos por trim/speed (TDD), generador .ass karaoke discreto (TDD), preview Konva, quemado con filtro ass de libass
+  - Verificado e2e: transcripción real (UTF-8 correcto) + export con subtítulos → MP4 1080x1920 válido; 162 tests verdes
 
 ## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)

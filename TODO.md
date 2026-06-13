@@ -1,31 +1,34 @@
 # TODO — ClipForge (editor local de clips de Twitch)
 
-> Last updated: 2026-06-12
-> Current phase: development
-> Overall progress: Hitos 1, 2 y 3 completos en master — Hito 4 pendiente de plan
+> Last updated: 2026-06-13
+> Current phase: maintenance
+> Overall progress: Hitos 1–4 completos en master — proyecto funcional de punta a punta
 
 ## In Progress
-- (nada — Hito 3 cerrado, pendiente smoke test del usuario)
+- (nada — los 4 hitos del plan están cerrados; pendiente smoke test del usuario del Hito 4)
 
 ## Up Next
-- Smoke test del usuario del export (paridad visual preview ↔ MP4)
-- Planificación del Hito 4 (writing-plans)
+- Smoke test del usuario del Hito 4 (filtros/velocidad/música/texto rotado/plantillas)
+- Ideas de mejora futuras en `Pendiente.txt` (valores de slider a mano, fondo blur/color/imagen, subtítulos automáticos, marcas de agua reutilizables)
 - Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
 
-## Backlog (hitos pendientes de plan)
-- [ ] `TASK-004` — Hito 4: presets de plantilla, filtros de color, velocidad por tramos, música de fondo, pulido y accesibilidad final
-  - Depends on: TASK-003
-  - Incluir: rotación de TEXTOS en el export (limitación de drawtext en H3; los textos rotados se exportan sin rotación), pista de Música en timeline + amix
-
-## Discovered / Backlog (mejoras menores del review final, para Hito 2)
+## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)
-  - Origin: revisión final Hito 1 | Priority: low
 - [ ] Null-check explícito de `ffmpegStatic` en vez del cast (`as unknown as string`)
-  - Origin: revisión final Hito 1 | Priority: low
 - [ ] Sustituir `res.body!` por guard en `clipsStore.ts`
-  - Origin: revisión final Hito 1 | Priority: low
+- [ ] Validar con Zod la respuesta de `/api/presets/:name` en el cliente antes de `applyPreset`
+- [ ] Jobs de export en memoria sin poda (crecen por sesión; aceptable en local)
 
 ## Completed
+- [x] `TASK-004` — Hito 4: filtros, velocidad, música, plantillas y pulido (2026-06-13)
+  - Directo en master (commits 27d606e..0d9469e aprox.)
+  - Plan: `docs/superpowers/plans/2026-06-12-hito-4-final.md` (12/12 tareas, revisión por tarea)
+  - Filtros de color por clip (CSS en vivo + eq/hue en export, B&N reduce saturación), velocidad por clip (playbackRate + setpts/cadena atempo)
+  - Música de fondo: subida con sniffer mp3/wav/ogg, pista en timeline, preview con pool de `<audio>` sincronizado, export con adelay+amix
+  - Rotación de textos en el export vía capa transparente rotada; plantillas (formato+textos+imágenes) guardar/aplicar/borrar con ids regenerados y undo
+  - 6 herramientas del carril activas; ayuda de atajos accesible (tecla ? + botón)
+  - Verificado e2e con ffprobe: export con velocidad 2x + B&N + texto rotado 30° → MP4 1080x1920 de 3.002s (6s de material a 2x). 129 tests verdes
+- [x] `TASK-003` — Hito 3: exportación con FFmpeg (2026-06-12)
 - [x] `TASK-003` — Hito 3: exportación con FFmpeg (2026-06-12)
   - Directo en master (commits 33d6ba1..3ef976d aprox.)
   - Plan: `docs/superpowers/plans/2026-06-12-hito-3-exportacion.md` (9/9 tareas, doble revisión por tarea)

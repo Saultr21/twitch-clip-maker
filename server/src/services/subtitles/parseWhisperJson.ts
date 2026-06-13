@@ -20,9 +20,12 @@ export function parseWhisperJson(raw: string): SubtitleCue[] {
     const words: SubtitleWord[] = [];
     for (const tok of seg.tokens ?? []) {
       const t = tok.text;
-      if (t.startsWith("[") || t.trim() === "") continue; // tokens especiales / vacíos
-      const startsWord = t.startsWith(" ");
       const piece = t.trim();
+      // Descarta vacíos y anotaciones no-habla entre corchetes/paréntesis:
+      // "[_BEG_]", " [Música]", "(aplausos)"… whisper las antepone con espacio,
+      // por eso no basta con t.startsWith("[")
+      if (piece === "" || /^[[(].*[\])]$/.test(piece)) continue;
+      const startsWord = t.startsWith(" ");
       if (startsWord || words.length === 0) {
         words.push({ text: piece, start: tok.offsets.from / 1000, end: tok.offsets.to / 1000 });
       } else {

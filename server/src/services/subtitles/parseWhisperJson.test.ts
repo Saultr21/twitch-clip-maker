@@ -40,6 +40,24 @@ describe("parseWhisperJson", () => {
     expect(parseWhisperJson(JSON.stringify(onlySpecial))).toEqual([]);
   });
 
+  it("descarta anotaciones entre corchetes aunque lleven espacio delante", () => {
+    const music = {
+      transcription: [
+        {
+          offsets: { from: 0, to: 8000 },
+          text: " [Música]",
+          tokens: [{ text: " [Música]", offsets: { from: 0, to: 8000 } }],
+        },
+        {
+          offsets: { from: 8000, to: 9000 },
+          text: " (aplausos)",
+          tokens: [{ text: " (aplausos)", offsets: { from: 8000, to: 9000 } }],
+        },
+      ],
+    };
+    expect(parseWhisperJson(JSON.stringify(music))).toEqual([]);
+  });
+
   it("lanza con JSON inválido", () => {
     expect(() => parseWhisperJson("{no json")).toThrow();
   });

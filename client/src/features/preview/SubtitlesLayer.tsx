@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Text as KonvaText } from "react-konva";
 import { activeWordIndex, cueEnd, cueStart } from "../../lib/subtitles";
 import { useProjectStore } from "../../stores/projectStore";
@@ -8,7 +9,18 @@ interface SubtitlesLayerProps {
   height: number;
 }
 
-/** Pinta la cue activa centrada; resalta la palabra bajo el playhead. Solo lectura. */
+interface PlacedWord {
+  text: string;
+  idx: number; // índice global en la cue (para el resaltado)
+  width: number;
+}
+interface Line {
+  items: PlacedWord[];
+  width: number;
+}
+
+/** Pinta la cue activa centrada y partida en líneas que caben en el lienzo
+ *  (como hace libass al quemar); resalta la palabra bajo el playhead. */
 export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
   const playhead = useUiStore((s) => s.playhead);
   const cues = useProjectStore((s) => s.project.subtitles.cues);
@@ -17,63 +29,66 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
   const cue = cues.find((c) => playhead >= cueStart(c) && playhead < cueEnd(c));
   const activeIdx = cue ? activeWordIndex(cue, playhead) : -1;
 
-  if (!cue) return null;
-
   const fontSize = style.fontSize * height;
-  // Konva.Text con segmentos de color por palabra usa un solo color; para el
-  // resaltado por palabra pintamos cada palabra como su propio Text en fila.
-  // Para simplicidad y robustez de medida, usamos un único Text con la palabra
-  // activa marcada vía textos individuales posicionados en una fila centrada.
-  const words = cue.words.map((w) => (style.uppercase ? w.text.toUpperCase() : w.text));
-
-  return (
-    <WordRow
-      words={words}
-      activeIdx={activeIdx}
-      width={width}
-      y={style.y * height}
-      fontSize={fontSize}
-      fontFamily={style.fontFamily}
-      fill={style.fill}
-      highlight={style.highlight}
-      stroke={style.stroke}
-      strokeWidth={style.strokeWidth * height}
-    />
-  );
-}
-
-function WordRow({
-  words, activeIdx, width, y, fontSize, fontFamily, fill, highlight, stroke, strokeWidth,
-}: {
-  words: string[]; activeIdx: number; width: number; y: number; fontSize: number;
-  fontFamily: string; fill: string; highlight: string; stroke: string; strokeWidth: number;
-}) {
-  // medir cada palabra para colocarlas en fila y centrar el conjunto
   const space = fontSize * 0.3;
-  const widths = words.map((w) => measureText(w, fontSize, fontFamily));
-  const total = widths.reduce((a, b) => a + b, 0) + space * (words.length - 1);
-  let x = width / 2 - total / 2;
+
+  // El reparto en líneas solo depende del texto/tamaño/ancho, no del playhead:
+  // memoizarlo evita recalcular el layout en cada fotograma de reproducción.
+  const lines = useMemo<Line[]>(() => {
+    if (!cue || width < 1) return [];
+    const maxWidth = width * 0.92; // margen lateral, como el del export
+    const out: Line[] = [];
+    let cur: PlacedWord[] = [];
+    let curWidth = 0;
+    cue.words.forEach((w, idx) => {
+      const text = style.uppercase ? w.text.toUpperCase() : w.text;
+      const wordWidth = measureText(text, fontSize, style.fontFamily);
+      const added = (cur.length > 0 ? space : 0) + wordWidth;
+      if (cur.length > 0 && curWidth + added > maxWidth) {
+        out.push({ items: cur, width: curWidth });
+        cur = [];
+        curWidth = 0;
+      }
+      cur.push({ text, idx, width: wordWidth });
+      curWidth += cur.length > 1 ? space + wordWidth : wordWidth;
+    });
+    if (cur.length > 0) out.push({ items: cur, width: curWidth });
+    return out;
+  }, [cue, width, fontSize, space, style.fontFamily, style.uppercase]);
+
+  if (!cue || lines.length === 0) return null;
+
+  const lineHeight = fontSize * 1.25;
+  const blockHeight = lines.length * lineHeight;
+  // el bloque de líneas se centra verticalmente sobre style.y
+  const top = style.y * height - blockHeight / 2;
+  const strokeWidth = style.strokeWidth * height;
+
   return (
     <>
-      {words.map((w, i) => {
-        const node = (
-          <KonvaText
-            key={i}
-            text={w}
-            x={x}
-            y={y - fontSize / 2}
-            fontSize={fontSize}
-            fontFamily={fontFamily}
-            fontStyle="bold"
-            fill={i === activeIdx ? highlight : fill}
-            stroke={stroke || undefined}
-            strokeWidth={strokeWidth}
-            fillAfterStrokeEnabled
-            listening={false}
-          />
-        );
-        x += widths[i] + space;
-        return node;
+      {lines.map((line, li) => {
+        let x = width / 2 - line.width / 2;
+        const y = top + li * lineHeight + (lineHeight - fontSize) / 2;
+        return line.items.map((it) => {
+          const node = (
+            <KonvaText
+              key={it.idx}
+              text={it.text}
+              x={x}
+              y={y}
+              fontSize={fontSize}
+              fontFamily={style.fontFamily}
+              fontStyle="bold"
+              fill={it.idx === activeIdx ? style.highlight : style.fill}
+              stroke={style.stroke || undefined}
+              strokeWidth={strokeWidth}
+              fillAfterStrokeEnabled
+              listening={false}
+            />
+          );
+          x += it.width + space;
+          return node;
+        });
       })}
     </>
   );

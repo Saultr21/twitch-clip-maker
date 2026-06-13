@@ -135,6 +135,15 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
             backgroundColor: background.type === "color" ? background.color : "#000000",
           }}
         >
+          {background.type === "image" && background.fileName && (
+            <img
+              src={`/assets/${background.fileName}`}
+              alt=""
+              aria-hidden="true"
+              className="absolute inset-0 w-full h-full max-w-none pointer-events-none"
+              style={{ objectFit: "cover" }}
+            />
+          )}
           {background.type === "blur" && (
             // capa propia recortada: el scale 1.1 tapa el borde del blur sin
             // recortar el vídeo principal, el velo ni las asas de Konva

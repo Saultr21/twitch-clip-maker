@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -252,16 +252,33 @@ function VideoProperties({ clipId }: { clipId: string }) {
   );
 }
 
-const BG_LABELS: Record<"black" | "color" | "blur", string> = {
+const BG_LABELS: Record<"black" | "color" | "blur" | "image", string> = {
   black: "Negro",
   color: "Color sólido",
   blur: "Desenfoque del vídeo",
+  image: "Imagen",
 };
 
 /** Fondo del proyecto (rellena las zonas que el vídeo no cubre). */
 function BackgroundProperties() {
   const background = useProjectStore((s) => s.project.settings.background);
   const setBackground = useProjectStore((s) => s.setBackground);
+  const bgInputRef = useRef<HTMLInputElement>(null);
+  const [bgError, setBgError] = useState<string | null>(null);
+
+  const uploadBgImage = async (file: File) => {
+    setBgError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/assets", { method: "POST", body });
+      if (!res.ok) throw new Error();
+      const asset = (await res.json()) as { fileName: string };
+      setBackground({ fileName: asset.fileName });
+    } catch {
+      setBgError("No se pudo subir la imagen de fondo");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -296,6 +313,37 @@ function BackgroundProperties() {
         <Field label={`Intensidad del desenfoque · ${Math.round(background.blur * 100)}%`} htmlFor="prop-bg-blur">
           <Slider id="prop-bg-blur" min={0} max={1} step={0.05} value={background.blur} onChange={(v) => setBackground({ blur: v })} />
         </Field>
+      )}
+      {background.type === "image" && (
+        <div className="flex flex-col gap-1">
+          <input
+            ref={bgInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            aria-label="Seleccionar imagen de fondo"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void uploadBgImage(file);
+              e.target.value = "";
+            }}
+          />
+          <button
+            type="button"
+            onClick={() => bgInputRef.current?.click()}
+            className="text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent"
+          >
+            {background.fileName ? "Cambiar imagen de fondo" : "Subir imagen de fondo"}
+          </button>
+          {background.fileName && (
+            <img
+              src={`/assets/${background.fileName}`}
+              alt="Imagen de fondo actual"
+              className="w-full h-16 object-cover rounded-md border border-border-2"
+            />
+          )}
+          {bgError && <p role="alert" className="text-[11px] text-danger">{bgError}</p>}
+        </div>
       )}
     </div>
   );

@@ -1,5 +1,5 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Music } from "lucide-react";
+import { Music, Scissors } from "lucide-react";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -185,11 +185,15 @@ function CommonOverlayProps({ opacity, rotation, onOpacity, onRotation }: {
   );
 }
 
+type SilenceState = "idle" | "analyzing" | "none" | "done" | "error";
+
 function VideoProperties({ clipId }: { clipId: string }) {
   const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
   const setOriginalAudioVolume = useProjectStore((s) => s.setOriginalAudioVolume);
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
+  const removeSilencesFromClip = useProjectStore((s) => s.removeSilencesFromClip);
   const clip = useProjectStore((s) => s.project.tracks.video.find((c) => c.id === clipId));
+  const [silence, setSilence] = useState<SilenceState>("idle");
   if (!clip) return null;
 
   const zoom = (patch: Partial<typeof clip.zoom>) =>
@@ -197,6 +201,24 @@ function VideoProperties({ clipId }: { clipId: string }) {
 
   const filters = (patch: Partial<typeof clip.filters>) =>
     updateVideoClip(clip.id, { filters: { ...clip.filters, ...patch } });
+
+  const removeSilences = async () => {
+    setSilence("analyzing");
+    try {
+      const res = await fetch(`/api/clips/${clip.clipId}/silences`);
+      if (!res.ok) throw new Error();
+      const { ranges } = (await res.json()) as { ranges: Array<{ start: number; end: number }> };
+      const inTrim = ranges.filter((r) => r.end > clip.trimIn && r.start < clip.trimOut);
+      if (inTrim.length === 0) {
+        setSilence("none");
+        return;
+      }
+      removeSilencesFromClip(clip.id, ranges); // mueve la selección al 1.er segmento
+      setSilence("done");
+    } catch {
+      setSilence("error");
+    }
+  };
 
   return (
     <div className="flex flex-col gap-3">
@@ -249,6 +271,22 @@ function VideoProperties({ clipId }: { clipId: string }) {
       <Field label={`Volumen del clip · ${Math.round(originalAudioVolume * 100)}%`} htmlFor="prop-vol">
         <Slider id="prop-vol" min={0} max={1} step={0.01} value={originalAudioVolume} onChange={setOriginalAudioVolume} />
       </Field>
+
+      <div className="border-t border-border pt-3 flex flex-col gap-1">
+        <button
+          type="button"
+          disabled={silence === "analyzing"}
+          onClick={() => void removeSilences()}
+          title="Detecta los silencios del audio y los recorta del clip"
+          className="flex items-center justify-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent disabled:opacity-50"
+        >
+          <Scissors size={14} aria-hidden="true" />
+          {silence === "analyzing" ? "Analizando audio…" : "Eliminar silencios"}
+        </button>
+        {silence === "none" && <p className="text-[10px] text-muted">No se detectaron silencios.</p>}
+        {silence === "error" && <p role="alert" className="text-[10px] text-danger">No se pudo analizar el audio.</p>}
+        <p className="text-[10px] text-muted">Parte el clip por los silencios y los quita (ripple en la pista de vídeo).</p>
+      </div>
     </div>
   );
 }

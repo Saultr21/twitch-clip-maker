@@ -28,6 +28,33 @@ function pruneSelection(project: Project): void {
 const HISTORY_LIMIT = 100;
 const MIN_CLIP_DURATION = 0.1;
 
+/** Tramos NO silenciosos dentro de [trimIn, trimOut] (tiempo de archivo): el
+ *  complemento de los silencios, ya recortados, ordenados y fusionados. Pura. */
+export function nonSilentSegments(
+  trimIn: number,
+  trimOut: number,
+  silences: Array<{ start: number; end: number }>,
+): Array<[number, number]> {
+  const within = silences
+    .map((s) => ({ start: Math.max(trimIn, s.start), end: Math.min(trimOut, s.end) }))
+    .filter((s) => s.end > s.start)
+    .sort((a, b) => a.start - b.start);
+  const merged: Array<{ start: number; end: number }> = [];
+  for (const s of within) {
+    const last = merged[merged.length - 1];
+    if (last && s.start <= last.end) last.end = Math.max(last.end, s.end);
+    else merged.push({ ...s });
+  }
+  const segs: Array<[number, number]> = [];
+  let cur = trimIn;
+  for (const s of merged) {
+    if (s.start > cur) segs.push([cur, s.start]);
+    cur = s.end;
+  }
+  if (cur < trimOut) segs.push([cur, trimOut]);
+  return segs;
+}
+
 export type ElementKind = "video" | "text" | "image" | "audio" | "subtitle";
 
 interface MutateOptions {
@@ -48,6 +75,7 @@ interface ProjectState {
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
+  removeSilencesFromClip: (id: string, silences: Array<{ start: number; end: number }>) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   updateVideoClip: (id: string, patch: Partial<VideoClip>, opts?: MutateOptions) => void;
@@ -138,6 +166,53 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       mutate((d) => {
         d.tracks.video = d.tracks.video.filter((v) => v.clipId !== clipId);
       }),
+
+    // parte el clip en sus tramos con voz (quita los silencios) y los deja
+    // pegados desde su inicio; los bloques de vídeo posteriores se desplazan a
+    // la izquierda lo recortado (ripple en la pista de vídeo)
+    removeSilencesFromClip: (id, silences) => {
+      let firstPieceId: string | null = null;
+      mutate((d) => {
+        const c = d.tracks.video.find((v) => v.id === id);
+        if (!c) return;
+        const segs = nonSilentSegments(c.trimIn, c.trimOut, silences);
+        // sin silencios reales (un único segmento == clip entero) o todo silencio
+        if (segs.length === 0 || (segs.length === 1 && segs[0][0] === c.trimIn && segs[0][1] === c.trimOut)) {
+          return;
+        }
+        const oldEnd = clipEnd(c);
+        let start = c.timelineStart;
+        const pieces = segs.map(([a, b]) => {
+          const piece = {
+            ...c,
+            id: globalThis.crypto.randomUUID(),
+            trimIn: a,
+            trimOut: b,
+            timelineStart: start,
+            zoom: { ...c.zoom },
+            filters: { ...c.filters },
+          };
+          start += (b - a) / c.speed;
+          return piece;
+        });
+        firstPieceId = pieces[0].id;
+        const removed = (c.trimOut - c.trimIn) / c.speed - (start - c.timelineStart);
+        d.tracks.video = d.tracks.video
+          .flatMap((v) => {
+            if (v.id === id) return pieces;
+            // ripple: los clips que iban después se adelantan lo recortado
+            if (v.timelineStart >= oldEnd && removed > 0) {
+              return [{ ...v, timelineStart: Math.max(0, v.timelineStart - removed) }];
+            }
+            return [v];
+          })
+          .sort((a, b) => a.timelineStart - b.timelineStart);
+      });
+      // el clip original desapareció: mueve la selección al primer segmento
+      if (firstPieceId && useUiStore.getState().selection?.id === id) {
+        useUiStore.getState().select({ kind: "video", id: firstPieceId });
+      }
+    },
 
     moveVideoClip: (id, newStart, opts) =>
       mutate((d) => {

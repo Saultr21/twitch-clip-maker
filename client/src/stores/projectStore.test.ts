@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { createEmptyProject, projectToPreset } from "@clipforge/shared";
 import type { ClipInfo, SubtitleCue } from "@clipforge/shared";
-import { useProjectStore } from "./projectStore";
+import { useProjectStore, nonSilentSegments } from "./projectStore";
 import { useUiStore } from "./uiStore";
 
 const clipInfo: ClipInfo = {
@@ -45,6 +45,50 @@ describe("addVideoClipAt", () => {
     const v = useProjectStore.getState().project.tracks.video;
     expect(v).toHaveLength(2);
     expect(v[1].timelineStart).toBe(15);
+  });
+});
+
+describe("nonSilentSegments", () => {
+  it("devuelve el complemento de los silencios dentro del recorte", () => {
+    expect(nonSilentSegments(0, 10, [{ start: 2, end: 4 }, { start: 6, end: 7 }])).toEqual([
+      [0, 2],
+      [4, 6],
+      [7, 10],
+    ]);
+  });
+
+  it("fusiona silencios solapados y recorta a [trimIn,trimOut]", () => {
+    expect(nonSilentSegments(0, 10, [{ start: 2, end: 5 }, { start: 4, end: 6 }, { start: 8, end: 20 }])).toEqual([
+      [0, 2],
+      [6, 8],
+    ]);
+  });
+
+  it("silencio al inicio y clip totalmente silencioso", () => {
+    expect(nonSilentSegments(0, 10, [{ start: 0, end: 3 }])).toEqual([[3, 10]]);
+    expect(nonSilentSegments(0, 10, [{ start: 0, end: 10 }])).toEqual([]);
+  });
+});
+
+describe("removeSilencesFromClip", () => {
+  it("parte el clip en sus tramos con voz, pegados desde el inicio", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip(clipInfo); // duración 10 → trimIn 0, trimOut 10, start 0
+    const id = useProjectStore.getState().project.tracks.video[0].id;
+    s.removeSilencesFromClip(id, [{ start: 2, end: 4 }]);
+    const v = useProjectStore.getState().project.tracks.video;
+    expect(v).toHaveLength(2);
+    expect([v[0].trimIn, v[0].trimOut, v[0].timelineStart]).toEqual([0, 2, 0]);
+    // 2º tramo: 4..10, pegado tras el primero (que dura 2s en proyecto)
+    expect([v[1].trimIn, v[1].trimOut, v[1].timelineStart]).toEqual([4, 10, 2]);
+  });
+
+  it("sin silencios no hace nada", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip(clipInfo);
+    const id = useProjectStore.getState().project.tracks.video[0].id;
+    s.removeSilencesFromClip(id, []);
+    expect(useProjectStore.getState().project.tracks.video).toHaveLength(1);
   });
 });
 

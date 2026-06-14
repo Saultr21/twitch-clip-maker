@@ -1,11 +1,18 @@
+import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
+import { pipeline } from "node:stream/promises";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import type { DownloadEvent } from "@clipforge/shared";
+import type { ClipInfo, DownloadEvent } from "@clipforge/shared";
+import { CLIPS_DIR } from "../lib/paths.js";
 import { isTwitchClipUrl } from "../lib/twitchUrl.js";
-import { listClips, removeClip } from "../services/clipsRegistry.js";
+import { addClip, listClips, removeClip } from "../services/clipsRegistry.js";
 import { getClipThumbnail } from "../services/clipThumbnail.js";
 import { downloadClip } from "../services/download.js";
+import { probeVideo } from "../services/probe.js";
+
+const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "mkv", "avi", "m4v"]);
 
 const downloadBody = z.object({ url: z.string() });
 
@@ -42,6 +49,46 @@ export function clipRoutes(app: FastifyInstance): void {
       });
     }
     reply.raw.end();
+  });
+
+  // Sube un vídeo del escritorio: streaming a disco, valida con ffprobe y registra
+  app.post("/api/clips/upload", async (req, reply) => {
+    const file = await req.file();
+    if (!file) return reply.code(400).send({ error: "No se recibió ningún archivo" });
+
+    const ext = path.extname(file.filename ?? "").slice(1).toLowerCase();
+    if (!VIDEO_EXTS.has(ext)) {
+      return reply.code(400).send({ error: "Formato de vídeo no soportado (mp4, webm, mov, mkv, avi, m4v)" });
+    }
+
+    const id = crypto.randomUUID();
+    const fileName = `${id}.${ext}`;
+    const outPath = path.join(CLIPS_DIR, fileName);
+    try {
+      await pipeline(file.file, fs.createWriteStream(outPath));
+      if (file.file.truncated) {
+        fs.rmSync(outPath, { force: true });
+        return reply.code(413).send({ error: "El archivo supera el límite de 2 GB" });
+      }
+      const meta = await probeVideo(outPath); // lanza si no hay pista de vídeo
+      const clip: ClipInfo = {
+        id,
+        url: "",
+        title: (file.filename ?? "Vídeo").replace(/\.[^.]+$/, "") || "Vídeo",
+        fileName,
+        ...meta,
+        createdAt: new Date().toISOString(),
+      };
+      addClip(clip);
+      return clip;
+    } catch (err) {
+      fs.rmSync(outPath, { force: true });
+      return reply.code(400).send({
+        error: err instanceof Error && /pista de vídeo/.test(err.message)
+          ? "El archivo no contiene vídeo válido"
+          : "No se pudo procesar el vídeo",
+      });
+    }
   });
 
   app.get<{ Params: { id: string } }>("/api/clips/:id/thumbnail", async (req, reply) => {

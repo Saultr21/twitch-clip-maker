@@ -30,7 +30,9 @@ await app.register(fastifyStatic, {
 });
 
 await app.register(fastifyMultipart, {
-  limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  // app local: vídeos del escritorio pueden ser grandes (la subida va por
+  // streaming a disco, no se bufferea en memoria)
+  limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
 });
 
 app.get("/api/health", async () => ({ ok: true }));

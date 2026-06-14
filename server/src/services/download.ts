@@ -60,6 +60,26 @@ export async function downloadClip(
   } catch (err) {
     fs.rmSync(outPath, { force: true });
     fs.rmSync(`${outPath}.part`, { force: true });
-    throw err;
+    throw friendlyDownloadError(err);
   }
+}
+
+/** Si Windows bloqueó el binario (p. ej. Control de aplicaciones inteligente),
+ *  execa falla al hacer spawn con un error críptico ("spawn UNKNOWN/EACCES").
+ *  Lo traducimos a algo accionable para el usuario. */
+function friendlyDownloadError(err: unknown): Error {
+  const e = err as { code?: string; message?: string };
+  const blocked =
+    e.code === "UNKNOWN" ||
+    e.code === "EACCES" ||
+    /spawn .*(UNKNOWN|EACCES)/i.test(e.message ?? "") ||
+    /control de aplicaciones|application control|blocked/i.test(e.message ?? "");
+  if (blocked) {
+    return new Error(
+      "Windows bloqueó yt-dlp (Control de aplicaciones inteligente). Para descargar " +
+        "clips de Twitch, desactívalo en Seguridad de Windows, o sube el vídeo a mano " +
+        "con «Subir vídeo del escritorio».",
+    );
+  }
+  return err instanceof Error ? err : new Error("Error desconocido durante la descarga");
 }

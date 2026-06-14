@@ -7,9 +7,11 @@ interface ClipsState {
   downloading: boolean;
   downloadProgress: number;
   downloadError: string | null;
+  uploading: boolean;
   fetchClips: () => Promise<void>;
   selectClip: (id: string) => void;
   downloadClip: (url: string) => Promise<void>;
+  uploadClip: (file: File) => Promise<void>;
   removeClip: (id: string) => Promise<boolean>;
 }
 
@@ -19,6 +21,7 @@ export const useClipsStore = create<ClipsState>((set) => ({
   downloading: false,
   downloadProgress: 0,
   downloadError: null,
+  uploading: false,
 
   fetchClips: async () => {
     try {
@@ -31,6 +34,25 @@ export const useClipsStore = create<ClipsState>((set) => ({
   },
 
   selectClip: (id) => set({ selectedClipId: id }),
+
+  uploadClip: async (file) => {
+    set({ uploading: true, downloadError: null });
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/clips/upload", { method: "POST", body });
+      if (!res.ok) {
+        const data = (await res.json()) as { error: string };
+        throw new Error(data.error);
+      }
+      const clip = (await res.json()) as ClipInfo;
+      set((s) => ({ clips: [clip, ...s.clips], selectedClipId: clip.id }));
+    } catch (err) {
+      set({ downloadError: err instanceof Error ? err.message : "Error al subir el vídeo" });
+    } finally {
+      set({ uploading: false });
+    }
+  },
 
   removeClip: async (id) => {
     try {

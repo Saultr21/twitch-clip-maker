@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from "react";
-import { Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { Trash2, Upload } from "lucide-react";
 import type { ClipInfo } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -18,12 +18,24 @@ export function MediaPanel() {
     downloading,
     downloadProgress,
     downloadError,
+    uploading,
     fetchClips,
     selectClip,
     downloadClip,
+    uploadClip,
     removeClip,
   } = useClipsStore();
   const [url, setUrl] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [dragFiles, setDragFiles] = useState(false);
+
+  const uploadFiles = async (files: FileList | null) => {
+    if (!files) return;
+    // un archivo a la vez (el backend acepta uno por petición)
+    for (const file of Array.from(files).filter((f) => f.type.startsWith("video/") || /\.(mp4|webm|mov|mkv|avi|m4v)$/i.test(f.name))) {
+      await uploadClip(file);
+    }
+  };
 
   const addToTimeline = (clip: ClipInfo) => {
     useProjectStore.getState().addVideoClip(clip);
@@ -56,7 +68,25 @@ export function MediaPanel() {
   return (
     <section
       aria-label="Medios"
-      className="flex-1 min-w-0 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto"
+      onDragOver={(e) => {
+        if (e.dataTransfer.types.includes("Files")) {
+          e.preventDefault();
+          if (!dragFiles) setDragFiles(true);
+        }
+      }}
+      onDragLeave={(e) => {
+        // solo al salir de la sección, no al pasar entre hijos
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragFiles(false);
+      }}
+      onDrop={(e) => {
+        if (e.dataTransfer.files.length === 0) return;
+        e.preventDefault();
+        setDragFiles(false);
+        void uploadFiles(e.dataTransfer.files);
+      }}
+      className={`flex-1 min-w-0 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto ${
+        dragFiles ? "ring-2 ring-inset ring-accent bg-accent/5" : ""
+      }`}
     >
       <h2 className="text-xs font-bold tracking-wide">MEDIOS</h2>
 
@@ -81,6 +111,34 @@ export function MediaPanel() {
           {downloading ? "Descargando..." : "Descargar clip"}
         </button>
       </form>
+
+      <div className="flex items-center gap-2 text-[10px] text-muted">
+        <span className="h-px flex-1 bg-border" />o<span className="h-px flex-1 bg-border" />
+      </div>
+
+      <input
+        ref={fileRef}
+        type="file"
+        accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,.mp4,.webm,.mov,.mkv,.avi,.m4v"
+        aria-label="Seleccionar vídeo del escritorio"
+        className="sr-only"
+        onChange={(e) => {
+          void uploadFiles(e.target.files);
+          e.target.value = "";
+        }}
+      />
+      <button
+        type="button"
+        disabled={uploading}
+        onClick={() => fileRef.current?.click()}
+        className="flex items-center justify-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent disabled:opacity-50"
+      >
+        <Upload size={14} aria-hidden="true" />
+        {uploading ? "Subiendo vídeo..." : "Subir vídeo del escritorio"}
+      </button>
+      <p className="text-[10px] text-muted -mt-1">
+        O arrastra un vídeo aquí (mp4, webm, mov, mkv, avi).
+      </p>
 
       {downloading && (
         <div role="status" aria-live="polite">

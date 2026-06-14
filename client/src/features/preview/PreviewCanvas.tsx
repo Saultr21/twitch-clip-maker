@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { Clapperboard, Link2, Upload } from "lucide-react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -121,7 +122,7 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
           // clic en el fondo fuera del lienzo: deselecciona el overlay activo
           if (e.target === e.currentTarget) select(null);
         }}
-        className="flex-1 min-h-0 grid place-items-center p-4 overflow-hidden"
+        className="relative flex-1 min-h-0 grid place-items-center p-4 overflow-hidden"
       >
         {/* El <video> existe SIEMPRE (aunque el lienzo mida 0 hasta el primer
             ResizeObserver): el motor engancha sus listeners en el montaje.
@@ -181,6 +182,24 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
           />
           {canvas.width > 0 && children?.(canvas)}
         </div>
+
+        {videoTrack.length === 0 && (
+          <div className="absolute inset-0 grid place-items-center p-6 pointer-events-none">
+            <div className="max-w-xs text-center flex flex-col items-center gap-3 text-muted">
+              <Clapperboard size={40} strokeWidth={1.5} aria-hidden="true" className="text-accent-soft" />
+              <p className="text-sm font-semibold text-text">Empieza añadiendo un vídeo</p>
+              <ul className="text-[11px] flex flex-col gap-1.5">
+                <li className="flex items-center justify-center gap-1.5">
+                  <Link2 size={13} aria-hidden="true" /> Pega una URL de clip de Twitch
+                </li>
+                <li className="flex items-center justify-center gap-1.5">
+                  <Upload size={13} aria-hidden="true" /> Sube o arrastra un vídeo del escritorio
+                </li>
+              </ul>
+              <p className="text-[10px]">Luego haz doble clic o arrástralo a la línea de tiempo.</p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

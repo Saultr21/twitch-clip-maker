@@ -170,7 +170,7 @@ export function MediaPanel() {
       <ul className="flex flex-col gap-1.5" aria-label="Clips descargados">
         {clips.length === 0 && !downloading && (
           <li className="text-[11px] text-muted">
-            Aún no hay clips. Pega una URL para empezar.
+            Aún no hay vídeos. Pega una URL de Twitch, sube un archivo o arrástralo aquí.
           </li>
         )}
         {clips.map((clip) => (

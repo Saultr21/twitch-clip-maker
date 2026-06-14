@@ -12,8 +12,14 @@ import { getClipThumbnail } from "../services/clipThumbnail.js";
 import { downloadClip } from "../services/download.js";
 import { probeVideo } from "../services/probe.js";
 import { ingestUploadedVideo } from "../services/uploadVideo.js";
+import { detectSilences } from "../services/silenceDetect.js";
 
 const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "mkv", "avi", "m4v"]);
+
+const silencesQuery = z.object({
+  noise: z.coerce.number().min(-90).max(0).optional(),
+  minSilence: z.coerce.number().min(0.1).max(10).optional(),
+});
 
 const downloadBody = z.object({ url: z.string() });
 
@@ -94,6 +100,22 @@ export function clipRoutes(app: FastifyInstance): void {
       });
     }
   });
+
+  app.get<{ Params: { id: string }; Querystring: { noise?: string; minSilence?: string } }>(
+    "/api/clips/:id/silences",
+    async (req, reply) => {
+      const clip = listClips().find((c) => c.id === req.params.id);
+      if (!clip) return reply.code(404).send({ error: "Clip no encontrado" });
+      const q = silencesQuery.safeParse(req.query);
+      if (!q.success) return reply.code(400).send({ error: "Parámetros no válidos" });
+      try {
+        const ranges = await detectSilences(clip.fileName, q.data.noise, q.data.minSilence);
+        return { ranges };
+      } catch {
+        return reply.code(500).send({ error: "No se pudo analizar el audio" });
+      }
+    },
+  );
 
   app.get<{ Params: { id: string } }>("/api/clips/:id/thumbnail", async (req, reply) => {
     try {

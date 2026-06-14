@@ -64,22 +64,35 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
   const top = style.y * height - blockHeight / 2;
   const strokeWidth = style.strokeWidth * height;
 
+  // pop: la palabra activa salta a +30% al entrar y vuelve a 1 en ~180ms
+  const activeStart = activeIdx >= 0 && cue ? cue.words[activeIdx].start : null;
+  const popScale =
+    style.animate && activeStart !== null
+      ? 1 + 0.3 * Math.max(0, 1 - ((playhead - activeStart) * 1000) / 180)
+      : 1;
+
   return (
     <>
       {lines.map((line, li) => {
         let x = width / 2 - line.width / 2;
         const y = top + li * lineHeight + (lineHeight - fontSize) / 2;
         return line.items.map((it) => {
+          const active = it.idx === activeIdx;
+          const popping = active && popScale !== 1;
           const node = (
             <KonvaText
               key={it.idx}
               text={it.text}
-              x={x}
-              y={y}
+              x={popping ? x + it.width / 2 : x}
+              y={popping ? y + fontSize / 2 : y}
+              offsetX={popping ? it.width / 2 : 0}
+              offsetY={popping ? fontSize / 2 : 0}
+              scaleX={popping ? popScale : 1}
+              scaleY={popping ? popScale : 1}
               fontSize={fontSize}
               fontFamily={style.fontFamily}
               fontStyle="bold"
-              fill={it.idx === activeIdx ? style.highlight : style.fill}
+              fill={active ? style.highlight : style.fill}
               stroke={style.stroke || undefined}
               strokeWidth={strokeWidth}
               fillAfterStrokeEnabled

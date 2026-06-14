@@ -4,7 +4,7 @@ import { hexToAssColor, toAssTime, buildAss } from "./assSubtitles.js";
 
 const style: SubtitleStyle = {
   fontFamily: "Impact", fontSize: 0.05, fill: "#ffffff", highlight: "#9146ff",
-  stroke: "#000000", strokeWidth: 0.004, y: 0.82, uppercase: true,
+  stroke: "#000000", strokeWidth: 0.004, y: 0.82, uppercase: true, animate: false,
 };
 
 describe("hexToAssColor", () => {
@@ -41,5 +41,12 @@ describe("buildAss", () => {
     // override de resaltado por palabra (ms relativos: Hola 0–500, mundo 500–1000)
     expect(ass).toContain("\\t(0,0,\\c&HFF4691&)");
     expect(ass).toContain("\\t(500,500,\\c&HFFFFFF&)");
+    // sin animación no hay escala
+    expect(ass).not.toContain("fscx");
+  });
+
+  it("con animate añade el pop de escala (fscx) por palabra", () => {
+    const ass = buildAss(cues, { ...style, animate: true }, 1080, 1920);
+    expect(ass).toContain("\\t(0,0,\\fscx130\\fscy130)\\t(0,180,\\fscx100\\fscy100)");
   });
 });

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { SubtitleCue } from "@clipforge/shared";
+import { censorCues } from "../../lib/profanity";
 import { videoClipAt } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -113,7 +114,10 @@ export function SubtitlesPanel() {
         <>
           <div className="flex items-center justify-between">
             <h3 className="text-[11px] font-bold text-muted tracking-wide">FRASES ({cues.length})</h3>
-            <button type="button" onClick={clearSubtitles} className="text-[11px] text-muted hover:text-danger">Borrar todas</button>
+            <div className="flex items-center gap-2">
+              <button type="button" onClick={() => setSubtitleCues(censorCues(cues))} className="text-[11px] text-muted hover:text-text" title="Censurar palabrotas">Censurar</button>
+              <button type="button" onClick={clearSubtitles} className="text-[11px] text-muted hover:text-danger">Borrar todas</button>
+            </div>
           </div>
           <ul className="flex flex-col gap-1.5">
             {cues.map((c) => (
@@ -131,6 +135,10 @@ export function SubtitlesPanel() {
           <label className="text-[11px] text-muted flex items-center gap-2">
             <input type="checkbox" checked={style.uppercase} onChange={(e) => setSubtitleStyle({ uppercase: e.target.checked })} className="accent-accent" />
             MAYÚSCULAS
+          </label>
+          <label className="text-[11px] text-muted flex items-center gap-2">
+            <input type="checkbox" checked={style.animate} onChange={(e) => setSubtitleStyle({ animate: e.target.checked })} className="accent-accent" />
+            Animar palabra activa (pop)
           </label>
           <label htmlFor="sub-size" className="text-[11px] text-muted">Tamaño · {Math.round(style.fontSize * 1000)}</label>
           <input id="sub-size" type="range" min={0.02} max={0.15} step={0.005} value={style.fontSize} onChange={(e) => setSubtitleStyle({ fontSize: parseFloat(e.target.value) })} className="accent-accent h-1.5" />

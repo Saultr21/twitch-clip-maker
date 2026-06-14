@@ -3,6 +3,7 @@ import { CheckCircle2, FolderOpen } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { QualityPresetId } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
+import { useUiStore } from "../../stores/uiStore";
 import { useExport } from "./useExport";
 
 const PRESET_LABELS: Record<QualityPresetId, string> = {
@@ -22,7 +23,29 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const { state, start, cancel, reset, openFolder } = useExport();
   const [preset, setPreset] = useState<QualityPresetId>("tiktok");
   const [fileName, setFileName] = useState("");
+  const [extra, setExtra] = useState<{ phase: "idle" | "working" | "done" | "error"; name?: string }>({ phase: "idle" });
   const dialogRef = useRef<HTMLDivElement>(null);
+
+  const exportExtra = async (kind: "frame" | "gif") => {
+    setExtra({ phase: "working" });
+    try {
+      const project = useProjectStore.getState().project;
+      const body =
+        kind === "frame"
+          ? { project, time: useUiStore.getState().playhead, fileName }
+          : { project, fileName };
+      const res = await fetch(`/api/export/${kind}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error();
+      const data = (await res.json()) as { fileName: string };
+      setExtra({ phase: "done", name: data.fileName });
+    } catch {
+      setExtra({ phase: "error" });
+    }
+  };
 
   useEffect(() => {
     if (!open) return;
@@ -130,6 +153,39 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
                 Exportar
               </button>
             </div>
+
+            <div className="flex items-center gap-2 text-[10px] text-muted mt-1">
+              <span className="h-px flex-1 bg-border" />o<span className="h-px flex-1 bg-border" />
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                disabled={!hasClips || extra.phase === "working"}
+                onClick={() => void exportExtra("frame")}
+                title="Guarda el fotograma actual (playhead) como PNG"
+                className="flex-1 text-[11px] text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent disabled:opacity-50"
+              >
+                Fotograma (PNG)
+              </button>
+              <button
+                type="button"
+                disabled={!hasClips || extra.phase === "working"}
+                onClick={() => void exportExtra("gif")}
+                title="Exporta el montaje como GIF"
+                className="flex-1 text-[11px] text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent disabled:opacity-50"
+              >
+                GIF
+              </button>
+            </div>
+            {extra.phase === "working" && <p role="status" className="text-[10px] text-muted">Generando…</p>}
+            {extra.phase === "done" && (
+              <p className="flex items-center gap-1.5 text-[10px]">
+                <CheckCircle2 size={13} aria-hidden="true" className="shrink-0 text-accent-soft" />
+                <span><span className="font-mono text-accent-soft">{extra.name}</span> guardado.</span>
+                <button type="button" onClick={openFolder} className="ml-auto text-accent-soft hover:underline">Abrir carpeta</button>
+              </p>
+            )}
+            {extra.phase === "error" && <p role="alert" className="text-[10px] text-danger">No se pudo generar.</p>}
           </>
         )}
 

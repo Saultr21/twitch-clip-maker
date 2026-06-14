@@ -1,8 +1,19 @@
 import { execa } from "execa";
 import type { FastifyInstance } from "fastify";
-import { exportRequestSchema, type ExportEvent } from "@clipforge/shared";
+import { z } from "zod";
+import { exportRequestSchema, projectSchema, type ExportEvent } from "@clipforge/shared";
 import { EXPORTS_DIR } from "../lib/paths.js";
 import { cancelExport, getJob, startExport } from "../services/exportJobs.js";
+import { exportStillFrame, exportGif } from "../services/exportStill.js";
+
+const frameBody = z.object({ project: projectSchema, time: z.number().min(0).default(0), fileName: z.string().optional() });
+const gifBody = z.object({ project: projectSchema, fileName: z.string().optional() });
+
+/** Nombre seguro con la extensión dada (sin path traversal). */
+function safeName(raw: string | undefined, fallback: string, ext: string): string {
+  const clean = (raw ?? fallback).replace(/\.[^.]+$/, "").replace(/[^a-zA-Z0-9áéíóúüñÁÉÍÓÚÜÑ _-]/g, "").trim();
+  return `${clean || fallback}.${ext}`;
+}
 
 export function exportRoutes(app: FastifyInstance): void {
   app.post("/api/export", async (req, reply) => {
@@ -17,6 +28,32 @@ export function exportRoutes(app: FastifyInstance): void {
       return reply
         .code(400)
         .send({ error: err instanceof Error ? err.message : "No se pudo iniciar la exportación" });
+    }
+  });
+
+  // Fotograma de portada (PNG) del montaje en un instante dado
+  app.post("/api/export/frame", async (req, reply) => {
+    const parsed = frameBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Petición no válida" });
+    const fileName = safeName(parsed.data.fileName, parsed.data.project.name, "png");
+    try {
+      await exportStillFrame(parsed.data.project, parsed.data.time, fileName);
+      return { fileName };
+    } catch {
+      return reply.code(500).send({ error: "No se pudo exportar el fotograma" });
+    }
+  });
+
+  // Export a GIF optimizado del montaje
+  app.post("/api/export/gif", async (req, reply) => {
+    const parsed = gifBody.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: "Petición no válida" });
+    const fileName = safeName(parsed.data.fileName, parsed.data.project.name, "gif");
+    try {
+      await exportGif(parsed.data.project, fileName);
+      return { fileName };
+    } catch {
+      return reply.code(500).send({ error: "No se pudo exportar el GIF" });
     }
   });
 

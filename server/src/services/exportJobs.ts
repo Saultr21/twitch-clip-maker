@@ -53,6 +53,20 @@ export interface ExportJob {
 }
 
 const jobs = new Map<string, ExportJob>();
+const MAX_JOBS = 20;
+
+/** Descarta del mapa los jobs terminados más antiguos hasta no superar `max`;
+ *  los que siguen "running" nunca se tocan. El Map conserva orden de inserción. */
+export function pruneJobMap(map: Map<string, { state: ExportJobState }>, max: number): void {
+  for (const [id, job] of map) {
+    if (map.size <= max) break;
+    if (job.state !== "running") map.delete(id);
+  }
+}
+
+function pruneJobs(): void {
+  pruneJobMap(jobs, MAX_JOBS);
+}
 
 function notify(job: ExportJob): void {
   for (const fn of job.listeners) fn();
@@ -72,6 +86,7 @@ export function startExport(
   preset: QualityPresetId,
   rawFileName?: string,
 ): ExportJob {
+  pruneJobs(); // hygiene: no acumular jobs terminados de sesiones largas
   const fileName = sanitizeFileName(
     rawFileName ?? `${project.name}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}`,
   );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isNvencFailure, parseFfmpegTime, sanitizeFileName } from "./exportJobs.js";
+import { isNvencFailure, parseFfmpegTime, pruneJobMap, sanitizeFileName } from "./exportJobs.js";
 
 describe("parseFfmpegTime", () => {
   it("extrae los segundos de una línea de progreso de stderr", () => {
@@ -31,6 +31,29 @@ describe("sanitizeFileName", () => {
 
   it("lanza con nombres vacíos tras sanear", () => {
     expect(() => sanitizeFileName("../..")).toThrow();
+  });
+});
+
+describe("pruneJobMap", () => {
+  const term = (state: "done" | "running") => ({ state }) as { state: "done" | "running" };
+
+  it("descarta los terminados más antiguos hasta no superar el máximo", () => {
+    const m = new Map<string, { state: "done" | "running" }>();
+    for (let i = 0; i < 5; i++) m.set(`j${i}`, term("done"));
+    pruneJobMap(m, 3);
+    expect(m.size).toBe(3);
+    // se quedan los 3 más recientes (orden de inserción)
+    expect([...m.keys()]).toEqual(["j2", "j3", "j4"]);
+  });
+
+  it("nunca borra jobs en curso aunque se supere el máximo", () => {
+    const m = new Map<string, { state: "done" | "running" }>();
+    m.set("a", term("running"));
+    m.set("b", term("running"));
+    m.set("c", term("done"));
+    pruneJobMap(m, 1);
+    // solo se puede borrar el terminado; los running se mantienen
+    expect([...m.keys()]).toEqual(["a", "b"]);
   });
 });
 

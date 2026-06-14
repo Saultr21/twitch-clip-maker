@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { ClipInfo } from "@clipforge/shared";
-import { CLIPS_DIR, THUMBNAILS_DIR } from "../lib/paths.js";
+import { CLIPS_DIR, THUMBNAILS_DIR, WAVEFORMS_DIR } from "../lib/paths.js";
 
 function indexPath(dir: string): string {
   return path.join(dir, "index.json");
@@ -30,5 +30,6 @@ export function removeClip(id: string, dir: string = CLIPS_DIR): boolean {
   fs.writeFileSync(indexPath(dir), JSON.stringify(clips.filter((c) => c.id !== id), null, 2));
   fs.rmSync(path.join(dir, clip.fileName), { force: true });
   fs.rmSync(path.join(THUMBNAILS_DIR, `${id}.jpg`), { force: true });
+  fs.rmSync(path.join(WAVEFORMS_DIR, `clip-${clip.fileName}.json`), { force: true });
   return true;
 }

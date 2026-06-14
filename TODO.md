@@ -48,7 +48,9 @@
 - [x] `res.body!` → guard en `clipsStore.ts` (2026-06-14)
 - [x] Validar con Zod la respuesta de `/api/presets/:name` antes de `applyPreset` (2026-06-14)
 - [x] Favicon (SVG con la marca) y launcher `VideoForge.cmd` (abrir sin comando) (2026-06-14)
-- [ ] Audio ducking (bajar música cuando hay voz)
+- [x] Audio ducking: baja la música cuando hay voz al exportar (sidechaincompress, toggle en Música) (2026-06-14)
+- [x] Modales in-app (confirmDialog/promptDialog) en vez de window.confirm/prompt nativos (2026-06-14)
+- [x] yt-dlp estable en vez de nightly (Smart App Control bloqueaba el nightly) (2026-06-14)
 - [ ] Estilos/animaciones de subtítulo (pop/bounce, caja, emojis, filtro de palabrotas)
 - [ ] Export extra: miniatura, GIF, cola de exports
 - [ ] Revisión de atajos de teclado y acciones de timeline (ripple delete, etc.)

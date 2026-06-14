@@ -81,7 +81,8 @@ export const useClipsStore = create<ClipsState>((set) => ({
         const body = (await res.json()) as { error: string };
         throw new Error(body.error);
       }
-      const reader = res.body!.getReader();
+      if (!res.body) throw new Error("Respuesta de descarga sin cuerpo");
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
       for (;;) {

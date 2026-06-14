@@ -9,11 +9,17 @@ import ffprobeStatic from "ffprobe-static";
 import type { SetupStatus } from "@clipforge/shared";
 import { BIN_DIR } from "../lib/paths.js";
 
+// yt-dlp.exe es solo-Windows a propósito: la app está pensada para Windows
+// (ver README). En otra plataforma habría que descargar el binario equivalente.
 const YTDLP_URL =
   "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe";
 
 export const ytDlpPath = path.join(BIN_DIR, "yt-dlp.exe");
-export const ffmpegBin = ffmpegStatic as unknown as string;
+// ffmpeg-static exporta la ruta del binario, o null si no resolvió en la
+// plataforma (sus tipos publicados son incorrectos, de ahí el cast al tipo real)
+const ffmpegPath = ffmpegStatic as unknown as string | null;
+if (!ffmpegPath) throw new Error("ffmpeg-static no disponible en esta plataforma");
+export const ffmpegBin: string = ffmpegPath;
 export const ffprobeBin = ffprobeStatic.path;
 
 let status: SetupStatus = { ready: false, step: "checking" };

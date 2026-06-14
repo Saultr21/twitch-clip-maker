@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
-import type { Preset } from "@clipforge/shared";
-import { projectToPreset } from "@clipforge/shared";
+import { presetSchema, projectToPreset } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 
 interface PresetEntry {
@@ -56,8 +55,11 @@ export function TemplatesMenu() {
     try {
       const res = await fetch(`/api/presets/${encodeURIComponent(name)}`);
       if (!res.ok) throw new Error();
-      const preset = (await res.json()) as Preset;
-      useProjectStore.getState().applyPreset(preset);
+      // valida la respuesta antes de aplicarla: una plantilla corrupta no debe
+      // romper el proyecto en curso
+      const parsed = presetSchema.safeParse(await res.json());
+      if (!parsed.success) throw new Error();
+      useProjectStore.getState().applyPreset(parsed.data);
       setOpen(false);
     } catch {
       setError(`No se pudo aplicar «${name}»`);

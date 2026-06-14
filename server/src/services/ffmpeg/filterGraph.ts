@@ -223,9 +223,23 @@ export function buildFilterGraph(
       filters.push(`[${inputIdx}:a]${chain.join(",")}[mus${m}]`);
       musLabels.push(`[mus${m}]`);
     });
-    filters.push(
-      `[acat]${musLabels.join("")}amix=inputs=${musLabels.length + 1}:duration=first:normalize=0[amix]`,
-    );
+    if (project.settings.audioDucking) {
+      // ducking: la voz (acat) baja la música vía cadena lateral (sidechain),
+      // luego se vuelve a mezclar con la voz a volumen completo
+      filters.push("[acat]asplit=2[avoice][ascv]");
+      filters.push("[ascv]aresample=44100,aformat=channel_layouts=stereo[asc]");
+      let musmix = musLabels[0];
+      if (musLabels.length > 1) {
+        filters.push(`${musLabels.join("")}amix=inputs=${musLabels.length}:duration=longest:normalize=0[musmix]`);
+        musmix = "[musmix]";
+      }
+      filters.push(`${musmix}[asc]sidechaincompress=threshold=0.02:ratio=8:attack=5:release=250[ducked]`);
+      filters.push("[avoice][ducked]amix=inputs=2:duration=first:normalize=0[amix]");
+    } else {
+      filters.push(
+        `[acat]${musLabels.join("")}amix=inputs=${musLabels.length + 1}:duration=first:normalize=0[amix]`,
+      );
+    }
     audioLabel = "[amix]";
   }
 

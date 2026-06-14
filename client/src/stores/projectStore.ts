@@ -72,6 +72,7 @@ interface ProjectState {
   renameProject: (name: string) => void;
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
+  setAudioDucking: (on: boolean) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
@@ -134,6 +135,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         d.settings.width = width;
         d.settings.height = height;
       }),
+
+    setAudioDucking: (on) => mutate((d) => void (d.settings.audioDucking = on)),
 
     setBackground: (patch) =>
       mutate((d) => {

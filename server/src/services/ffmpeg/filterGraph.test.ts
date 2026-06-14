@@ -261,4 +261,18 @@ describe("buildFilterGraph — música", () => {
     expect(g.audioLabel).toBe("[acat]");
     expect(g.filterComplex).not.toContain("amix");
   });
+
+  it("con ducking activado, la voz baja la música vía sidechaincompress", () => {
+    const p = projectWithClip();
+    p.settings.audioDucking = true;
+    p.tracks.audio.push({
+      id: "m1", assetId: "a9", fileName: "song.mp3",
+      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40,
+    });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("[acat]asplit=2[avoice][ascv]");
+    expect(g.filterComplex).toContain("[mus0][asc]sidechaincompress=");
+    expect(g.filterComplex).toContain("[avoice][ducked]amix=inputs=2:duration=first:normalize=0[amix]");
+    expect(g.audioLabel).toBe("[amix]");
+  });
 });

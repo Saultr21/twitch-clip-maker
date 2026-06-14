@@ -13,6 +13,8 @@ export function AudioPanel() {
   const [assets, setAssets] = useState<UploadedAudio[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const ducking = useProjectStore((s) => s.project.settings.audioDucking);
+  const setAudioDucking = useProjectStore((s) => s.setAudioDucking);
 
   const upload = async (file: File) => {
     setUploading(true);
@@ -94,6 +96,17 @@ export function AudioPanel() {
           </li>
         ))}
       </ul>
+
+      <label className="flex items-center gap-2 text-[11px] text-muted border-t border-border pt-3">
+        <input
+          type="checkbox"
+          checked={ducking}
+          onChange={(e) => setAudioDucking(e.target.checked)}
+          className="accent-accent"
+        />
+        Bajar la música cuando hay voz (ducking)
+      </label>
+      <p className="text-[10px] text-muted -mt-1">Se aplica al exportar.</p>
     </section>
   );
 }

@@ -42,11 +42,12 @@
 - [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16) — pendiente, proyecto propio con spec (detección en navegador + keyframes en preview y export)
 - [ ] UX extra (opcional): soltar vídeo en cualquier parte de la app para subir; mini-tour
 
-## Discovered / Backlog (mejoras menores, baja prioridad)
-- [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)
-- [ ] Null-check explícito de `ffmpegStatic` en vez del cast (`as unknown as string`)
-- [ ] Sustituir `res.body!` por guard en `clipsStore.ts`
-- [ ] Validar con Zod la respuesta de `/api/presets/:name` en el cliente antes de `applyPreset`
+## Discovered / Backlog
+- [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)
+- [x] Null-check de `ffmpegStatic` (cast al tipo real `string | null` + guard) (2026-06-14)
+- [x] `res.body!` → guard en `clipsStore.ts` (2026-06-14)
+- [x] Validar con Zod la respuesta de `/api/presets/:name` antes de `applyPreset` (2026-06-14)
+- [x] Favicon (SVG con la marca) y launcher `VideoForge.cmd` (abrir sin comando) (2026-06-14)
 - [ ] Audio ducking (bajar música cuando hay voz)
 - [ ] Estilos/animaciones de subtítulo (pop/bounce, caja, emojis, filtro de palabrotas)
 - [ ] Export extra: miniatura, GIF, cola de exports

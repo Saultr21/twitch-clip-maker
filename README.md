@@ -21,6 +21,14 @@ local y se abre en el navegador. Pensada para Windows.
 
 ## Puesta en marcha
 
+La forma más cómoda en Windows: **doble clic en `VideoForge.cmd`** (en la raíz
+del proyecto). Instala las dependencias la primera vez, arranca la app y la abre
+en el navegador automáticamente. Deja esa ventana abierta mientras la usas;
+ciérrala para detener la app. Puedes crear un acceso directo a `VideoForge.cmd`
+en el escritorio.
+
+Alternativa por terminal:
+
 ```bash
 npm install
 npm run dev
@@ -34,8 +42,9 @@ En el primer arranque el servidor descarga `yt-dlp` (canal nightly) en
 
 ## Cómo se usa
 
-1. **Medios** → pega la URL de un clip de Twitch y pulsa *Descargar clip*.
-2. *+ Añadir a la línea de tiempo* coloca el clip en la pista de Vídeo.
+1. **Medios** → pega la URL de un clip de Twitch y pulsa *Descargar clip*, o
+   sube/arrastra un vídeo del escritorio.
+2. **Doble clic** en el medio (o arrástralo) para colocarlo en la pista de Vídeo.
 3. Edita: arrastra/recorta los bloques del timeline, añade **Texto** e **Imagen**
    (arrástralos, redimensiónalos por las esquinas y rótalos en el lienzo),
    sube **Música**, y ajusta **Velocidad** y **Filtros** del clip en el panel

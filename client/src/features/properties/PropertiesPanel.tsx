@@ -1,8 +1,11 @@
 import { useRef, useState, type ReactNode } from "react";
-import { Music, Scissors } from "lucide-react";
+import { Music, Scissors, Crop } from "lucide-react";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
+import { useClipsStore } from "../../stores/clipsStore";
 import { useUiStore } from "../../stores/uiStore";
+import { buildReframeSegments } from "../../lib/reframe";
+import { detectFaceTrack } from "../reframe/detectFaces";
 
 export const FONT_FAMILIES = [
   "Segoe UI",
@@ -186,15 +189,40 @@ function CommonOverlayProps({ opacity, rotation, onOpacity, onRotation }: {
 }
 
 type SilenceState = "idle" | "analyzing" | "none" | "done" | "error";
+type ReframeState = { phase: "idle" | "none" | "error" } | { phase: "running"; progress: number };
 
 function VideoProperties({ clipId }: { clipId: string }) {
   const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
   const setOriginalAudioVolume = useProjectStore((s) => s.setOriginalAudioVolume);
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
   const removeSilencesFromClip = useProjectStore((s) => s.removeSilencesFromClip);
+  const applyReframe = useProjectStore((s) => s.applyReframe);
+  const settings = useProjectStore((s) => s.project.settings);
+  const clipInfos = useClipsStore((s) => s.clips);
   const clip = useProjectStore((s) => s.project.tracks.video.find((c) => c.id === clipId));
   const [silence, setSilence] = useState<SilenceState>("idle");
+  const [reframe, setReframe] = useState<ReframeState>({ phase: "idle" });
   if (!clip) return null;
+
+  const reframeClip = async () => {
+    const info = clipInfos.find((c) => c.id === clip.clipId);
+    if (!info) return;
+    setReframe({ phase: "running", progress: 0 });
+    try {
+      const samples = await detectFaceTrack(info.fileName, clip.trimIn, clip.trimOut, (p) =>
+        setReframe({ phase: "running", progress: p }),
+      );
+      if (samples.length === 0) {
+        setReframe({ phase: "none" });
+        return;
+      }
+      const segs = buildReframeSegments(samples, clip, info, { width: settings.width, height: settings.height });
+      applyReframe(clip.id, segs); // mueve la selección al primer segmento
+      setReframe({ phase: "idle" });
+    } catch {
+      setReframe({ phase: "error" });
+    }
+  };
 
   const zoom = (patch: Partial<typeof clip.zoom>) =>
     updateVideoClip(clip.id, { zoom: { ...clip.zoom, ...patch } });
@@ -286,6 +314,24 @@ function VideoProperties({ clipId }: { clipId: string }) {
         {silence === "none" && <p className="text-[10px] text-muted">No se detectaron silencios.</p>}
         {silence === "error" && <p role="alert" className="text-[10px] text-danger">No se pudo analizar el audio.</p>}
         <p className="text-[10px] text-muted">Parte el clip por los silencios y los quita (ripple en la pista de vídeo).</p>
+      </div>
+
+      <div className="border-t border-border pt-3 flex flex-col gap-1">
+        <button
+          type="button"
+          disabled={reframe.phase === "running"}
+          onClick={() => void reframeClip()}
+          title="Detecta la cara y reencuadra el clip al formato de salida siguiéndola"
+          className="flex items-center justify-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-md py-1.5 hover:border-accent disabled:opacity-50"
+        >
+          <Crop size={14} aria-hidden="true" />
+          {reframe.phase === "running"
+            ? `Analizando… ${Math.round(reframe.progress * 100)}%`
+            : "Auto-reframe (seguir cara)"}
+        </button>
+        {reframe.phase === "none" && <p className="text-[10px] text-muted">No se detectó ninguna cara.</p>}
+        {reframe.phase === "error" && <p role="alert" className="text-[10px] text-danger">No se pudo reencuadrar.</p>}
+        <p className="text-[10px] text-muted">Parte el clip y encuadra cada tramo sobre la cara (para vertical).</p>
       </div>
     </div>
   );

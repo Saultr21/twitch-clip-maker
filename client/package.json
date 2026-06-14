@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@clipforge/shared": "*",
+    "@mediapipe/tasks-vision": "^0.10.35",
     "immer": "^10.2.0",
     "konva": "^10.3.0",
     "lucide-react": "^1.18.0",

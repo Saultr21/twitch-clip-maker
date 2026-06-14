@@ -1,4 +1,4 @@
-# TODO — ClipForge (editor local de clips de Twitch)
+# TODO — VideoForge (editor de vídeo local; antes ClipForge)
 
 > Last updated: 2026-06-13
 > Current phase: maintenance
@@ -91,5 +91,5 @@
 - Controles de transporte: combinación B+C (inicio/fin, fotograma a fotograma, bucle + barra de progreso y volumen)
 - Usuario en Windows; binarios asumen yt-dlp.exe
 - data/ y .superpowers/ están en .gitignore
-- El logotipo "ClipForge" en acento #9146FF está exento de contraste por WCAG 1.4.3 (logotypes)
+- El logotipo "VideoForge" en acento #9146FF está exento de contraste por WCAG 1.4.3 (logotypes)
 - Rama base del repo: `master` (no `main`)

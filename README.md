@@ -1,6 +1,7 @@
-# ClipForge
+# VideoForge
 
-Editor local de clips de Twitch: descarga un clip por su URL y edítalo en una
+Editor de vídeo local: sube un vídeo del escritorio o descarga un clip de Twitch
+por su URL y edítalo en una
 línea de tiempo multipista — recorte, multi-clip, zoom/encuadre, texto e imágenes
 superpuestas (arrastrables, redimensionables y rotables), música de fondo,
 velocidad y filtros de color por clip, fondo de relleno (color/desenfoque/imagen),
@@ -49,7 +50,7 @@ En el primer arranque el servidor descarga `yt-dlp` (canal nightly) en
 6. **Exportar** → elige calidad (TikTok / YouTube / Máxima) y genera el MP4 en
    `data/exports/`.
 
-> La primera vez que generes subtítulos, ClipForge descarga whisper.cpp y su
+> La primera vez que generes subtítulos, VideoForge descarga whisper.cpp y su
 > modelo (~150 MB) en `data/bin/`. Requiere el Microsoft Visual C++
 > Redistributable (presente en la mayoría de Windows).
 

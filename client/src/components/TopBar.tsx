@@ -21,7 +21,7 @@ export function TopBar() {
   return (
     <header className="flex items-center gap-3 bg-surface border-b border-border px-4 py-2">
       <h1 className="text-base font-bold">
-        Clip<span className="text-accent">Forge</span>
+        Video<span className="text-accent">Forge</span>
       </h1>
       <input
         value={name}

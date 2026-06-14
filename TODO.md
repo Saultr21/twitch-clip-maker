@@ -44,11 +44,16 @@
 - [x] Subtítulos: filtro de palabrotas (Censurar) + animación pop de la palabra activa (preview + ASS)
 - [x] Export extra: fotograma de portada (PNG) y GIF del montaje
 
-## Opcional / futuro
-- [ ] UX extra: soltar vídeo en cualquier parte de la app para subir; mini-tour
-- [ ] Auto-reframe v2: paneo suave con keyframes (preview + export); empaquetar MediaPipe offline (ahora carga de CDN en el 1.er uso)
-- [ ] Transiciones v2: crossfade entre clips (reescribe el concat con xfade)
-- [ ] Export: cola de varios exports (poco valor en app de un usuario)
+## Opcional — hecho (2026-06-14)
+- [x] Soltar un vídeo en cualquier parte de la app para subir (GlobalDropZone)
+- [x] Mini-tour de bienvenida (primer arranque)
+- [x] Transición entre clips: fundido a negro en los límites (gated)
+
+## Opcional — deferido a propósito (no se rushea)
+- [ ] Cola de varios exports — poco valor en app de un usuario; montaje UI no trivial
+- [ ] Empaquetar MediaPipe offline — marginal (el navegador ya cachea el CDN; el 1.er uso necesita red como el resto de herramientas)
+- [ ] Auto-reframe v2: paneo SUAVE con keyframes — proyecto de arquitectura (keyframes en modelo + preview + export); requiere diseño propio, no un batch
+- [ ] Transiciones v2: crossfade real (xfade) entre clips — reescribe el concat (lo más central/testeado); riesgo alto
 
 ## Discovered / Backlog
 - [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)

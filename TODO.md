@@ -34,10 +34,13 @@
 - [x] Subidas con códec no-web (mov/mkv/avi/HEVC) se transcodifican a mp4 H.264 reproducible (NVENC con fallback CPU); mp4/h264 y webm se conservan
 - [x] Renombrado de app a VideoForge (marca visible); subir vídeos del escritorio (botón + arrastrar)
 
+## Hecho (2026-06-14, cont.)
+- [x] Eliminar silencios: detección con silencedetect + recorte por tramos con voz (ripple)
+- [x] UX: estado vacío guiado en la preview sin vídeo + textos de Medios
+
 ## En curso / siguiente
-- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16) — EN DISEÑO
-- [ ] Eliminar silencios / cortes automáticos por audio
-- [ ] UX / onboarding (estados vacíos con pistas, mini-tour)
+- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16) — pendiente, proyecto propio con spec (detección en navegador + keyframes en preview y export)
+- [ ] UX extra (opcional): soltar vídeo en cualquier parte de la app para subir; mini-tour
 
 ## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)

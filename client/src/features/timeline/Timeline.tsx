@@ -161,6 +161,12 @@ export function Timeline({ height }: { height: number }) {
             pxPerSecond={pxPerSecond}
             onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
             onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
+            onDropClip={(clipId, t) => {
+              const clip = clips.find((c) => c.id === clipId);
+              if (!clip) return;
+              useProjectStore.getState().addVideoClipAt(clip, t);
+              useUiStore.getState().select(null);
+            }}
           />
           <TrackRow
             title="Texto"

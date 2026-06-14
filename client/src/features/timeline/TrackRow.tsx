@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import type { Project } from "@clipforge/shared";
 import { findSnapPoints, snapTime } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
@@ -30,7 +30,11 @@ interface TrackRowProps {
   onMove: (id: string, newStart: number, transient: boolean) => void;
   /** Recorta un borde del bloque al instante t (ya con snap aplicado). */
   onTrim: (id: string, edge: "start" | "end", t: number, transient: boolean) => void;
+  /** Soltar un clip de Medios (arrastrado) en el instante t de esta pista. */
+  onDropClip?: (clipId: string, t: number) => void;
 }
+
+const CLIP_DND_TYPE = "application/x-clip-id";
 
 const SNAP_PX = 8;
 const EDGE_PX = 8;
@@ -45,7 +49,9 @@ export function TrackRow({
   laneCount = 1,
   onMove,
   onTrim,
+  onDropClip,
 }: TrackRowProps) {
+  const [dropActive, setDropActive] = useState(false);
   // started: la transacción de historial se abre en el PRIMER movimiento real,
   // no en el pointerdown — un simple clic de selección no debe crear entrada de undo
   const dragRef = useRef<{ id: string; mode: "move" | "trim-start" | "trim-end"; offsetT: number; started: boolean } | null>(null);
@@ -62,7 +68,33 @@ export function TrackRow({
       <div className="w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10">
         {title}
       </div>
-      <div className="relative flex-1" style={{ height: 4 + laneCount * LANE_HEIGHT }}>
+      <div
+        className={`relative flex-1 ${dropActive ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
+        style={{ height: 4 + laneCount * LANE_HEIGHT }}
+        onDragOver={
+          onDropClip
+            ? (e) => {
+                if (e.dataTransfer.types.includes(CLIP_DND_TYPE)) {
+                  e.preventDefault(); // permite el drop
+                  if (!dropActive) setDropActive(true);
+                }
+              }
+            : undefined
+        }
+        onDragLeave={onDropClip ? () => setDropActive(false) : undefined}
+        onDrop={
+          onDropClip
+            ? (e) => {
+                e.preventDefault();
+                setDropActive(false);
+                const clipId = e.dataTransfer.getData(CLIP_DND_TYPE);
+                if (!clipId) return;
+                const rect = e.currentTarget.getBoundingClientRect();
+                onDropClip(clipId, Math.max(0, (e.clientX - rect.left) / pxPerSecond));
+              }
+            : undefined
+        }
+      >
         {blocks.map((b) => {
           const selected = selection?.id === b.id;
           return (

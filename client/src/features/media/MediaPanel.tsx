@@ -25,6 +25,11 @@ export function MediaPanel() {
   } = useClipsStore();
   const [url, setUrl] = useState("");
 
+  const addToTimeline = (clip: ClipInfo) => {
+    useProjectStore.getState().addVideoClip(clip);
+    useUiStore.getState().select(null);
+  };
+
   const onDelete = async (clip: ClipInfo) => {
     const inTimeline = useProjectStore.getState().project.tracks.video.some((v) => v.clipId === clip.id);
     const msg = inTimeline
@@ -113,21 +118,37 @@ export function MediaPanel() {
         {clips.map((clip) => (
           <li
             key={clip.id}
-            className={`bg-surface-2 rounded-md overflow-hidden border ${
+            className={`relative bg-surface-2 rounded-md overflow-hidden border ${
               clip.id === selectedClipId ? "border-accent" : "border-transparent"
             }`}
           >
             <button
               type="button"
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("application/x-clip-id", clip.id);
+                e.dataTransfer.effectAllowed = "copy";
+                selectClip(clip.id);
+              }}
               onClick={() => selectClip(clip.id)}
+              onDoubleClick={() => addToTimeline(clip)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addToTimeline(clip);
+                }
+              }}
               aria-pressed={clip.id === selectedClipId}
-              className="w-full text-left text-[11px]"
+              title="Doble clic o Enter para añadir · arrastra a la línea de tiempo"
+              aria-label={`${clip.title}. Doble clic o Enter para añadir a la línea de tiempo; también puedes arrastrarlo`}
+              className="w-full text-left text-[11px] cursor-grab active:cursor-grabbing"
             >
               <img
                 src={`/api/clips/${clip.id}/thumbnail`}
                 alt=""
                 loading="lazy"
-                className="w-full aspect-video object-cover bg-black"
+                draggable={false}
+                className="w-full aspect-video object-cover bg-black pointer-events-none"
               />
               <span className={`block truncate font-medium px-2 pt-1.5 ${clip.id === selectedClipId ? "text-text" : ""}`}>
                 {clip.title}
@@ -136,27 +157,15 @@ export function MediaPanel() {
                 {formatDuration(clip.duration)} · {clip.width}x{clip.height}
               </span>
             </button>
-            <div className="flex items-stretch gap-1 px-1 pb-1">
-              <button
-                type="button"
-                onClick={() => {
-                  useProjectStore.getState().addVideoClip(clip);
-                  useUiStore.getState().select(null);
-                }}
-                className="flex-1 text-[11px] text-accent-soft border border-border-2 rounded-md py-1 hover:border-accent"
-              >
-                + Añadir a la línea de tiempo
-              </button>
-              <button
-                type="button"
-                onClick={() => void onDelete(clip)}
-                aria-label={`Borrar clip ${clip.title}`}
-                title="Borrar clip"
-                className="shrink-0 px-2 text-muted hover:text-danger border border-border-2 rounded-md grid place-items-center"
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => void onDelete(clip)}
+              aria-label={`Borrar clip ${clip.title}`}
+              title="Borrar clip"
+              className="absolute top-1 right-1 p-1 rounded-md bg-black/50 text-white/80 hover:text-danger grid place-items-center"
+            >
+              <Trash2 size={14} aria-hidden="true" />
+            </button>
           </li>
         ))}
       </ul>

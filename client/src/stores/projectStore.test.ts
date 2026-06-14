@@ -30,6 +30,24 @@ describe("addVideoClip", () => {
   });
 });
 
+describe("addVideoClipAt", () => {
+  it("coloca el clip en el instante soltado si el hueco está libre", () => {
+    useProjectStore.getState().addVideoClipAt(clipInfo, 5);
+    const v = useProjectStore.getState().project.tracks.video;
+    expect(v).toHaveLength(1);
+    expect(v[0].timelineStart).toBe(5);
+  });
+
+  it("si el instante pisa otro bloque, lo coloca al final de la secuencia", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClipAt(clipInfo, 5); // 5..15 (duración 10)
+    s.addVideoClipAt(clipInfo, 3); // 3..13 solapa con 5..15 → al final
+    const v = useProjectStore.getState().project.tracks.video;
+    expect(v).toHaveLength(2);
+    expect(v[1].timelineStart).toBe(15);
+  });
+});
+
 describe("addCue", () => {
   it("inserta una frase en el instante dado y mantiene la lista ordenada por tiempo", () => {
     const s = useProjectStore.getState();

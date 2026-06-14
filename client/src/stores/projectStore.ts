@@ -46,6 +46,7 @@ interface ProjectState {
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   addVideoClip: (clip: ClipInfo) => void;
+  addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
@@ -117,6 +118,19 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           ? Math.max(...d.tracks.video.map(clipEnd))
           : 0;
         d.tracks.video.push(createVideoClip(clip.id, lastEnd, clip.duration));
+      }),
+
+    // suelta el clip en el instante indicado si el hueco está libre; si pisa otro
+    // bloque, cae al final de la secuencia (evita solapes en la pista de vídeo)
+    addVideoClipAt: (clip, start) =>
+      mutate((d) => {
+        const dur = clip.duration;
+        const desired = Math.max(0, start);
+        const overlaps = d.tracks.video.some(
+          (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
+        );
+        const lastEnd = d.tracks.video.length ? Math.max(...d.tracks.video.map(clipEnd)) : 0;
+        d.tracks.video.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
       }),
 
     // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente

@@ -11,6 +11,7 @@ import { addClip, listClips, removeClip } from "../services/clipsRegistry.js";
 import { getClipThumbnail } from "../services/clipThumbnail.js";
 import { downloadClip } from "../services/download.js";
 import { probeVideo } from "../services/probe.js";
+import { ingestUploadedVideo } from "../services/uploadVideo.js";
 
 const VIDEO_EXTS = new Set(["mp4", "webm", "mov", "mkv", "avi", "m4v"]);
 
@@ -62,15 +63,17 @@ export function clipRoutes(app: FastifyInstance): void {
     }
 
     const id = crypto.randomUUID();
-    const fileName = `${id}.${ext}`;
-    const outPath = path.join(CLIPS_DIR, fileName);
+    const tempPath = path.join(CLIPS_DIR, `${id}.tmp.${ext}`);
     try {
-      await pipeline(file.file, fs.createWriteStream(outPath));
+      await pipeline(file.file, fs.createWriteStream(tempPath));
       if (file.file.truncated) {
-        fs.rmSync(outPath, { force: true });
+        fs.rmSync(tempPath, { force: true });
         return reply.code(413).send({ error: "El archivo supera el límite de 2 GB" });
       }
-      const meta = await probeVideo(outPath); // lanza si no hay pista de vídeo
+      const meta = await probeVideo(tempPath); // lanza si no hay pista de vídeo
+      // conserva mp4/h264 y webm; transcodifica el resto a mp4 para que la
+      // preview del navegador pueda reproducirlo (HEVC, mkv, avi…)
+      const fileName = await ingestUploadedVideo(tempPath, id, ext);
       const clip: ClipInfo = {
         id,
         url: "",
@@ -82,7 +85,8 @@ export function clipRoutes(app: FastifyInstance): void {
       addClip(clip);
       return clip;
     } catch (err) {
-      fs.rmSync(outPath, { force: true });
+      fs.rmSync(tempPath, { force: true });
+      fs.rmSync(path.join(CLIPS_DIR, `${id}.mp4`), { force: true });
       return reply.code(400).send({
         error: err instanceof Error && /pista de vídeo/.test(err.message)
           ? "El archivo no contiene vídeo válido"

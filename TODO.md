@@ -38,9 +38,12 @@
 - [x] Eliminar silencios: detección con silencedetect + recorte por tramos con voz (ripple)
 - [x] UX: estado vacío guiado en la preview sin vídeo + textos de Medios
 
-## En curso / siguiente
-- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16) — pendiente, proyecto propio con spec (detección en navegador + keyframes en preview y export)
-- [ ] UX extra (opcional): soltar vídeo en cualquier parte de la app para subir; mini-tour
+## Hecho (2026-06-14, cont. 2)
+- [x] Auto-reframe (seguir cara) simplificado: MediaPipe detecta la cara → parte el clip en segmentos con encuadre estático (sin keyframes), reutilizando split+zoom. Verificado e2e (25 segmentos en clip con caras)
+
+## Opcional / futuro
+- [ ] UX extra: soltar vídeo en cualquier parte de la app para subir; mini-tour
+- [ ] Auto-reframe v2: paneo suave con keyframes (preview + export); empaquetar MediaPipe offline (ahora carga de CDN en el 1.er uso)
 
 ## Discovered / Backlog
 - [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)

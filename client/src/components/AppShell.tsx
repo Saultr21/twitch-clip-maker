@@ -10,6 +10,7 @@ import { useUiStore } from "../stores/uiStore";
 import { handleShortcut } from "../lib/shortcuts";
 import { useSessionRestore } from "../features/projects/useSessionRestore";
 import { useUnloadGuard } from "../features/projects/useAutosave";
+import { DialogHost } from "./DialogHost";
 import { ResizeHandle } from "./ResizeHandle";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
@@ -72,6 +73,7 @@ export function AppShell() {
         />
         <Timeline height={timelineHeight} />
       </PlaybackProvider>
+      <DialogHost />
     </div>
   );
 }

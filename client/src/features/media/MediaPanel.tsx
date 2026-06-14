@@ -4,6 +4,7 @@ import type { ClipInfo } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { confirmDialog } from "../../stores/dialogStore";
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -47,7 +48,7 @@ export function MediaPanel() {
     const msg = inTimeline
       ? `¿Borrar «${clip.title}»? Se quitará también de la línea de tiempo.`
       : `¿Borrar «${clip.title}»? Esta acción no se puede deshacer.`;
-    if (!window.confirm(msg)) return;
+    if (!(await confirmDialog({ message: msg, danger: true }))) return;
     const ok = await removeClip(clip.id);
     if (ok && inTimeline) {
       useProjectStore.getState().removeVideoClipsBySource(clip.id);

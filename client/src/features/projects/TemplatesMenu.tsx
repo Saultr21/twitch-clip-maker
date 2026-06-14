@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Plus, Trash2 } from "lucide-react";
 import { presetSchema, projectToPreset } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
+import { confirmDialog, promptDialog } from "../../stores/dialogStore";
 
 interface PresetEntry {
   name: string;
@@ -38,7 +39,7 @@ export function TemplatesMenu() {
   }, [open]);
 
   const saveCurrent = async () => {
-    const name = window.prompt("Nombre de la plantilla:");
+    const name = await promptDialog({ title: "Plantilla", message: "Nombre de la plantilla:" });
     if (!name?.trim()) return;
     const preset = projectToPreset(name.trim(), useProjectStore.getState().project);
     const res = await fetch(`/api/presets/${encodeURIComponent(name.trim())}`, {
@@ -67,7 +68,7 @@ export function TemplatesMenu() {
   };
 
   const remove = async (name: string) => {
-    if (!window.confirm(`¿Borrar la plantilla «${name}»?`)) return;
+    if (!(await confirmDialog({ message: `¿Borrar la plantilla «${name}»?`, danger: true }))) return;
     const res = await fetch(`/api/presets/${encodeURIComponent(name)}`, { method: "DELETE" });
     if (!res.ok) {
       setError(`No se pudo borrar «${name}»`);

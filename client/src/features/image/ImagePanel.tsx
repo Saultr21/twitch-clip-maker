@@ -3,6 +3,7 @@ import { Star, Trash2 } from "lucide-react";
 import type { Watermark } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { confirmDialog, promptDialog } from "../../stores/dialogStore";
 
 interface UploadedAsset {
   assetId: string;
@@ -77,7 +78,7 @@ export function ImagePanel() {
   };
 
   const saveWatermark = async (file: File) => {
-    const name = window.prompt("Nombre de la marca de agua:", file.name);
+    const name = await promptDialog({ title: "Marca de agua", message: "Nombre de la marca de agua:", defaultValue: file.name });
     if (name === null) return;
     setError(null);
     try {
@@ -97,7 +98,7 @@ export function ImagePanel() {
   };
 
   const removeWatermark = async (id: string) => {
-    if (!window.confirm("¿Borrar esta marca de agua guardada?")) return;
+    if (!(await confirmDialog({ message: "¿Borrar esta marca de agua guardada?", danger: true }))) return;
     const res = await fetch(`/api/watermarks/${id}`, { method: "DELETE" });
     if (res.ok) setWatermarks((prev) => prev.filter((w) => w.id !== id));
   };

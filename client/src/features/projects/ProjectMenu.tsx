@@ -4,6 +4,7 @@ import type { Project } from "@clipforge/shared";
 import { createEmptyProject } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { confirmDialog } from "../../stores/dialogStore";
 import { saveNow } from "./useAutosave";
 import { setLastProject } from "./lastProject";
 
@@ -72,7 +73,7 @@ export function ProjectMenu() {
   };
 
   const remove = async (name: string) => {
-    if (!window.confirm(`¿Borrar el proyecto «${name}»? Esta acción no se puede deshacer.`)) return;
+    if (!(await confirmDialog({ message: `¿Borrar el proyecto «${name}»? Esta acción no se puede deshacer.`, danger: true }))) return;
     const res = await fetch(`/api/projects/${encodeURIComponent(name)}`, { method: "DELETE" });
     if (!res.ok) {
       setError(`No se pudo borrar «${name}»`);

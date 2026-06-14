@@ -29,17 +29,21 @@
   - whisper.cpp auto-descargado (zip+bsdtar del sistema, modelo base), transcripción con SSE y mapeo de tiempos por trim/speed (TDD), generador .ass karaoke discreto (TDD), preview Konva, quemado con filtro ass de libass
   - Verificado e2e: transcripción real (UTF-8 correcto) + export con subtítulos → MP4 1080x1920 válido; 162 tests verdes
 
+## Hardening (2026-06-14) — hechas
+- [x] Poda de jobs de export en memoria (cap 20, descarta terminados antiguos) y de la caché de waveform al borrar un clip
+- [x] Subidas con códec no-web (mov/mkv/avi/HEVC) se transcodifican a mp4 H.264 reproducible (NVENC con fallback CPU); mp4/h264 y webm se conservan
+- [x] Renombrado de app a VideoForge (marca visible); subir vídeos del escritorio (botón + arrastrar)
+
+## En curso / siguiente
+- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16) — EN DISEÑO
+- [ ] Eliminar silencios / cortes automáticos por audio
+- [ ] UX / onboarding (estados vacíos con pistas, mini-tour)
+
 ## Discovered / Backlog (mejoras menores, baja prioridad)
 - [ ] Guard de `process.platform` o comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito)
 - [ ] Null-check explícito de `ffmpegStatic` en vez del cast (`as unknown as string`)
 - [ ] Sustituir `res.body!` por guard en `clipsStore.ts`
 - [ ] Validar con Zod la respuesta de `/api/presets/:name` en el cliente antes de `applyPreset`
-- [ ] Jobs de export en memoria sin poda (crecen por sesión; aceptable en local)
-- [ ] Poda de la caché de waveforms (`data/waveforms`) cuando se borran clips/assets
-
-## Ideas de producto no empezadas (sin compromiso)
-- [ ] Auto-reframe / seguimiento de hablante (recorte inteligente 16:9 → 9:16)
-- [ ] Eliminar silencios / cortes automáticos por audio
 - [ ] Audio ducking (bajar música cuando hay voz)
 - [ ] Estilos/animaciones de subtítulo (pop/bounce, caja, emojis, filtro de palabrotas)
 - [ ] Export extra: miniatura, GIF, cola de exports

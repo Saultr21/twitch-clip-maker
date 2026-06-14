@@ -40,10 +40,15 @@
 
 ## Hecho (2026-06-14, cont. 2)
 - [x] Auto-reframe (seguir cara) simplificado: MediaPipe detecta la cara → parte el clip en segmentos con encuadre estático (sin keyframes), reutilizando split+zoom. Verificado e2e (25 segmentos en clip con caras)
+- [x] Transiciones: fundido de entrada/salida del vídeo y audio al exportar (fade/afade)
+- [x] Subtítulos: filtro de palabrotas (Censurar) + animación pop de la palabra activa (preview + ASS)
+- [x] Export extra: fotograma de portada (PNG) y GIF del montaje
 
 ## Opcional / futuro
 - [ ] UX extra: soltar vídeo en cualquier parte de la app para subir; mini-tour
 - [ ] Auto-reframe v2: paneo suave con keyframes (preview + export); empaquetar MediaPipe offline (ahora carga de CDN en el 1.er uso)
+- [ ] Transiciones v2: crossfade entre clips (reescribe el concat con xfade)
+- [ ] Export: cola de varios exports (poco valor en app de un usuario)
 
 ## Discovered / Backlog
 - [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)

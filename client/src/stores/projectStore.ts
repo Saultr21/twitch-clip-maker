@@ -77,6 +77,10 @@ interface ProjectState {
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
   removeSilencesFromClip: (id: string, silences: Array<{ start: number; end: number }>) => void;
+  applyReframe: (
+    id: string,
+    segments: Array<{ start: number; end: number; zoom: { x: number; y: number; scale: number } }>,
+  ) => void;
   moveVideoClip: (id: string, newStart: number, opts?: MutateOptions) => void;
   trimVideoClip: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   updateVideoClip: (id: string, patch: Partial<VideoClip>, opts?: MutateOptions) => void;
@@ -212,6 +216,37 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           .sort((a, b) => a.timelineStart - b.timelineStart);
       });
       // el clip original desapareció: mueve la selección al primer segmento
+      if (firstPieceId && useUiStore.getState().selection?.id === id) {
+        useUiStore.getState().select({ kind: "video", id: firstPieceId });
+      }
+    },
+
+    // auto-reframe: parte el clip en segmentos contiguos (misma duración total,
+    // sin ripple) y aplica a cada uno el encuadre que centra la cara
+    applyReframe: (id, segments) => {
+      let firstPieceId: string | null = null;
+      mutate((d) => {
+        const c = d.tracks.video.find((v) => v.id === id);
+        if (!c || segments.length === 0) return;
+        let start = c.timelineStart;
+        const pieces = segments.map((s) => {
+          const piece = {
+            ...c,
+            id: globalThis.crypto.randomUUID(),
+            trimIn: s.start,
+            trimOut: s.end,
+            timelineStart: start,
+            zoom: { x: s.zoom.x, y: s.zoom.y, scale: s.zoom.scale },
+            filters: { ...c.filters },
+          };
+          start += (s.end - s.start) / c.speed;
+          return piece;
+        });
+        firstPieceId = pieces[0].id;
+        d.tracks.video = d.tracks.video
+          .flatMap((v) => (v.id === id ? pieces : [v]))
+          .sort((a, b) => a.timelineStart - b.timelineStart);
+      });
       if (firstPieceId && useUiStore.getState().selection?.id === id) {
         useUiStore.getState().select({ kind: "video", id: firstPieceId });
       }

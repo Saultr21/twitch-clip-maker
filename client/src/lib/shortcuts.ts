@@ -5,18 +5,20 @@ import { useUiStore } from "../stores/uiStore";
 const NUDGE = 0.005;
 const NUDGE_FAST = 0.02;
 
-function isEditableTarget(e: KeyboardEvent): boolean {
+/** Campos de texto: ningún atajo global debe robar la pulsación mientras se escribe. */
+function isTextEntry(e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement;
   return (
-    t.tagName === "INPUT" ||
-    t.tagName === "TEXTAREA" ||
-    t.tagName === "SELECT" ||
-    // Space sobre un botón/enlace enfocado debe activarlo, no alternar la
-    // reproducción (WCAG 2.1.1: el manejador global no roba la interacción)
-    t.tagName === "BUTTON" ||
-    t.tagName === "A" ||
-    t.isContentEditable
+    t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable
   );
+}
+
+/** Botón/enlace enfocado: solo Espacio/Enter los activan de forma nativa; el
+ *  resto de atajos (Supr, flechas, Escape…) deben seguir funcionando, p. ej.
+ *  borrar el bloque del timeline que acabas de seleccionar (queda enfocado). */
+function isNativeActivation(e: KeyboardEvent): boolean {
+  const t = e.target as HTMLElement;
+  return (t.tagName === "BUTTON" || t.tagName === "A") && (e.code === "Space" || e.code === "Enter");
 }
 
 interface ShortcutDeps {
@@ -25,7 +27,7 @@ interface ShortcutDeps {
 }
 
 export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
-  if (isEditableTarget(e)) return;
+  if (isTextEntry(e) || isNativeActivation(e)) return;
   const ui = useUiStore.getState();
   const store = useProjectStore.getState();
 

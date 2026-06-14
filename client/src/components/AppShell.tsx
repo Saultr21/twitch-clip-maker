@@ -11,6 +11,7 @@ import { handleShortcut } from "../lib/shortcuts";
 import { useSessionRestore } from "../features/projects/useSessionRestore";
 import { useUnloadGuard } from "../features/projects/useAutosave";
 import { DialogHost } from "./DialogHost";
+import { GlobalDropZone } from "./GlobalDropZone";
 import { ResizeHandle } from "./ResizeHandle";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
@@ -74,6 +75,7 @@ export function AppShell() {
         <Timeline height={timelineHeight} />
       </PlaybackProvider>
       <DialogHost />
+      <GlobalDropZone />
     </div>
   );
 }

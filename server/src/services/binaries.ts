@@ -11,8 +11,11 @@ import { BIN_DIR } from "../lib/paths.js";
 
 // yt-dlp.exe es solo-Windows a propósito: la app está pensada para Windows
 // (ver README). En otra plataforma habría que descargar el binario equivalente.
+// Canal ESTABLE (no nightly): el nightly cambia de hash a diario y nunca acumula
+// reputación, así que Smart App Control de Windows 11 lo bloquea ("spawn UNKNOWN").
+// El estable, muy descargado, pasa la comprobación de reputación de SAC.
 const YTDLP_URL =
-  "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe";
+  "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe";
 
 export const ytDlpPath = path.join(BIN_DIR, "yt-dlp.exe");
 // ffmpeg-static exporta la ruta del binario, o null si no resolvió en la
@@ -48,8 +51,10 @@ export async function ensureBinaries(): Promise<void> {
         throw err;
       }
     } else {
-      // Twitch rompe el extractor periódicamente; nightly lleva el fix antes
-      await execa(ytDlpPath, ["--update-to", "nightly"]).catch(() => {});
+      // mantiene el binario al día dentro del canal estable (Twitch rompe el
+      // extractor a veces; el estable recibe el fix en días). Se queda en estable
+      // a propósito para no reintroducir el nightly que SAC bloquea.
+      await execa(ytDlpPath, ["--update-to", "stable"]).catch(() => {});
     }
     status = { ready: true, step: "ready" };
   } catch (err) {

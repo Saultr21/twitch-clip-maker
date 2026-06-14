@@ -12,6 +12,7 @@ import { useSessionRestore } from "../features/projects/useSessionRestore";
 import { useUnloadGuard } from "../features/projects/useAutosave";
 import { DialogHost } from "./DialogHost";
 import { GlobalDropZone } from "./GlobalDropZone";
+import { WelcomeTour } from "./WelcomeTour";
 import { ResizeHandle } from "./ResizeHandle";
 import { TopBar } from "./TopBar";
 import { ToolRail } from "./ToolRail";
@@ -76,6 +77,7 @@ export function AppShell() {
       </PlaybackProvider>
       <DialogHost />
       <GlobalDropZone />
+      <WelcomeTour />
     </div>
   );
 }

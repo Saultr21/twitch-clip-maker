@@ -280,6 +280,18 @@ describe("buildFilterGraph — música", () => {
     expect(g.filterComplex).not.toContain("fade=");
   });
 
+  it("transición entre clips: fade a negro en los límites (out del 1.º, in del 2.º)", () => {
+    const p = createEmptyProject("demo");
+    p.settings.clipTransition = 0.5;
+    p.tracks.video.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    // clip 0 (dur 4): solo fade-out al final
+    expect(g.filterComplex).toContain("[seg0]fade=t=out:st=3.5:d=0.5[segt0]");
+    expect(g.filterComplex).toContain("[sega0]afade=t=out:st=3.5:d=0.5[segat0]");
+    // clip 1: solo fade-in al inicio
+    expect(g.filterComplex).toContain("[seg1]fade=t=in:st=0:d=0.5[segt1]");
+  });
+
   it("con ducking activado, la voz baja la música vía sidechaincompress", () => {
     const p = projectWithClip();
     p.settings.audioDucking = true;

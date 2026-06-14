@@ -350,6 +350,7 @@ function BackgroundProperties() {
   const setBackground = useProjectStore((s) => s.setBackground);
   const fadeIn = useProjectStore((s) => s.project.settings.fadeIn);
   const fadeOut = useProjectStore((s) => s.project.settings.fadeOut);
+  const clipTransition = useProjectStore((s) => s.project.settings.clipTransition);
   const setFade = useProjectStore((s) => s.setFade);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const [bgError, setBgError] = useState<string | null>(null);
@@ -441,7 +442,10 @@ function BackgroundProperties() {
       <Field label={`Fundido de salida · ${fadeOut.toFixed(1)}s`} htmlFor="prop-fade-out">
         <Slider id="prop-fade-out" min={0} max={5} step={0.1} value={fadeOut} onChange={(v) => setFade({ fadeOut: v })} />
       </Field>
-      <p className="text-[10px] text-muted -mt-1">Se aplican al exportar (entrada/salida del vídeo).</p>
+      <Field label={`Entre clips (fundido a negro) · ${clipTransition.toFixed(1)}s`} htmlFor="prop-clip-trans">
+        <Slider id="prop-clip-trans" min={0} max={2} step={0.1} value={clipTransition} onChange={(v) => setFade({ clipTransition: v })} />
+      </Field>
+      <p className="text-[10px] text-muted -mt-1">Se aplican al exportar.</p>
     </div>
   );
 }

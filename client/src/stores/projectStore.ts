@@ -73,7 +73,7 @@ interface ProjectState {
   setAspect: (aspect: Project["settings"]["aspect"], width: number, height: number) => void;
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   setAudioDucking: (on: boolean) => void;
-  setFade: (patch: { fadeIn?: number; fadeOut?: number }) => void;
+  setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
@@ -147,6 +147,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       mutate((d) => {
         if (patch.fadeIn !== undefined) d.settings.fadeIn = patch.fadeIn;
         if (patch.fadeOut !== undefined) d.settings.fadeOut = patch.fadeOut;
+        if (patch.clipTransition !== undefined) d.settings.clipTransition = patch.clipTransition;
       }),
 
     setBackground: (patch) =>

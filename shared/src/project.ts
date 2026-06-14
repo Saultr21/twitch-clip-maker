@@ -32,6 +32,8 @@ export const projectSettingsSchema = z.object({
   // fundido de entrada/salida del vídeo y audio al exportar (segundos)
   fadeIn: z.number().min(0).max(5).default(0),
   fadeOut: z.number().min(0).max(5).default(0),
+  // transición (fundido a negro) entre clips consecutivos al exportar (segundos)
+  clipTransition: z.number().min(0).max(2).default(0),
 });
 
 export const videoClipSchema = z
@@ -134,6 +136,7 @@ export function createEmptyProject(name: string): Project {
       audioDucking: false,
       fadeIn: 0,
       fadeOut: 0,
+      clipTransition: 0,
     },
     tracks: { video: [], text: [], image: [], audio: [] },
     originalAudioVolume: 1,

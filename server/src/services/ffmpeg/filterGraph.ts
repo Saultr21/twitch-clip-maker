@@ -92,7 +92,8 @@ export function buildFilterGraph(
     segIdx++;
   };
 
-  for (const clip of clips) {
+  const transition = project.settings.clipTransition ?? 0;
+  clips.forEach((clip, ci) => {
     const info = clipInfos.get(clip.clipId);
     if (!info) throw new Error(`Falta la información del clip ${clip.clipId}`);
     if (clip.timelineStart > cursor + 0.001) pushGap(clip.timelineStart - cursor);
@@ -131,10 +132,36 @@ export function buildFilterGraph(
       "aformat=channel_layouts=stereo",
     ];
     filters.push(`[${inputIdx}:a]${audioChain.join(",")}[sega${segIdx}]`);
-    segLabels.push(`[seg${segIdx}][sega${segIdx}]`);
+
+    // transición a negro entre clips: fade-out al final (si hay clip siguiente)
+    // y fade-in al inicio (si hay clip anterior). td se limita a medio clip.
+    let vLabel = `[seg${segIdx}]`;
+    let aLabel = `[sega${segIdx}]`;
+    if (transition > 0 && clips.length > 1) {
+      const td = Math.min(transition, dur / 2);
+      const vf: string[] = [];
+      const af: string[] = [];
+      if (ci > 0) {
+        vf.push(`fade=t=in:st=0:d=${num(td)}`);
+        af.push(`afade=t=in:st=0:d=${num(td)}`);
+      }
+      if (ci < clips.length - 1) {
+        vf.push(`fade=t=out:st=${num(dur - td)}:d=${num(td)}`);
+        af.push(`afade=t=out:st=${num(dur - td)}:d=${num(td)}`);
+      }
+      if (vf.length) {
+        filters.push(`[seg${segIdx}]${vf.join(",")}[segt${segIdx}]`);
+        vLabel = `[segt${segIdx}]`;
+      }
+      if (af.length) {
+        filters.push(`[sega${segIdx}]${af.join(",")}[segat${segIdx}]`);
+        aLabel = `[segat${segIdx}]`;
+      }
+    }
+    segLabels.push(`${vLabel}${aLabel}`);
     segIdx++;
     cursor = clipEnd(clip);
-  }
+  });
 
   // Cola final: si un texto/imagen termina después del último clip, la preview
   // muestra negro con el overlay — el export añade el mismo tramo en negro

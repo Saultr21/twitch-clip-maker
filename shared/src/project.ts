@@ -29,6 +29,9 @@ export const projectSettingsSchema = z.object({
   background: backgroundSchema,
   // baja la música automáticamente cuando hay voz (ducking) al exportar
   audioDucking: z.boolean().default(false),
+  // fundido de entrada/salida del vídeo y audio al exportar (segundos)
+  fadeIn: z.number().min(0).max(5).default(0),
+  fadeOut: z.number().min(0).max(5).default(0),
 });
 
 export const videoClipSchema = z
@@ -129,6 +132,8 @@ export function createEmptyProject(name: string): Project {
       fps: 30,
       background: { type: "black", color: "#000000", blur: 0.5 },
       audioDucking: false,
+      fadeIn: 0,
+      fadeOut: 0,
     },
     tracks: { video: [], text: [], image: [], audio: [] },
     originalAudioVolume: 1,

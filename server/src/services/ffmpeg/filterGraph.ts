@@ -243,6 +243,27 @@ export function buildFilterGraph(
     audioLabel = "[amix]";
   }
 
+  // Fundido de entrada/salida (último paso, sobre el vídeo y el audio finales)
+  const fadeIn = project.settings.fadeIn ?? 0;
+  const fadeOut = project.settings.fadeOut ?? 0;
+  if (fadeIn > 0 || fadeOut > 0) {
+    const outStart = Math.max(0, totalDuration - fadeOut);
+    const vf: string[] = [];
+    const af: string[] = [];
+    if (fadeIn > 0) {
+      vf.push(`fade=t=in:st=0:d=${num(fadeIn)}`);
+      af.push(`afade=t=in:st=0:d=${num(fadeIn)}`);
+    }
+    if (fadeOut > 0) {
+      vf.push(`fade=t=out:st=${num(outStart)}:d=${num(fadeOut)}`);
+      af.push(`afade=t=out:st=${num(outStart)}:d=${num(fadeOut)}`);
+    }
+    filters.push(`${videoLabel}${vf.join(",")}[vfade]`);
+    filters.push(`${audioLabel}${af.join(",")}[afade]`);
+    videoLabel = "[vfade]";
+    audioLabel = "[afade]";
+  }
+
   return {
     inputs,
     filterComplex: filters.join(";"),

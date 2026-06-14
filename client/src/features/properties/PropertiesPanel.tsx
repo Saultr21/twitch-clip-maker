@@ -348,6 +348,9 @@ const BG_LABELS: Record<"black" | "color" | "blur" | "image", string> = {
 function BackgroundProperties() {
   const background = useProjectStore((s) => s.project.settings.background);
   const setBackground = useProjectStore((s) => s.setBackground);
+  const fadeIn = useProjectStore((s) => s.project.settings.fadeIn);
+  const fadeOut = useProjectStore((s) => s.project.settings.fadeOut);
+  const setFade = useProjectStore((s) => s.setFade);
   const bgInputRef = useRef<HTMLInputElement>(null);
   const [bgError, setBgError] = useState<string | null>(null);
 
@@ -430,6 +433,15 @@ function BackgroundProperties() {
           {bgError && <p role="alert" className="text-[11px] text-danger">{bgError}</p>}
         </div>
       )}
+
+      <h3 className="text-[11px] font-bold text-muted tracking-wide mt-2 border-t border-border pt-3">TRANSICIONES</h3>
+      <Field label={`Fundido de entrada · ${fadeIn.toFixed(1)}s`} htmlFor="prop-fade-in">
+        <Slider id="prop-fade-in" min={0} max={5} step={0.1} value={fadeIn} onChange={(v) => setFade({ fadeIn: v })} />
+      </Field>
+      <Field label={`Fundido de salida · ${fadeOut.toFixed(1)}s`} htmlFor="prop-fade-out">
+        <Slider id="prop-fade-out" min={0} max={5} step={0.1} value={fadeOut} onChange={(v) => setFade({ fadeOut: v })} />
+      </Field>
+      <p className="text-[10px] text-muted -mt-1">Se aplican al exportar (entrada/salida del vídeo).</p>
     </div>
   );
 }

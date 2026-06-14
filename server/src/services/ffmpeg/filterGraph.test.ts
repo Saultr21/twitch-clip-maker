@@ -262,6 +262,24 @@ describe("buildFilterGraph — música", () => {
     expect(g.filterComplex).not.toContain("amix");
   });
 
+  it("fundido de entrada/salida añade fade y afade al final con los tiempos correctos", () => {
+    const p = projectWithClip(); // vídeo en [0,5)
+    p.settings.fadeIn = 1;
+    p.settings.fadeOut = 2;
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("fade=t=in:st=0:d=1");
+    expect(g.filterComplex).toContain("fade=t=out:st=3:d=2"); // total 5 - 2
+    expect(g.filterComplex).toContain("afade=t=in:st=0:d=1");
+    expect(g.filterComplex).toContain("afade=t=out:st=3:d=2");
+    expect(g.videoLabel).toBe("[vfade]");
+    expect(g.audioLabel).toBe("[afade]");
+  });
+
+  it("sin fundidos no añade fade", () => {
+    const g = buildFilterGraph(projectWithClip(), new Map([["clip-1", info]]));
+    expect(g.filterComplex).not.toContain("fade=");
+  });
+
   it("con ducking activado, la voz baja la música vía sidechaincompress", () => {
     const p = projectWithClip();
     p.settings.audioDucking = true;

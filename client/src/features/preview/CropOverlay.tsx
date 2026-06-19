@@ -44,7 +44,9 @@ function initialCropPx(selection: { kind: string; id: string } | null, bounds: B
     const c = clip?.crop;
     if (c) return { x: c.x * bounds.w, y: c.y * bounds.h, w: c.w * bounds.w, h: c.h * bounds.h };
   }
-  return { x: 0, y: 0, w: bounds.w, h: bounds.h };
+  // Sin crop previo: empezar al 80% centrado para que sea movible desde el inicio
+  const pad = 0.1;
+  return { x: bounds.w * pad, y: bounds.h * pad, w: bounds.w * (1 - pad * 2), h: bounds.h * (1 - pad * 2) };
 }
 
 export function CropOverlay({ canvasW, canvasH }: Props) {
@@ -129,10 +131,16 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
         stroke="white"
         strokeWidth={1.5}
         draggable
-        dragBoundFunc={(pos) => ({
-          x: Math.max(bounds.left, Math.min(bounds.left + bounds.w - crop.w, pos.x)),
-          y: Math.max(bounds.top, Math.min(bounds.top + bounds.h - crop.h, pos.y)),
-        })}
+        dragBoundFunc={(pos) => {
+          // Leer tamaño actual del nodo (no del estado, que puede ser stale)
+          const node = rectRef.current;
+          const nw = node ? node.width() * Math.abs(node.scaleX()) : crop.w;
+          const nh = node ? node.height() * Math.abs(node.scaleY()) : crop.h;
+          return {
+            x: Math.max(bounds.left, Math.min(bounds.left + bounds.w - nw, pos.x)),
+            y: Math.max(bounds.top, Math.min(bounds.top + bounds.h - nh, pos.y)),
+          };
+        }}
         onDragMove={(e) => setCrop(c => ({
           ...c,
           x: e.target.x() - bounds.left,

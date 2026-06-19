@@ -45,8 +45,8 @@ function useHtmlImage(src: string): HTMLImageElement | null {
   return img;
 }
 
-function ImageNode({ overlay, width, height, selected, onGuides }: {
-  overlay: ImageOverlay; width: number; height: number; selected: boolean; onGuides: GuidesCallback;
+function ImageNode({ overlay, width, height, selected, onGuides, cropMode }: {
+  overlay: ImageOverlay; width: number; height: number; selected: boolean; onGuides: GuidesCallback; cropMode: boolean;
 }) {
   const img = useHtmlImage(`/assets/${overlay.fileName}`);
   const ref = useRef<Konva.Image>(null);
@@ -86,7 +86,7 @@ function ImageNode({ overlay, width, height, selected, onGuides }: {
             height: overlay.crop.h * img.naturalHeight,
           }
         } : {})}
-        draggable
+        draggable={!cropMode}
         onMouseDown={() => select({ kind: "image", id: overlay.id })}
         onTap={() => select({ kind: "image", id: overlay.id })}
         onDragStart={() => beginTransaction()}
@@ -120,7 +120,7 @@ function ImageNode({ overlay, width, height, selected, onGuides }: {
           node.scaleY(1);
         }}
       />
-      {selected && <Transformer ref={trRef} rotateEnabled flipEnabled={false} />}
+      {selected && !cropMode && <Transformer ref={trRef} rotateEnabled flipEnabled={false} />}
     </>
   );
 }
@@ -220,8 +220,8 @@ function TextNode({ overlay, width, height, selected, onGuides }: {
  * esquinas del Transformer cambian el zoom. La posición del nodo deriva del
  * modelo en cada render, así que los gestos son updates transitorias.
  */
-function VideoFrameNode({ width, height, onGuides }: {
-  width: number; height: number; onGuides: GuidesCallback;
+function VideoFrameNode({ width, height, onGuides, cropMode }: {
+  width: number; height: number; onGuides: GuidesCallback; cropMode: boolean;
 }) {
   const ref = useRef<Konva.Rect>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -267,7 +267,7 @@ function VideoFrameNode({ width, height, onGuides }: {
         fill="transparent"
         onMouseDown={() => select({ kind: "video", id: activeClip.id })}
         onTap={() => select({ kind: "video", id: activeClip.id })}
-        draggable={selected}
+        draggable={selected && !cropMode}
         onDragStart={() => beginTransaction()}
         onDragMove={(e) => {
           const node = e.target;
@@ -335,7 +335,7 @@ function VideoFrameNode({ width, height, onGuides }: {
           updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
         }}
       />
-      {selected && (
+      {selected && !cropMode && (
         <Transformer
           ref={trRef}
           rotateEnabled={false}
@@ -379,7 +379,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
-        <VideoFrameNode width={width} height={height} onGuides={onGuides} />
+        <VideoFrameNode width={width} height={height} onGuides={onGuides} cropMode={cropMode} />
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}
@@ -388,6 +388,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
             height={height}
             selected={selection?.kind === "image" && selection.id === o.id}
             onGuides={onGuides}
+            cropMode={cropMode}
           />
         ))}
         {visibleTexts.map((o) => (

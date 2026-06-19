@@ -131,21 +131,16 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
         stroke="white"
         strokeWidth={1.5}
         draggable
-        dragBoundFunc={(pos) => {
-          // Leer tamaño actual del nodo (no del estado, que puede ser stale)
-          const node = rectRef.current;
-          const nw = node ? node.width() * Math.abs(node.scaleX()) : crop.w;
-          const nh = node ? node.height() * Math.abs(node.scaleY()) : crop.h;
-          return {
-            x: Math.max(bounds.left, Math.min(bounds.left + bounds.w - nw, pos.x)),
-            y: Math.max(bounds.top, Math.min(bounds.top + bounds.h - nh, pos.y)),
-          };
+        onDragMove={(e) => {
+          const node = e.target;
+          const nw = node.width() * Math.abs(node.scaleX());
+          const nh = node.height() * Math.abs(node.scaleY());
+          // Clamp dentro de los bounds del elemento
+          const clampedX = Math.max(bounds.left, Math.min(bounds.left + bounds.w - nw, node.x()));
+          const clampedY = Math.max(bounds.top, Math.min(bounds.top + bounds.h - nh, node.y()));
+          node.position({ x: clampedX, y: clampedY });
+          setCrop(c => ({ ...c, x: clampedX - bounds.left, y: clampedY - bounds.top }));
         }}
-        onDragMove={(e) => setCrop(c => ({
-          ...c,
-          x: e.target.x() - bounds.left,
-          y: e.target.y() - bounds.top,
-        }))}
         onTransformEnd={(e) => updateFromNode(e.target as Konva.Rect)}
       />
       <Transformer

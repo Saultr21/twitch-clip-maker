@@ -6,7 +6,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import type { ClipInfo, DownloadEvent } from "@clipforge/shared";
 import { CLIPS_DIR } from "../lib/paths.js";
-import { isTwitchClipUrl } from "../lib/twitchUrl.js";
+import { matchPlatform, SUPPORTED_LABELS } from "../lib/supportedUrl.js";
 import { addClip, listClips, removeClip } from "../services/clipsRegistry.js";
 import { getClipThumbnail } from "../services/clipThumbnail.js";
 import { downloadClip } from "../services/download.js";
@@ -28,10 +28,10 @@ export function clipRoutes(app: FastifyInstance): void {
 
   app.post("/api/clips", async (req, reply) => {
     const parsed = downloadBody.safeParse(req.body);
-    if (!parsed.success || !isTwitchClipUrl(parsed.data.url)) {
+    if (!parsed.success || !matchPlatform(parsed.data.url)) {
       return reply
         .code(400)
-        .send({ error: "La URL no es un clip válido de Twitch" });
+        .send({ error: `La URL no es de una plataforma soportada (${SUPPORTED_LABELS})` });
     }
 
     reply.raw.writeHead(200, {

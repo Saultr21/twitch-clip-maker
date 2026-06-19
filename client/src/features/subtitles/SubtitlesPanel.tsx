@@ -124,8 +124,8 @@ export function SubtitlesPanel() {
         <>
           <div className="flex flex-col gap-1.5">
             <h3 className="text-[11px] font-bold text-muted tracking-wide">FRASES ({cues.length})</h3>
-            <div className="flex items-center gap-3">
-              <button type="button" onClick={() => setSubtitleCues(censorCues(cues))} className="text-[11px] text-muted hover:text-text" title="Censurar palabrotas">Censurar</button>
+            <div className="flex flex-col gap-1">
+              <button type="button" onClick={() => setSubtitleCues(censorCues(cues))} className="text-[11px] text-accent-soft hover:text-text" title="Censurar palabrotas">Censurar palabrotas</button>
               <button
                 type="button"
                 onClick={() => void clearAll()}

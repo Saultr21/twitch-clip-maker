@@ -22,6 +22,9 @@ const STAGE_MARGIN = 200;
 // Imán de las guías de centrado (px en pantalla)
 const GUIDE_SNAP_PX = 6;
 
+// Recorte neutro (frame completo)
+const FULL_CROP = { x: 0, y: 0, w: 1, h: 1 } as const;
+
 type GuidesCallback = (vertical: boolean, horizontal: boolean) => void;
 
 /** Si pos está a menos del imán del centro del eje, engancha al centro. */
@@ -246,12 +249,17 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
   const info = activeClip ? clips.find((c) => c.id === activeClip.clipId) : undefined;
   if (!activeClip || !info) return null;
 
-  // Misma geometría que el <video> de PreviewCanvas (base = contain)
+  // Geometría del FRAME completo (igual que el <video> de PreviewCanvas)
   const baseScale = Math.min(width / info.width, height / info.height);
   const w = info.width * baseScale * activeClip.zoom.scale;
   const h = info.height * baseScale * activeClip.zoom.scale;
-  const left = activeClip.zoom.x * (width - w);
-  const top = activeClip.zoom.y * (height - h);
+  // El recuadro abraza el rect VISIBLE (frame con su recorte aplicado), no el
+  // frame entero: tras recortar, la selección/asas siguen al vídeo recortado
+  const crop = activeClip.crop ?? FULL_CROP;
+  const vW = w * crop.w;
+  const vH = h * crop.h;
+  const vLeft = activeClip.zoom.x * (width - w) + w * crop.x;
+  const vTop = activeClip.zoom.y * (height - h) + h * crop.y;
 
   const clipNow = () =>
     useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClip.id);
@@ -260,10 +268,10 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
     <>
       <Rect
         ref={ref}
-        x={left}
-        y={top}
-        width={w}
-        height={h}
+        x={vLeft}
+        y={vTop}
+        width={vW}
+        height={vH}
         fill="transparent"
         onMouseDown={() => select({ kind: "video", id: activeClip.id })}
         onTap={() => select({ kind: "video", id: activeClip.id })}
@@ -273,30 +281,35 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
           const node = e.target;
           const clip = clipNow();
           if (!clip) return;
-          // left = zoom.x·(lienzo − w) ⇒ zoom.x = x / (lienzo − w), por eje
+          // node.x() es la esquina VISIBLE; el offset del recorte (w·crop.x) la
+          // separa del frame completo: zoom.x = (visX − w·crop.x) / (lienzo − w)
           const zoom = { ...clip.zoom };
           let vGuide = false;
           let hGuide = false;
           if (Math.abs(width - w) > 1) {
-            zoom.x = clamp01(node.x() / (width - w));
-            // imán al centro: el centro del vídeo cae sobre el centro del lienzo
-            if (Math.abs((zoom.x - 0.5) * (width - w)) < GUIDE_SNAP_PX) {
-              zoom.x = 0.5;
+            zoom.x = clamp01((node.x() - w * crop.x) / (width - w));
+            // imán: el centro del vídeo VISIBLE cae sobre el centro del lienzo
+            const visLeft = zoom.x * (width - w) + w * crop.x;
+            if (Math.abs(visLeft + vW / 2 - width / 2) < GUIDE_SNAP_PX) {
+              zoom.x = clamp01((width / 2 - vW / 2 - w * crop.x) / (width - w));
               vGuide = true;
             }
           }
           if (Math.abs(height - h) > 1) {
-            zoom.y = clamp01(node.y() / (height - h));
-            if (Math.abs((zoom.y - 0.5) * (height - h)) < GUIDE_SNAP_PX) {
-              zoom.y = 0.5;
+            zoom.y = clamp01((node.y() - h * crop.y) / (height - h));
+            const visTop = zoom.y * (height - h) + h * crop.y;
+            if (Math.abs(visTop + vH / 2 - height / 2) < GUIDE_SNAP_PX) {
+              zoom.y = clamp01((height / 2 - vH / 2 - h * crop.y) / (height - h));
               hGuide = true;
             }
           }
           onGuides(vGuide, hGuide);
           updateVideoClip(clip.id, { zoom }, { transient: true });
-          // Re-clava el nodo a la posición derivada del modelo: si el clamp o el
-          // imán lo detuvieron, el recuadro no debe seguir al puntero
-          node.position({ x: zoom.x * (width - w), y: zoom.y * (height - h) });
+          // Re-clava el nodo a la posición VISIBLE derivada del modelo
+          node.position({
+            x: zoom.x * (width - w) + w * crop.x,
+            y: zoom.y * (height - h) + h * crop.y,
+          });
         }}
         onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
@@ -312,11 +325,14 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
           const w2 = info.width * baseScale * scale;
           const h2 = info.height * baseScale * scale;
           const zoom = { ...clip.zoom, scale };
-          if (Math.abs(width - w2) > 1) zoom.x = clamp01(node.x() / (width - w2));
-          if (Math.abs(height - h2) > 1) zoom.y = clamp01(node.y() / (height - h2));
+          if (Math.abs(width - w2) > 1) zoom.x = clamp01((node.x() - w2 * crop.x) / (width - w2));
+          if (Math.abs(height - h2) > 1) zoom.y = clamp01((node.y() - h2 * crop.y) / (height - h2));
           updateVideoClip(clip.id, { zoom }, { transient: true });
           node.scale({ x: 1, y: 1 });
-          node.position({ x: zoom.x * (width - w2), y: zoom.y * (height - h2) });
+          node.position({
+            x: zoom.x * (width - w2) + w2 * crop.x,
+            y: zoom.y * (height - h2) + h2 * crop.y,
+          });
         }}
         onTransformEnd={(e) => {
           e.target.scale({ x: 1, y: 1 });
@@ -403,7 +419,14 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
         ))}
         <SubtitlesLayer width={width} height={height} onGuides={onGuides} />
         {cropMode && (selection?.kind === "image" || selection?.kind === "video") && (
-          <CropOverlay canvasW={width} canvasH={height} />
+          // key liga el recorte a la selección y al tamaño del lienzo: si cambian,
+          // CropOverlay se remonta y recalcula sus bounds (no se queda con los del
+          // elemento anterior)
+          <CropOverlay
+            key={`${selection.kind}:${selection.id}:${width}x${height}`}
+            canvasW={width}
+            canvasH={height}
+          />
         )}
         {guides.vertical && (
           <Line

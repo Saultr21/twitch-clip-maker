@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
@@ -15,6 +15,10 @@ interface PreviewCanvasProps {
 }
 
 const ASPECT_OPTIONS = ["9:16", "16:9", "1:1", "4:5"] as const;
+
+// Crop neutro (frame entero): se usa cuando el clip no tiene recorte o mientras
+// se está recortando, para mostrar el fotograma completo
+const FULL_FRAME = { x: 0, y: 0, w: 1, h: 1 } as const;
 
 export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps) {
   const settings = useProjectStore((s) => s.project.settings);
@@ -163,44 +167,47 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               />
             </div>
           )}
-          {videoStyle && activeClip?.crop ? (
-            <div
-              style={{
-                position: "absolute",
-                left: videoStyle.left + videoStyle.width * activeClip.crop.x,
-                top: videoStyle.top + videoStyle.height * activeClip.crop.y,
-                width: videoStyle.width * activeClip.crop.w,
-                height: videoStyle.height * activeClip.crop.h,
-                overflow: "hidden",
-                visibility: inGap ? "hidden" : "visible",
-              }}
-            >
-              <video
-                ref={videoRef}
-                preload="auto"
-                className="absolute max-w-none"
-                style={{
+          {/* Estructura SIEMPRE idéntica (wrapper + <video>), tenga crop o no y
+              haya clip o no: así el nodo <video> nunca se remonta al aplicar/quitar
+              recorte ni al cruzar huecos, evitando que pierda src/currentTime y se
+              funda a negro. El recorte se aplica reposicionando el <video> dentro
+              del wrapper, sin recargar. */}
+          {(() => {
+            const crop = activeClip?.crop ?? FULL_FRAME;
+            const visible = videoStyle && !inGap ? "visible" : "hidden";
+            const wrapperStyle: CSSProperties = videoStyle
+              ? {
+                  position: "absolute",
+                  left: videoStyle.left + videoStyle.width * crop.x,
+                  top: videoStyle.top + videoStyle.height * crop.y,
+                  width: videoStyle.width * crop.w,
+                  height: videoStyle.height * crop.h,
+                  overflow: "hidden",
+                  visibility: visible,
+                }
+              : { position: "absolute", inset: 0, overflow: "hidden", visibility: "hidden" };
+            const innerStyle: CSSProperties = videoStyle
+              ? {
                   width: videoStyle.width,
                   height: videoStyle.height,
-                  left: -videoStyle.width * activeClip.crop.x,
-                  top: -videoStyle.height * activeClip.crop.y,
+                  left: -videoStyle.width * crop.x,
+                  top: -videoStyle.height * crop.y,
                   filter: videoStyle.filter,
-                }}
-              />
-            </div>
-          ) : (
-            <video
-              ref={videoRef}
-              preload="auto"
-              // max-w-none: el preflight de Tailwind capa los <video> a max-width 100%
-              // y rompería el zoom cuando el vídeo desborda el lienzo
-              className="absolute max-w-none"
-              style={{
-                visibility: inGap || !videoStyle ? "hidden" : "visible",
-                ...(videoStyle ?? { inset: 0, width: "100%", height: "100%" }),
-              }}
-            />
-          )}
+                }
+              : { inset: 0, width: "100%", height: "100%" };
+            return (
+              <div style={wrapperStyle}>
+                <video
+                  ref={videoRef}
+                  preload="auto"
+                  // max-w-none: el preflight de Tailwind capa los <video> a
+                  // max-width 100% y rompería el zoom al desbordar el lienzo
+                  className="absolute max-w-none"
+                  style={innerStyle}
+                />
+              </div>
+            );
+          })()}
           {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
           <div
             aria-hidden="true"

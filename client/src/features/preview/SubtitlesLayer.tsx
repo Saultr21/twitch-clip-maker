@@ -5,9 +5,14 @@ import { activeWordIndex, cueEnd, cueStart } from "../../lib/subtitles";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 
+const GUIDE_SNAP_PX = 6;
+
+type GuidesCallback = (vertical: boolean, horizontal: boolean) => void;
+
 interface SubtitlesLayerProps {
   width: number;
   height: number;
+  onGuides: GuidesCallback;
 }
 
 interface PlacedWord {
@@ -20,7 +25,7 @@ interface Line {
   width: number;
 }
 
-export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
+export function SubtitlesLayer({ width, height, onGuides }: SubtitlesLayerProps) {
   const playhead = useUiStore((s) => s.playhead);
   const cues = useProjectStore((s) => s.project.subtitles.cues);
   const style = useProjectStore((s) => s.project.subtitles.style);
@@ -99,11 +104,20 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
         onTap={() => select({ kind: "subtitle", id: cue.id })}
         onDragStart={() => beginTransaction()}
         onDragMove={(e) => {
+          let nx = e.target.x();
+          let ny = e.target.y();
+          const sv = Math.abs(nx - width / 2) < GUIDE_SNAP_PX;
+          const sh = Math.abs(ny - height / 2) < GUIDE_SNAP_PX;
+          if (sv) nx = width / 2;
+          if (sh) ny = height / 2;
+          e.target.position({ x: nx, y: ny });
+          onGuides(sv, sh);
           setSubtitleStyle({
-            x: Math.min(1, Math.max(0, e.target.x() / width)),
-            y: Math.min(1, Math.max(0, e.target.y() / height)),
+            x: Math.min(1, Math.max(0, nx / width)),
+            y: Math.min(1, Math.max(0, ny / height)),
           });
         }}
+        onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
         onTransformEnd={(e) => {
           const node = e.target;

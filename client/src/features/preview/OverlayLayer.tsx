@@ -390,7 +390,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
             onGuides={onGuides}
           />
         ))}
-        <SubtitlesLayer width={width} height={height} />
+        <SubtitlesLayer width={width} height={height} onGuides={onGuides} />
         {guides.vertical && (
           <Line
             points={[width / 2, -STAGE_MARGIN, width / 2, height + STAGE_MARGIN]}

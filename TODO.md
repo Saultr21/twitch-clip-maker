@@ -7,6 +7,16 @@
 ## In Progress
 - (nada — proyecto funcional de punta a punta + todas las mejoras de Pendiente.txt hechas; pendiente smoke test del usuario de los subtítulos)
 
+## Recorte directo (2026-06-19) — hecho
+- [x] UX de recorte de vídeo/imagen rehecha (commit 98adfe8, directo a master)
+  - Botones ✓/✕ discretos en el lienzo + etiqueta "Recortando" (sin depender solo de Enter/Esc)
+  - El recuadro abraza el elemento VISIBLE y los recortes se componen de forma acumulativa (`composeCrop` puro + tests)
+  - El box de selección del vídeo sigue al recorte aplicado, no al frame completo (arrastre/zoom/imán ajustados al offset del crop)
+  - Render del `<video>` con estructura estable (wrapper único): aplicar recorte ya no funde a negro
+  - Fix de `boundBoxFunc` para el offset del stage (`STAGE_MARGIN`): el rect ya no se descontrola al redimensionar
+  - Files: `client/src/features/preview/{CropOverlay,OverlayLayer,PreviewCanvas}.tsx`, `client/src/lib/cropBox.ts(.test)`
+  - Verificado: 81 tests client verdes + typecheck limpio + smoke test del usuario OK
+
 ## Descarga multiplataforma (2026-06-19) — hecha
 - [x] Allowlist de plataformas (Twitch, YouTube, TikTok, Instagram, X) vía `matchPlatform` (`server/src/lib/supportedUrl.ts`), sustituye la validación solo-Twitch; quita la regex `/clip/` (acepta también VODs y canal de Twitch)
 - [x] Selector de formato `bv*+ba/b` con merge a mp4 en `download.ts` (sube calidad; arregla el techo de 720p en YouTube). `--no-playlist` evita descargar canales/playlists enteras
@@ -61,6 +71,20 @@
 - [ ] Empaquetar MediaPipe offline — marginal (el navegador ya cachea el CDN; el 1.er uso necesita red como el resto de herramientas)
 - [ ] Auto-reframe v2: paneo SUAVE con keyframes — proyecto de arquitectura (keyframes en modelo + preview + export); requiere diseño propio, no un batch
 - [ ] Transiciones v2: crossfade real (xfade) entre clips — reescribe el concat (lo más central/testeado); riesgo alto
+
+## Pendiente — features grandes (pedidas por el usuario 2026-06-19, requieren diseño propio)
+- [ ] `TASK-010` — Zoom de la zona de trabajo (preview/lienzo)
+  - Poder acercar/alejar el lienzo del editor para trabajar con precisión (no confundir con el `zoom.scale` del clip, que reencuadra el vídeo)
+  - Notas: afecta al cálculo de tamaño del lienzo en `PreviewCanvas` y a las coordenadas del Stage de Konva (`OverlayLayer`); pan + reset; atajos rueda/Ctrl
+  - Priority: medium
+- [ ] `TASK-011` — Apartado de animaciones/transiciones
+  - Transiciones tipo desvanecer, fundido, crossfade, etc., colocables ENTRE medios o al inicio/final
+  - Notas: se solapa con lo ya deferido (fade in/out al export ya existe; "Transiciones v2: crossfade real (xfade)" reescribe el concat → riesgo alto). Requiere modelo de transiciones en el proyecto + preview + export FFmpeg (xfade/acrossfade)
+  - Priority: medium
+- [ ] `TASK-012` — Multipista: varias líneas de medios (vídeo/imagen superpuestos, PiP)
+  - Picture-in-picture: un vídeo encima de otro, una imagen encima de otra, etc.
+  - Notas: feature MAYOR. Hoy la pista de vídeo es una sola línea secuencial (`hasOverlap` impide solapes), el preview pinta solo un clip activo y el export concatena en secuencia. Toca: modelo (pistas en capas), render del preview (compositar varios `<video>`), timeline multi-carril y grafo FFmpeg (overlay). Brainstorming dedicado pendiente
+  - Priority: high (es la siguiente que el usuario quiere abordar)
 
 ## Discovered / Backlog
 - [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)

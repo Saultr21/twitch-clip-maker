@@ -10,8 +10,8 @@ interface Step {
 }
 
 const STEPS: Step[] = [
-  { Icon: Clapperboard, title: "Bienvenido a VideoForge", body: "Un editor de vídeo local: descarga clips de Twitch o usa los tuyos, edítalos y exporta para TikTok, Reels, Shorts o YouTube." },
-  { Icon: Upload, title: "1 · Añade vídeo", body: "En Medios, pega una URL de Twitch o sube/arrastra un vídeo del escritorio. Luego doble clic (o arrástralo) para llevarlo a la línea de tiempo." },
+  { Icon: Clapperboard, title: "Bienvenido a VideoForge", body: "Un editor de vídeo local: descarga vídeos de Twitch, YouTube, TikTok, Instagram o X (o usa los tuyos), edítalos y exporta para TikTok, Reels, Shorts o YouTube." },
+  { Icon: Upload, title: "1 · Añade vídeo", body: "En Medios, pega una URL (Twitch, YouTube, TikTok, Instagram, X) o sube/arrastra un vídeo del escritorio. Luego doble clic (o arrástralo) para llevarlo a la línea de tiempo." },
   { Icon: Scissors, title: "2 · Edita", body: "Recorta y ordena clips, añade texto, imágenes y música, ajusta zoom/velocidad/filtros, elimina silencios y prueba el auto-reframe para vertical." },
   { Icon: Captions, title: "3 · Subtítulos", body: "Genera subtítulos automáticos (karaoke) desde el panel Subtítulos, edítalos y dales estilo. Puedes censurar palabrotas y animar la palabra activa." },
   { Icon: Download, title: "4 · Exporta", body: "Elige el formato arriba (9:16, 16:9, 1:1, 4:5) y pulsa Exportar: vídeo (MP4), un fotograma de portada (PNG) o un GIF." },

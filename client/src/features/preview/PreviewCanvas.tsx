@@ -190,7 +190,7 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               <p className="text-sm font-semibold text-text">Empieza añadiendo un vídeo</p>
               <ul className="text-[11px] flex flex-col gap-1.5">
                 <li className="flex items-center justify-center gap-1.5">
-                  <Link2 size={13} aria-hidden="true" /> Pega una URL de clip de Twitch
+                  <Link2 size={13} aria-hidden="true" /> Pega una URL de vídeo (Twitch, YouTube, TikTok…)
                 </li>
                 <li className="flex items-center justify-center gap-1.5">
                   <Upload size={13} aria-hidden="true" /> Sube o arrastra un vídeo del escritorio

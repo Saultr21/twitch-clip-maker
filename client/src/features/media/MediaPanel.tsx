@@ -93,14 +93,14 @@ export function MediaPanel() {
 
       <form onSubmit={onSubmit} className="flex flex-col gap-2">
         <label htmlFor="clip-url" className="text-[11px] text-muted">
-          URL del clip de Twitch
+          URL del vídeo (Twitch, YouTube, TikTok, Instagram, X)
         </label>
         <input
           id="clip-url"
           type="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://clips.twitch.tv/..."
+          placeholder="https://www.youtube.com/watch?v=..."
           disabled={downloading}
           className="bg-surface-2 border border-border-2 rounded-md px-2 py-1.5 text-xs placeholder:text-muted/60 focus:outline-none focus:border-accent"
         />
@@ -171,7 +171,7 @@ export function MediaPanel() {
       <ul className="flex flex-col gap-1.5" aria-label="Clips descargados">
         {clips.length === 0 && !downloading && (
           <li className="text-[11px] text-muted">
-            Aún no hay vídeos. Pega una URL de Twitch, sube un archivo o arrástralo aquí.
+            Aún no hay vídeos. Pega una URL (Twitch, YouTube, TikTok…), sube un archivo o arrástralo aquí.
           </li>
         )}
         {clips.map((clip) => (

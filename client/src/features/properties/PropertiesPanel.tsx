@@ -517,6 +517,9 @@ function SubtitleCueProperties({ cueId }: { cueId: string }) {
           <input id="prop-sub-hl" type="color" value={style.highlight} onChange={(e) => setSubtitleStyle({ highlight: e.target.value })} className="h-8 w-full bg-surface-2 rounded-md border border-border-2" />
         </Field>
       </div>
+      <Field label={`Posición horizontal · ${Math.round(style.x * 100)}%`} htmlFor="prop-sub-x">
+        <Slider id="prop-sub-x" min={0} max={1} step={0.01} value={style.x} onChange={(v) => setSubtitleStyle({ x: v })} />
+      </Field>
       <Field label={`Posición vertical · ${Math.round(style.y * 100)}%`} htmlFor="prop-sub-y">
         <Slider id="prop-sub-y" min={0} max={1} step={0.01} value={style.y} onChange={(v) => setSubtitleStyle({ y: v })} />
       </Field>

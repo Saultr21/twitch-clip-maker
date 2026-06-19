@@ -20,6 +20,7 @@ export const subtitleStyleSchema = z.object({
   highlight: hex,
   stroke: z.string().regex(/^$|^#[0-9a-f]{6}$/i),
   strokeWidth: z.number().min(0).max(0.1),
+  x: z.number().min(0).max(1).default(0.5),
   y: z.number().min(0).max(1),
   uppercase: z.boolean(),
   // resaltar la palabra activa con el color highlight
@@ -37,6 +38,7 @@ export const DEFAULT_SUBTITLE_STYLE = {
   highlight: "#9146ff",
   stroke: "#000000",
   strokeWidth: 0.004,
+  x: 0.5,
   y: 0.82,
   uppercase: true,
   wordHighlight: true,

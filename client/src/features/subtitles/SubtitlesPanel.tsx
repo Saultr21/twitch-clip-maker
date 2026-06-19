@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { SubtitleCue } from "@clipforge/shared";
 import { censorCues } from "../../lib/profanity";
+import { splitCuesToMaxWords } from "../../lib/subtitles";
 import { videoClipAt } from "../../lib/timeline";
 import { confirmDialog } from "../../stores/dialogStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -25,9 +26,13 @@ export function SubtitlesPanel() {
   const removeCue = useProjectStore((s) => s.removeCue);
   const clearSubtitles = useProjectStore((s) => s.clearSubtitles);
   const setSubtitleStyle = useProjectStore((s) => s.setSubtitleStyle);
+  const maxWordsPerCue = useProjectStore((s) => s.project.subtitles.maxWordsPerCue);
+  const setMaxWordsPerCue = useProjectStore((s) => s.setMaxWordsPerCue);
   const [language, setLanguage] = useState("auto");
   const [model, setModel] = useState<"small" | "medium">("small");
-  const { state, start, cancel } = useTranscribe(setSubtitleCues);
+  const { state, start, cancel } = useTranscribe((cues) =>
+    setSubtitleCues(splitCuesToMaxWords(cues, maxWordsPerCue)),
+  );
 
   const generate = () => {
     const project = useProjectStore.getState().project;
@@ -144,6 +149,17 @@ export function SubtitlesPanel() {
           </ul>
 
           <h3 className="text-[11px] font-bold text-muted tracking-wide mt-2">ESTILO</h3>
+          <label htmlFor="sub-maxwords" className="text-[11px] text-muted">Palabras por frase · {maxWordsPerCue}</label>
+          <input
+            id="sub-maxwords"
+            type="range"
+            min={1}
+            max={20}
+            step={1}
+            value={maxWordsPerCue}
+            onChange={(e) => setMaxWordsPerCue(parseInt(e.target.value, 10))}
+            className="accent-accent h-1.5"
+          />
           <label className="text-[11px] text-muted">Color base
             <input type="color" value={style.fill} onChange={(e) => setSubtitleStyle({ fill: e.target.value })} className="ml-2 h-6 w-10 align-middle bg-surface-2 rounded border border-border-2" />
           </label>

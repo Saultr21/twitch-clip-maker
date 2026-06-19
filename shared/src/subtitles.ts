@@ -45,8 +45,9 @@ export const subtitlesSchema = z
   .object({
     cues: z.array(subtitleCueSchema),
     style: subtitleStyleSchema,
+    maxWordsPerCue: z.number().int().min(1).max(30).default(8),
   })
-  .default({ cues: [], style: { ...DEFAULT_SUBTITLE_STYLE } });
+  .default({ cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 });
 
 export type SubtitleWord = z.infer<typeof subtitleWordSchema>;
 export type SubtitleCue = z.infer<typeof subtitleCueSchema>;

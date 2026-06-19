@@ -103,6 +103,7 @@ interface ProjectState {
   trimCue: (id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   removeCue: (id: string) => void;
   setSubtitleStyle: (patch: Partial<SubtitleStyle>) => void;
+  setMaxWordsPerCue: (n: number) => void;
   clearSubtitles: () => void;
   applyPreset: (preset: Preset) => void;
   setOriginalAudioVolume: (v: number) => void;
@@ -424,6 +425,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     setSubtitleStyle: (patch) =>
       mutate((d) => void Object.assign(d.subtitles.style, patch)),
+
+    setMaxWordsPerCue: (n) =>
+      mutate((d) => void (d.subtitles.maxWordsPerCue = Math.max(1, Math.min(30, n)))),
 
     clearSubtitles: () => mutate((d) => void (d.subtitles.cues = [])),
 

@@ -35,6 +35,19 @@ export function scaleCueWords(c: SubtitleCue, newStart: number, newEnd: number):
   return { ...c, words: c.words.map((w) => ({ text: w.text, start: map(w.start), end: map(w.end) })) };
 }
 
+/** Parte cues con más de maxWords palabras en trozos de maxWords conservando los tiempos. */
+export function splitCuesToMaxWords(cues: SubtitleCue[], maxWords: number): SubtitleCue[] {
+  if (maxWords < 1) return cues;
+  const out: SubtitleCue[] = [];
+  for (const cue of cues) {
+    for (let i = 0; i < cue.words.length; i += maxWords) {
+      const chunk = cue.words.slice(i, i + maxWords);
+      out.push({ id: `${cue.id}-${i}`, words: chunk });
+    }
+  }
+  return out;
+}
+
 /** Reparte el rango actual de la cue equitativamente entre las palabras del texto nuevo. */
 export function redistributeWordTimes(c: SubtitleCue, text: string): SubtitleCue {
   const tokens = text.trim().split(/\s+/).filter(Boolean);

@@ -140,7 +140,7 @@ export function createEmptyProject(name: string): Project {
     },
     tracks: { video: [], text: [], image: [], audio: [] },
     originalAudioVolume: 1,
-    subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE } },
+    subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 },
   };
 }
 

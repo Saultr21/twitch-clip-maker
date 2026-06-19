@@ -40,7 +40,11 @@ export function MediaPanel() {
 
   const addToTimeline = (clip: ClipInfo) => {
     useProjectStore.getState().addVideoClip(clip);
-    useUiStore.getState().select(null);
+    const tracks = useProjectStore.getState().project.tracks.video;
+    const newClip = tracks[tracks.length - 1];
+    if (newClip) {
+      useUiStore.getState().select({ kind: "video", id: newClip.id });
+    }
   };
 
   const onDelete = async (clip: ClipInfo) => {

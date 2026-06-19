@@ -39,18 +39,19 @@ export function Timeline({ height }: { height: number }) {
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
   const hasSelection = useUiStore((s) => s.selection !== null);
+  const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
   const videoCount = project.tracks.video.length;
   const prevVideoCount = useRef(videoCount);
-  // Cuando se añade un clip (y solo entonces), hace scroll para mostrarlo
+  // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
   useEffect(() => {
-    if (videoCount > prevVideoCount.current && scrollRef.current && project.tracks.video.length > 0) {
+    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && project.tracks.video.length > 0) {
       const last = project.tracks.video[project.tracks.video.length - 1];
       const left = 80 + last.timelineStart * pxPerSecond - 60;
-      scrollRef.current.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+      scrollRef.current.scrollLeft = Math.max(0, left);
     }
     prevVideoCount.current = videoCount;
-  }, [videoCount, project.tracks.video, pxPerSecond]);
+  }, [videoCount, project.tracks.video, pxPerSecond, dirty]);
   const canSplit = project.tracks.video.length > 0;
 
   const duration = projectDuration(project);

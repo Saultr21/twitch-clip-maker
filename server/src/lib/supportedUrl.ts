@@ -27,13 +27,13 @@ const PLATFORMS: Platform[] = [
   },
   {
     id: "x",
-    label: "X (Twitter)",
+    label: "X",
     hosts: ["x.com", "www.x.com", "twitter.com", "www.twitter.com", "mobile.twitter.com"],
   },
 ];
 
 /** Nombres de plataforma para mensajes de usuario. */
-export const SUPPORTED_LABELS = "Twitch, YouTube, TikTok, Instagram, X";
+export const SUPPORTED_LABELS = PLATFORMS.map((p) => p.label).join(", ");
 
 /** Devuelve la plataforma soportada de una URL https, o null si no encaja. */
 export function matchPlatform(rawUrl: string): Platform | null {

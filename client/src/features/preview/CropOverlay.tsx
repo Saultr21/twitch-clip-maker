@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import { Rect as KonvaRect, Transformer } from "react-konva";
+import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import type { CropRect } from "@clipforge/shared";
@@ -22,9 +23,11 @@ function computeBounds(selection: { kind: string; id: string } | null, canvasW: 
   if (selection.kind === "video") {
     const clip = useProjectStore.getState().project.tracks.video.find(c => c.id === selection.id);
     if (!clip) return null;
-    // For video bounds, use the canvas dimensions approximation
-    const w = canvasW * clip.zoom.scale;
-    const h = canvasH * clip.zoom.scale;
+    const info = useClipsStore.getState().clips.find(c => c.id === clip.clipId);
+    if (!info) return null;
+    const base = Math.min(canvasW / info.width, canvasH / info.height);
+    const w = info.width * base * clip.zoom.scale;
+    const h = info.height * base * clip.zoom.scale;
     return { left: clip.zoom.x * (canvasW - w), top: clip.zoom.y * (canvasH - h), w, h };
   }
   return null;

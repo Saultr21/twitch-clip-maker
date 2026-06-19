@@ -100,9 +100,10 @@ export function buildFilterGraph(
 
     const inputIdx = inputs.length;
     inputs.push({ kind: "video", fileName: info.fileName });
-    const srcW = clip.crop ? info.width * clip.crop.w : info.width;
-    const srcH = clip.crop ? info.height * clip.crop.h : info.height;
-    const rect = renderRect(W, H, srcW, srcH, clip.zoom);
+    // Escala basada en el frame completo; el recorte solo reduce el tamaño
+    // visible y desplaza el origen (igual que la preview). El paso `crop` recorta
+    // el source y `scale=rect.w:rect.h` lo deja al tamaño visible exacto
+    const rect = renderRect(W, H, info.width, info.height, clip.zoom, clip.crop);
     const dur = (clip.trimOut - clip.trimIn) / clip.speed;
     const cropStep = clip.crop
       ? `crop=iw*${clip.crop.w}:ih*${clip.crop.h}:iw*${clip.crop.x}:ih*${clip.crop.y}`

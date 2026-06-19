@@ -249,17 +249,18 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
   const info = activeClip ? clips.find((c) => c.id === activeClip.clipId) : undefined;
   if (!activeClip || !info) return null;
 
-  // Geometría del FRAME completo (igual que el <video> de PreviewCanvas)
+  // Geometría: escala del FRAME completo; el recorte solo reduce el tamaño
+  // VISIBLE. La posición usa zoom·(lienzo − tamaño visible), así el vídeo
+  // recortado se puede mover por todo el lienzo (coincide con renderRect del
+  // export). El recuadro/asas abrazan el rect visible.
   const baseScale = Math.min(width / info.width, height / info.height);
   const w = info.width * baseScale * activeClip.zoom.scale;
   const h = info.height * baseScale * activeClip.zoom.scale;
-  // El recuadro abraza el rect VISIBLE (frame con su recorte aplicado), no el
-  // frame entero: tras recortar, la selección/asas siguen al vídeo recortado
   const crop = activeClip.crop ?? FULL_CROP;
   const vW = w * crop.w;
   const vH = h * crop.h;
-  const vLeft = activeClip.zoom.x * (width - w) + w * crop.x;
-  const vTop = activeClip.zoom.y * (height - h) + h * crop.y;
+  const vLeft = activeClip.zoom.x * (width - vW);
+  const vTop = activeClip.zoom.y * (height - vH);
 
   const clipNow = () =>
     useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClip.id);
@@ -281,35 +282,29 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
           const node = e.target;
           const clip = clipNow();
           if (!clip) return;
-          // node.x() es la esquina VISIBLE; el offset del recorte (w·crop.x) la
-          // separa del frame completo: zoom.x = (visX − w·crop.x) / (lienzo − w)
+          // node.x() es la esquina del rect visible: zoom.x = x / (lienzo − vW)
           const zoom = { ...clip.zoom };
           let vGuide = false;
           let hGuide = false;
-          if (Math.abs(width - w) > 1) {
-            zoom.x = clamp01((node.x() - w * crop.x) / (width - w));
-            // imán: el centro del vídeo VISIBLE cae sobre el centro del lienzo
-            const visLeft = zoom.x * (width - w) + w * crop.x;
-            if (Math.abs(visLeft + vW / 2 - width / 2) < GUIDE_SNAP_PX) {
-              zoom.x = clamp01((width / 2 - vW / 2 - w * crop.x) / (width - w));
+          if (Math.abs(width - vW) > 1) {
+            zoom.x = clamp01(node.x() / (width - vW));
+            // imán: el centro del vídeo visible cae sobre el centro del lienzo
+            if (Math.abs((zoom.x - 0.5) * (width - vW)) < GUIDE_SNAP_PX) {
+              zoom.x = 0.5;
               vGuide = true;
             }
           }
-          if (Math.abs(height - h) > 1) {
-            zoom.y = clamp01((node.y() - h * crop.y) / (height - h));
-            const visTop = zoom.y * (height - h) + h * crop.y;
-            if (Math.abs(visTop + vH / 2 - height / 2) < GUIDE_SNAP_PX) {
-              zoom.y = clamp01((height / 2 - vH / 2 - h * crop.y) / (height - h));
+          if (Math.abs(height - vH) > 1) {
+            zoom.y = clamp01(node.y() / (height - vH));
+            if (Math.abs((zoom.y - 0.5) * (height - vH)) < GUIDE_SNAP_PX) {
+              zoom.y = 0.5;
               hGuide = true;
             }
           }
           onGuides(vGuide, hGuide);
           updateVideoClip(clip.id, { zoom }, { transient: true });
-          // Re-clava el nodo a la posición VISIBLE derivada del modelo
-          node.position({
-            x: zoom.x * (width - w) + w * crop.x,
-            y: zoom.y * (height - h) + h * crop.y,
-          });
+          // Re-clava el nodo a la posición visible derivada del modelo
+          node.position({ x: zoom.x * (width - vW), y: zoom.y * (height - vH) });
         }}
         onDragEnd={() => onGuides(false, false)}
         onTransformStart={() => beginTransaction()}
@@ -322,17 +317,14 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
           if (!clip) return;
           const factor = Math.max(node.scaleX(), node.scaleY());
           const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
-          const w2 = info.width * baseScale * scale;
-          const h2 = info.height * baseScale * scale;
+          const vW2 = info.width * baseScale * scale * crop.w;
+          const vH2 = info.height * baseScale * scale * crop.h;
           const zoom = { ...clip.zoom, scale };
-          if (Math.abs(width - w2) > 1) zoom.x = clamp01((node.x() - w2 * crop.x) / (width - w2));
-          if (Math.abs(height - h2) > 1) zoom.y = clamp01((node.y() - h2 * crop.y) / (height - h2));
+          if (Math.abs(width - vW2) > 1) zoom.x = clamp01(node.x() / (width - vW2));
+          if (Math.abs(height - vH2) > 1) zoom.y = clamp01(node.y() / (height - vH2));
           updateVideoClip(clip.id, { zoom }, { transient: true });
           node.scale({ x: 1, y: 1 });
-          node.position({
-            x: zoom.x * (width - w2) + w2 * crop.x,
-            y: zoom.y * (height - h2) + h2 * crop.y,
-          });
+          node.position({ x: zoom.x * (width - vW2), y: zoom.y * (height - vH2) });
         }}
         onTransformEnd={(e) => {
           e.target.scale({ x: 1, y: 1 });

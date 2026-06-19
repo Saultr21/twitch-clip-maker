@@ -174,14 +174,20 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               del wrapper, sin recargar. */}
           {(() => {
             const crop = activeClip?.crop ?? FULL_FRAME;
+            const zoom = activeClip?.zoom;
             const visible = videoStyle && !inGap ? "visible" : "hidden";
+            // Posición del rect VISIBLE (frame con su recorte): zoom·(lienzo −
+            // tamaño visible). El <video> dentro del wrapper se desplaza por el
+            // origen del recorte. Coincide con renderRect del export.
+            const vW = videoStyle ? videoStyle.width * crop.w : 0;
+            const vH = videoStyle ? videoStyle.height * crop.h : 0;
             const wrapperStyle: CSSProperties = videoStyle
               ? {
                   position: "absolute",
-                  left: videoStyle.left + videoStyle.width * crop.x,
-                  top: videoStyle.top + videoStyle.height * crop.y,
-                  width: videoStyle.width * crop.w,
-                  height: videoStyle.height * crop.h,
+                  left: (zoom?.x ?? 0) * (canvas.width - vW),
+                  top: (zoom?.y ?? 0) * (canvas.height - vH),
+                  width: vW,
+                  height: vH,
                   overflow: "hidden",
                   visibility: visible,
                 }

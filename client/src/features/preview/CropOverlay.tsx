@@ -111,14 +111,16 @@ function computeBounds(
     const base = Math.min(canvasW / info.width, canvasH / info.height);
     const fullW = info.width * base * clip.zoom.scale;
     const fullH = info.height * base * clip.zoom.scale;
-    const fullLeft = clip.zoom.x * (canvasW - fullW);
-    const fullTop = clip.zoom.y * (canvasH - fullH);
     const c = clip.crop ?? FULL;
+    // Tamaño visible (frame × recorte) y posición zoom·(lienzo − tamaño visible),
+    // igual que PreviewCanvas/renderRect
+    const vW = fullW * c.w;
+    const vH = fullH * c.h;
     return {
-      left: fullLeft + fullW * c.x,
-      top: fullTop + fullH * c.y,
-      w: fullW * c.w,
-      h: fullH * c.h,
+      left: clip.zoom.x * (canvasW - vW),
+      top: clip.zoom.y * (canvasH - vH),
+      w: vW,
+      h: vH,
     };
   }
 

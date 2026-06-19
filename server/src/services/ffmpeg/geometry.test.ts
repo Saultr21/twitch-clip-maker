@@ -33,4 +33,22 @@ describe("renderRect", () => {
     expect(r.w % 2).toBe(0);
     expect(r.h % 2).toBe(0);
   });
+
+  it("crop reduce el tamaño visible manteniendo la escala del frame completo", () => {
+    // 16:9 en 9:16 a 1x ocupa 1080x608. Recortar al 50% de ancho/alto deja
+    // 540x304 (misma escala, mitad de tamaño visible), NO se reescala a contain
+    const r = renderRect(1080, 1920, 1920, 1080, { x: 0.5, y: 0.5, scale: 1 }, { x: 0.25, y: 0.25, w: 0.5, h: 0.5 });
+    expect(r.w).toBe(540);
+    expect(r.h).toBe(304); // 608*0.5=304
+  });
+
+  it("crop permite posicionar el vídeo a los bordes (el límite usa el tamaño visible)", () => {
+    // Mismo caso: con vW=540 < 1080, zoom.x=0 lo pega a la izquierda y zoom.x=1 a
+    // la derecha (antes, con el frame completo de 1080, no había margen horizontal)
+    const crop = { x: 0.25, y: 0.25, w: 0.5, h: 0.5 };
+    const izq = renderRect(1080, 1920, 1920, 1080, { x: 0, y: 0.5, scale: 1 }, crop);
+    const der = renderRect(1080, 1920, 1920, 1080, { x: 1, y: 0.5, scale: 1 }, crop);
+    expect(izq.left).toBe(0);
+    expect(der.left).toBe(1080 - 540); // 540
+  });
 });

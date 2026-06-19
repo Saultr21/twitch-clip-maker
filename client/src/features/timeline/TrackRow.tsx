@@ -111,6 +111,14 @@ export function TrackRow({
                 top: 4 + (lanes?.[b.id] ?? 0) * LANE_HEIGHT,
                 width: Math.max(8, (b.end - b.start) * pxPerSecond),
               }}
+              onKeyDown={(e) => {
+                if (e.key === "Delete" || e.key === "Backspace") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  useProjectStore.getState().removeElement(b.kind, b.id);
+                  useUiStore.getState().select(null);
+                }
+              }}
               onPointerDown={(e) => {
                 e.currentTarget.setPointerCapture(e.pointerId);
                 select({ kind: b.kind, id: b.id });

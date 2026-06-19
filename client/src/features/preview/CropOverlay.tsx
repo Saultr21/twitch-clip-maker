@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import Konva from "konva";
 import { Rect as KonvaRect, Transformer } from "react-konva";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -7,12 +7,16 @@ import { useUiStore } from "../../stores/uiStore";
 import type { CropRect } from "@clipforge/shared";
 
 interface Bounds { left: number; top: number; w: number; h: number; }
-interface CropPx { x: number; y: number; w: number; h: number; }
 
 interface Props { canvasW: number; canvasH: number; }
 
-function computeBounds(selection: { kind: string; id: string } | null, canvasW: number, canvasH: number): Bounds | null {
+function computeBounds(
+  selection: { kind: string; id: string } | null,
+  canvasW: number,
+  canvasH: number,
+): Bounds | null {
   if (!selection) return null;
+
   if (selection.kind === "image") {
     const img = useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id);
     if (!img) return null;
@@ -20,6 +24,7 @@ function computeBounds(selection: { kind: string; id: string } | null, canvasW: 
     const h = img.height * canvasH;
     return { left: img.x * canvasW - w / 2, top: img.y * canvasH - h / 2, w, h };
   }
+
   if (selection.kind === "video") {
     const clip = useProjectStore.getState().project.tracks.video.find(c => c.id === selection.id);
     if (!clip) return null;
@@ -30,23 +35,23 @@ function computeBounds(selection: { kind: string; id: string } | null, canvasW: 
     const h = info.height * base * clip.zoom.scale;
     return { left: clip.zoom.x * (canvasW - w), top: clip.zoom.y * (canvasH - h), w, h };
   }
+
   return null;
 }
 
-function initialCropPx(selection: { kind: string; id: string } | null, bounds: Bounds): CropPx {
+function getExistingCropPx(
+  selection: { kind: string; id: string } | null,
+  b: Bounds,
+): { x: number; y: number; w: number; h: number } | null {
   if (selection?.kind === "image") {
-    const img = useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id);
-    const c = img?.crop;
-    if (c) return { x: c.x * bounds.w, y: c.y * bounds.h, w: c.w * bounds.w, h: c.h * bounds.h };
+    const c = useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id)?.crop;
+    if (c) return { x: c.x * b.w, y: c.y * b.h, w: c.w * b.w, h: c.h * b.h };
   }
   if (selection?.kind === "video") {
-    const clip = useProjectStore.getState().project.tracks.video.find(c => c.id === selection.id);
-    const c = clip?.crop;
-    if (c) return { x: c.x * bounds.w, y: c.y * bounds.h, w: c.w * bounds.w, h: c.h * bounds.h };
+    const c = useProjectStore.getState().project.tracks.video.find(v => v.id === selection.id)?.crop;
+    if (c) return { x: c.x * b.w, y: c.y * b.h, w: c.w * b.w, h: c.h * b.h };
   }
-  // Sin crop previo: empezar al 80% centrado para que sea movible desde el inicio
-  const pad = 0.1;
-  return { x: bounds.w * pad, y: bounds.h * pad, w: bounds.w * (1 - pad * 2), h: bounds.h * (1 - pad * 2) };
+  return null;
 }
 
 export function CropOverlay({ canvasW, canvasH }: Props) {
@@ -54,14 +59,29 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
   const setCropMode = useUiStore(s => s.setCropMode);
   const setImageCrop = useProjectStore(s => s.setImageCrop);
   const setVideoCrop = useProjectStore(s => s.setVideoCrop);
+
+  // Refs para los nodos Konva — gestionados de forma imperativa durante la interacción
   const rectRef = useRef<Konva.Rect>(null);
   const trRef = useRef<Konva.Transformer>(null);
+  const topRef = useRef<Konva.Rect>(null);
+  const bottomRef = useRef<Konva.Rect>(null);
+  const leftRef = useRef<Konva.Rect>(null);
+  const rightRef = useRef<Konva.Rect>(null);
 
-  const bounds = computeBounds(selection, canvasW, canvasH);
-  const [crop, setCrop] = useState<CropPx>(() =>
-    bounds ? initialCropPx(selection, bounds) : { x: 0, y: 0, w: canvasW, h: canvasH }
-  );
+  // Bounds y posición inicial calculados UNA SOLA VEZ al montar
+  const { bounds, init } = useMemo(() => {
+    const b = computeBounds(selection, canvasW, canvasH);
+    if (!b) return { bounds: null, init: null };
+    const existing = getExistingCropPx(selection, b);
+    // Sin crop previo: 80% centrado para que sea movible de inmediato
+    const pad = b.w * 0.1;
+    const padH = b.h * 0.1;
+    const crop = existing ?? { x: pad, y: padH, w: b.w - pad * 2, h: b.h - padH * 2 };
+    return { bounds: b, init: crop };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo en montaje
 
+  // Adjuntar Transformer al rect tras montar
   useEffect(() => {
     if (rectRef.current && trRef.current) {
       trRef.current.nodes([rectRef.current]);
@@ -69,18 +89,46 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
     }
   }, []);
 
-  const handleApply = () => {
-    if (!bounds || !selection) return;
-    const normalizedCrop: CropRect = {
-      x: Math.max(0, Math.min(1, crop.x / bounds.w)),
-      y: Math.max(0, Math.min(1, crop.y / bounds.h)),
-      w: Math.max(0.01, Math.min(1 - crop.x / bounds.w, crop.w / bounds.w)),
-      h: Math.max(0.01, Math.min(1 - crop.y / bounds.h, crop.h / bounds.h)),
+  // Actualiza las 4 zonas oscuras leyendo el estado ACTUAL del nodo Konva
+  const updateDark = useCallback(() => {
+    const b = bounds;
+    const rect = rectRef.current;
+    if (!b || !rect) return;
+
+    const rx = rect.x();
+    const ry = rect.y();
+    const rw = rect.width() * Math.abs(rect.scaleX());
+    const rh = rect.height() * Math.abs(rect.scaleY());
+
+    topRef.current?.setAttrs({ x: b.left, y: b.top, width: b.w, height: Math.max(0, ry - b.top) });
+    bottomRef.current?.setAttrs({ x: b.left, y: ry + rh, width: b.w, height: Math.max(0, b.top + b.h - ry - rh) });
+    leftRef.current?.setAttrs({ x: b.left, y: ry, width: Math.max(0, rx - b.left), height: rh });
+    rightRef.current?.setAttrs({ x: rx + rw, y: ry, width: Math.max(0, b.left + b.w - rx - rw), height: rh });
+    rect.getLayer()?.batchDraw();
+  }, [bounds]);
+
+  // Aplicar: lee la posición actual del nodo Konva (no del estado React)
+  const handleApply = useCallback(() => {
+    const b = bounds;
+    const rect = rectRef.current;
+    if (!b || !rect || !selection) return;
+
+    const rx = rect.x();
+    const ry = rect.y();
+    const rw = rect.width() * Math.abs(rect.scaleX());
+    const rh = rect.height() * Math.abs(rect.scaleY());
+
+    const crop: CropRect = {
+      x: Math.max(0, Math.min(1, (rx - b.left) / b.w)),
+      y: Math.max(0, Math.min(1, (ry - b.top) / b.h)),
+      w: Math.max(0.01, Math.min(1, rw / b.w)),
+      h: Math.max(0.01, Math.min(1, rh / b.h)),
     };
-    if (selection.kind === "image") setImageCrop(selection.id, normalizedCrop);
-    if (selection.kind === "video") setVideoCrop(selection.id, normalizedCrop);
+
+    if (selection.kind === "image") setImageCrop(selection.id, crop);
+    if (selection.kind === "video") setVideoCrop(selection.id, crop);
     setCropMode(false);
-  };
+  }, [bounds, selection, setImageCrop, setVideoCrop, setCropMode]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -89,59 +137,60 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crop, bounds, selection]);
+  }, [handleApply, setCropMode]);
 
-  if (!bounds) return null;
+  if (!bounds || !init) return null;
 
-  const absX = bounds.left + crop.x;
-  const absY = bounds.top + crop.y;
-
-  const updateFromNode = (node: Konva.Rect) => {
-    const newW = Math.max(20, node.width() * node.scaleX());
-    const newH = Math.max(20, node.height() * node.scaleY());
-    setCrop({
-      x: node.x() - bounds.left,
-      y: node.y() - bounds.top,
-      w: newW,
-      h: newH,
-    });
-    node.width(newW);
-    node.height(newH);
-    node.scaleX(1);
-    node.scaleY(1);
-  };
+  const b = bounds;
+  const initX = b.left + init.x;
+  const initY = b.top + init.y;
 
   return (
     <>
-      {/* Dark areas around crop */}
-      <KonvaRect x={bounds.left} y={bounds.top} width={bounds.w} height={crop.y} fill="rgba(0,0,0,0.6)" listening={false} />
-      <KonvaRect x={bounds.left} y={absY + crop.h} width={bounds.w} height={Math.max(0, bounds.h - crop.y - crop.h)} fill="rgba(0,0,0,0.6)" listening={false} />
-      <KonvaRect x={bounds.left} y={absY} width={crop.x} height={crop.h} fill="rgba(0,0,0,0.6)" listening={false} />
-      <KonvaRect x={absX + crop.w} y={absY} width={Math.max(0, bounds.w - crop.x - crop.w)} height={crop.h} fill="rgba(0,0,0,0.6)" listening={false} />
+      {/* Las 4 zonas oscuras — sus props iniciales no cambian: se actualizan solo via setAttrs imperativo */}
+      <KonvaRect ref={topRef}    x={b.left} y={b.top}          width={b.w} height={init.y}                           fill="rgba(0,0,0,0.6)" listening={false} />
+      <KonvaRect ref={bottomRef} x={b.left} y={initY + init.h} width={b.w} height={Math.max(0, b.h - init.y - init.h)} fill="rgba(0,0,0,0.6)" listening={false} />
+      <KonvaRect ref={leftRef}   x={b.left} y={initY}          width={init.x}                        height={init.h} fill="rgba(0,0,0,0.6)" listening={false} />
+      <KonvaRect ref={rightRef}  x={initX + init.w} y={initY}  width={Math.max(0, b.w - init.x - init.w)} height={init.h} fill="rgba(0,0,0,0.6)" listening={false} />
 
-      {/* Crop rect — draggable + transformer */}
+      {/* Rect del crop — las props iniciales no cambian tras el montaje */}
       <KonvaRect
         ref={rectRef}
-        x={absX}
-        y={absY}
-        width={crop.w}
-        height={crop.h}
+        x={initX}
+        y={initY}
+        width={init.w}
+        height={init.h}
         fill="transparent"
         stroke="white"
         strokeWidth={1.5}
         draggable
         onDragMove={(e) => {
-          const node = e.target;
+          const node = e.target as Konva.Rect;
           const nw = node.width() * Math.abs(node.scaleX());
           const nh = node.height() * Math.abs(node.scaleY());
           // Clamp dentro de los bounds del elemento
-          const clampedX = Math.max(bounds.left, Math.min(bounds.left + bounds.w - nw, node.x()));
-          const clampedY = Math.max(bounds.top, Math.min(bounds.top + bounds.h - nh, node.y()));
-          node.position({ x: clampedX, y: clampedY });
-          setCrop(c => ({ ...c, x: clampedX - bounds.left, y: clampedY - bounds.top }));
+          const cx = Math.max(b.left, Math.min(b.left + b.w - nw, node.x()));
+          const cy = Math.max(b.top,  Math.min(b.top  + b.h - nh, node.y()));
+          node.position({ x: cx, y: cy });
+          updateDark();
         }}
-        onTransformEnd={(e) => updateFromNode(e.target as Konva.Rect)}
+        onTransform={() => {
+          // Actualizar zonas oscuras en tiempo real mientras el usuario arrastra un asa
+          updateDark();
+        }}
+        onTransformEnd={() => {
+          const node = rectRef.current;
+          if (!node) return;
+          // Reset scale → aplicar al width/height (patrón estándar de Konva)
+          const newW = Math.max(20, node.width()  * node.scaleX());
+          const newH = Math.max(20, node.height() * node.scaleY());
+          node.width(newW);
+          node.height(newH);
+          node.scaleX(1);
+          node.scaleY(1);
+          trRef.current?.forceUpdate();
+          updateDark();
+        }}
       />
       <Transformer
         ref={trRef}
@@ -149,11 +198,12 @@ export function CropOverlay({ canvasW, canvasH }: Props) {
         flipEnabled={false}
         borderDash={[4, 4]}
         boundBoxFunc={(_, newBox) => {
-          const x = Math.max(bounds.left, newBox.x);
-          const y = Math.max(bounds.top, newBox.y);
-          const r = Math.min(bounds.left + bounds.w, newBox.x + newBox.width);
-          const b = Math.min(bounds.top + bounds.h, newBox.y + newBox.height);
-          return { ...newBox, x, y, width: Math.max(20, r - x), height: Math.max(20, b - y) };
+          // Constrañir el transform dentro de los bounds del elemento
+          const x = Math.max(b.left, newBox.x);
+          const y = Math.max(b.top,  newBox.y);
+          const r = Math.min(b.left + b.w, newBox.x + newBox.width);
+          const bot = Math.min(b.top  + b.h, newBox.y + newBox.height);
+          return { ...newBox, x, y, width: Math.max(20, r - x), height: Math.max(20, bot - y) };
         }}
       />
     </>

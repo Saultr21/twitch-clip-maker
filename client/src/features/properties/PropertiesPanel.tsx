@@ -471,6 +471,78 @@ function AudioProperties({ trackId }: { trackId: string }) {
   );
 }
 
+function SubtitleCueProperties({ cueId }: { cueId: string }) {
+  const updateCueText = useProjectStore((s) => s.updateCueText);
+  const setSubtitleStyle = useProjectStore((s) => s.setSubtitleStyle);
+  const style = useProjectStore((s) => s.project.subtitles.style);
+  const cue = useProjectStore((s) => s.project.subtitles.cues.find((c) => c.id === cueId));
+  const [text, setText] = useState(() => cue?.words.map((w) => w.text).join(" ") ?? "");
+  if (!cue) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      <Field label="Texto" htmlFor="prop-sub-text">
+        <textarea
+          id="prop-sub-text"
+          value={text}
+          onChange={(e) => {
+            setText(e.target.value);
+            updateCueText(cue.id, e.target.value);
+          }}
+          rows={2}
+          className={inputClass}
+        />
+      </Field>
+      <Field label="Fuente" htmlFor="prop-sub-font">
+        <select
+          id="prop-sub-font"
+          value={style.fontFamily}
+          onChange={(e) => setSubtitleStyle({ fontFamily: e.target.value })}
+          className={inputClass}
+          style={{ fontFamily: style.fontFamily }}
+        >
+          {FONT_FAMILIES.map((f) => (
+            <option key={f} value={f} style={{ fontFamily: f }}>{f}</option>
+          ))}
+        </select>
+      </Field>
+      <Field label={`Tamaño · ${Math.round(style.fontSize * 1000)}`} htmlFor="prop-sub-size">
+        <Slider id="prop-sub-size" min={0.02} max={0.15} step={0.005} value={style.fontSize} onChange={(v) => setSubtitleStyle({ fontSize: v })} />
+      </Field>
+      <div className="grid grid-cols-2 gap-2">
+        <Field label="Color" htmlFor="prop-sub-fill">
+          <input id="prop-sub-fill" type="color" value={style.fill} onChange={(e) => setSubtitleStyle({ fill: e.target.value })} className="h-8 w-full bg-surface-2 rounded-md border border-border-2" />
+        </Field>
+        <Field label="Resaltado" htmlFor="prop-sub-hl">
+          <input id="prop-sub-hl" type="color" value={style.highlight} onChange={(e) => setSubtitleStyle({ highlight: e.target.value })} className="h-8 w-full bg-surface-2 rounded-md border border-border-2" />
+        </Field>
+      </div>
+      <Field label={`Posición vertical · ${Math.round(style.y * 100)}%`} htmlFor="prop-sub-y">
+        <Slider id="prop-sub-y" min={0} max={1} step={0.01} value={style.y} onChange={(v) => setSubtitleStyle({ y: v })} />
+      </Field>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-[11px] text-muted flex items-center gap-2">
+          <input type="checkbox" checked={style.uppercase} onChange={(e) => setSubtitleStyle({ uppercase: e.target.checked })} className="accent-accent" />
+          MAYÚSCULAS
+        </label>
+        <label className="text-[11px] text-muted flex items-center gap-2">
+          <input type="checkbox" checked={style.wordHighlight} onChange={(e) => setSubtitleStyle({ wordHighlight: e.target.checked })} className="accent-accent" />
+          Resaltar palabra activa
+        </label>
+        <label className="text-[11px] text-muted flex items-center gap-2">
+          <input type="checkbox" checked={style.animate} onChange={(e) => setSubtitleStyle({ animate: e.target.checked })} className="accent-accent" />
+          Animar palabra (pop)
+        </label>
+        <label className="text-[11px] text-muted flex items-center gap-2">
+          <input type="checkbox" checked={style.boxBackground} onChange={(e) => setSubtitleStyle({ boxBackground: e.target.checked })} className="accent-accent" />
+          Fondo negro
+        </label>
+      </div>
+      <p className="text-[10px] text-muted -mt-1">El estilo afecta a todos los subtítulos.</p>
+    </div>
+  );
+}
+
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
   const text = useProjectStore((s) =>
@@ -498,6 +570,7 @@ export function PropertiesPanel() {
       {image && <ImageProperties overlay={image} />}
       {selection?.kind === "video" && <VideoProperties clipId={selection.id} />}
       {selection?.kind === "audio" && <AudioProperties trackId={selection.id} />}
+      {selection?.kind === "subtitle" && <SubtitleCueProperties key={selection.id} cueId={selection.id} />}
     </aside>
   );
 }

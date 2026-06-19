@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Text as KonvaText } from "react-konva";
+import { Rect as KonvaRect, Text as KonvaText } from "react-konva";
 import { activeWordIndex, cueEnd, cueStart } from "../../lib/subtitles";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -71,8 +71,22 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
       ? 1 + 0.3 * Math.max(0, 1 - ((playhead - activeStart) * 1000) / 180)
       : 1;
 
+  const blockWidth = Math.max(...lines.map((l) => l.width));
+  const pad = fontSize * 0.35;
+
   return (
     <>
+      {style.boxBackground && (
+        <KonvaRect
+          x={width / 2 - blockWidth / 2 - pad}
+          y={top - pad * 0.6}
+          width={blockWidth + pad * 2}
+          height={blockHeight + pad * 1.2}
+          fill="rgba(0,0,0,0.7)"
+          cornerRadius={6}
+          listening={false}
+        />
+      )}
       {lines.map((line, li) => {
         let x = width / 2 - line.width / 2;
         const y = top + li * lineHeight + (lineHeight - fontSize) / 2;

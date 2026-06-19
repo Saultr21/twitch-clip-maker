@@ -51,9 +51,9 @@ export function buildAss(
     `PlayResY: ${H}`,
     "",
     "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Outline, Alignment, MarginL, MarginR, MarginV",
-    // Alignment 2 = inferior-centro; Bold -1 = sí
-    `Style: Def, ${style.fontFamily}, ${fontSize}, ${primary}, ${outlineColor}, &H00000000&, -1, ${outline}, 2, 40, 40, ${marginV}`,
+    "Format: Name, Fontname, Fontsize, PrimaryColour, OutlineColour, BackColour, Bold, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, BorderStyle",
+    // Alignment 2 = inferior-centro; Bold -1 = sí; BorderStyle 4 = caja opaca, 1 = contorno normal
+    `Style: Def, ${style.fontFamily}, ${fontSize}, ${primary}, ${outlineColor}, &H99000000&, -1, ${style.boxBackground ? 0 : outline}, 0, 2, 40, 40, ${marginV}, ${style.boxBackground ? 4 : 1}`,
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",

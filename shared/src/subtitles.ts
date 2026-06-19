@@ -24,6 +24,8 @@ export const subtitleStyleSchema = z.object({
   uppercase: z.boolean(),
   // pop de la palabra activa (breve aumento de tamaño al entrar)
   animate: z.boolean().default(false),
+  // caja de fondo semitransparente detrás del bloque de texto
+  boxBackground: z.boolean().default(false),
 });
 
 export const DEFAULT_SUBTITLE_STYLE = {
@@ -36,6 +38,7 @@ export const DEFAULT_SUBTITLE_STYLE = {
   y: 0.82,
   uppercase: true,
   animate: false,
+  boxBackground: false,
 } as const;
 
 export const subtitlesSchema = z

@@ -158,6 +158,10 @@ export function SubtitlesPanel() {
             <input type="checkbox" checked={style.animate} onChange={(e) => setSubtitleStyle({ animate: e.target.checked })} className="accent-accent" />
             Animar palabra activa (pop)
           </label>
+          <label className="text-[11px] text-muted flex items-center gap-2">
+            <input type="checkbox" checked={style.boxBackground} onChange={(e) => setSubtitleStyle({ boxBackground: e.target.checked })} className="accent-accent" />
+            Fondo negro detrás del texto
+          </label>
           <label htmlFor="sub-size" className="text-[11px] text-muted">Tamaño · {Math.round(style.fontSize * 1000)}</label>
           <input id="sub-size" type="range" min={0.02} max={0.15} step={0.005} value={style.fontSize} onChange={(e) => setSubtitleStyle({ fontSize: parseFloat(e.target.value) })} className="accent-accent h-1.5" />
           <label htmlFor="sub-y" className="text-[11px] text-muted">Posición vertical · {Math.round(style.y * 100)}%</label>

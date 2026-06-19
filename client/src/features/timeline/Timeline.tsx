@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Scissors, Trash2 } from "lucide-react";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
@@ -39,6 +39,18 @@ export function Timeline({ height }: { height: number }) {
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
   const hasSelection = useUiStore((s) => s.selection !== null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const videoCount = project.tracks.video.length;
+  const prevVideoCount = useRef(videoCount);
+  // Cuando se añade un clip (y solo entonces), hace scroll para mostrarlo
+  useEffect(() => {
+    if (videoCount > prevVideoCount.current && scrollRef.current && project.tracks.video.length > 0) {
+      const last = project.tracks.video[project.tracks.video.length - 1];
+      const left = 80 + last.timelineStart * pxPerSecond - 60;
+      scrollRef.current.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
+    }
+    prevVideoCount.current = videoCount;
+  }, [videoCount, project.tracks.video, pxPerSecond]);
   const canSplit = project.tracks.video.length > 0;
 
   const duration = projectDuration(project);
@@ -150,7 +162,7 @@ export function Timeline({ height }: { height: number }) {
         />
       </div>
 
-      <div className="flex-1 overflow-x-auto overflow-y-auto">
+      <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
         <div className="relative" style={{ width: contentWidth }}>
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />

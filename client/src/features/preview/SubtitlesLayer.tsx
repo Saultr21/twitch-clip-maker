@@ -125,14 +125,13 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
             listening={false}
           />
         )}
-        {/* rect invisible de hit — necesario para que el Transformer tenga bounds correctos */}
+        {/* rect invisible de hit — listening=true (defecto) para que el Group reciba eventos */}
         <KonvaRect
           x={-blockWidth / 2 - pad}
           y={-blockHeight / 2 - pad * 0.6}
           width={blockWidth + pad * 2}
           height={blockHeight + pad * 1.2}
           fill="transparent"
-          listening={false}
         />
         {lines.map((line, li) => {
           let x = -line.width / 2;

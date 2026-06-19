@@ -162,7 +162,7 @@ export function SubtitlesPanel() {
               max={30}
               step={1}
               value={maxWordsPerCue}
-              onChange={(e) => setMaxWordsPerCue(parseInt(e.target.value, 10))}
+              onChange={(e) => { const v = parseInt(e.target.value, 10); if (!isNaN(v)) setMaxWordsPerCue(v); }}
               className="w-14 bg-surface-2 border border-border-2 rounded-md px-2 py-0.5 text-xs text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>

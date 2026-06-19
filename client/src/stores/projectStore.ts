@@ -427,7 +427,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       mutate((d) => void Object.assign(d.subtitles.style, patch)),
 
     setMaxWordsPerCue: (n) =>
-      mutate((d) => void (d.subtitles.maxWordsPerCue = Math.max(1, Math.min(30, n)))),
+      mutate((d) => void (d.subtitles.maxWordsPerCue = Number.isFinite(n) ? Math.max(1, Math.min(30, n)) : d.subtitles.maxWordsPerCue)),
 
     clearSubtitles: () => mutate((d) => void (d.subtitles.cues = [])),
 

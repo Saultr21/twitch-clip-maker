@@ -35,15 +35,29 @@ export function scaleCueWords(c: SubtitleCue, newStart: number, newEnd: number):
   return { ...c, words: c.words.map((w) => ({ text: w.text, start: map(w.start), end: map(w.end) })) };
 }
 
-/** Parte cues con más de maxWords palabras en trozos de maxWords conservando los tiempos. */
+/** Parte cues con más de maxWords palabras en trozos de maxWords conservando los tiempos.
+ *  El último word de cada chunk se extiende hasta el start del chunk siguiente para evitar
+ *  huecos de tiempo donde ningún chunk estaría activo (pausa mid-sentence de whisper). */
 export function splitCuesToMaxWords(cues: SubtitleCue[], maxWords: number): SubtitleCue[] {
-  if (maxWords < 1) return cues;
+  const n = Number.isFinite(maxWords) && maxWords >= 1 ? Math.floor(maxWords) : null;
+  if (n === null) return cues;
   const out: SubtitleCue[] = [];
   for (const cue of cues) {
-    for (let i = 0; i < cue.words.length; i += maxWords) {
-      const chunk = cue.words.slice(i, i + maxWords);
-      out.push({ id: `${cue.id}-${i}`, words: chunk });
+    const chunks: SubtitleCue[] = [];
+    for (let i = 0; i < cue.words.length; i += n) {
+      chunks.push({ id: `${cue.id}-${i}`, words: cue.words.slice(i, i + n) });
     }
+    // Cierra huecos entre chunks del mismo cue original: extiende el end del último word
+    // de cada chunk hasta el start del siguiente, para que el subtítulo no parpadee.
+    for (let ci = 0; ci < chunks.length - 1; ci++) {
+      const words = chunks[ci].words;
+      const last = words[words.length - 1];
+      const nextStart = chunks[ci + 1].words[0].start;
+      if (last.end < nextStart) {
+        chunks[ci] = { ...chunks[ci], words: [...words.slice(0, -1), { ...last, end: nextStart }] };
+      }
+    }
+    out.push(...chunks);
   }
   return out;
 }

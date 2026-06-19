@@ -177,6 +177,10 @@ export function SubtitlesPanel() {
             MAYÚSCULAS
           </label>
           <label className="text-[11px] text-muted flex items-center gap-2">
+            <input type="checkbox" checked={style.wordHighlight} onChange={(e) => setSubtitleStyle({ wordHighlight: e.target.checked })} className="accent-accent" />
+            Resaltar palabra activa
+          </label>
+          <label className="text-[11px] text-muted flex items-center gap-2">
             <input type="checkbox" checked={style.animate} onChange={(e) => setSubtitleStyle({ animate: e.target.checked })} className="accent-accent" />
             Animar palabra activa (pop)
           </label>

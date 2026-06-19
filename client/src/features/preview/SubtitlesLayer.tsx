@@ -106,7 +106,7 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
               fontSize={fontSize}
               fontFamily={style.fontFamily}
               fontStyle="bold"
-              fill={active ? style.highlight : style.fill}
+              fill={active && style.wordHighlight ? style.highlight : style.fill}
               stroke={style.stroke || undefined}
               strokeWidth={strokeWidth}
               fillAfterStrokeEnabled

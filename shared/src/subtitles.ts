@@ -22,6 +22,8 @@ export const subtitleStyleSchema = z.object({
   strokeWidth: z.number().min(0).max(0.1),
   y: z.number().min(0).max(1),
   uppercase: z.boolean(),
+  // resaltar la palabra activa con el color highlight
+  wordHighlight: z.boolean().default(true),
   // pop de la palabra activa (breve aumento de tamaño al entrar)
   animate: z.boolean().default(false),
   // caja de fondo semitransparente detrás del bloque de texto
@@ -37,6 +39,7 @@ export const DEFAULT_SUBTITLE_STYLE = {
   strokeWidth: 0.004,
   y: 0.82,
   uppercase: true,
+  wordHighlight: true,
   animate: false,
   boxBackground: false,
 } as const;

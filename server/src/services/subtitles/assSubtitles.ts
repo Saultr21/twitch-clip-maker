@@ -65,19 +65,29 @@ export function buildAss(
   const events = cues.map((cue) => {
     const start = cue.words[0].start;
     const end = cue.words[cue.words.length - 1].end;
-    const text = cue.words
-      .map((w) => {
-        const relStart = Math.round((w.start - start) * 1000);
-        const relEnd = Math.round((w.end - start) * 1000);
-        const label = style.uppercase ? w.text.toUpperCase() : w.text;
-        // pop: al entrar la palabra salta a 130% y vuelve a 100% en 180ms
-        const pop = style.animate
-          ? `\\t(${relStart},${relStart},\\fscx130\\fscy130)\\t(${relStart},${relStart + 180},\\fscx100\\fscy100)`
-          : "";
-        // salta a highlight en su ventana y vuelve a base al acabar
-        return `{${pop}\\t(${relStart},${relStart},\\c${hl})\\t(${relEnd},${relEnd},\\c${base})}${escapeAssText(label)}`;
-      })
-      .join(" ");
+    const text = style.wordHighlight
+      ? cue.words
+          .map((w) => {
+            const relStart = Math.round((w.start - start) * 1000);
+            const relEnd = Math.round((w.end - start) * 1000);
+            const label = style.uppercase ? w.text.toUpperCase() : w.text;
+            // pop: al entrar la palabra salta a 130% y vuelve a 100% en 180ms
+            const pop = style.animate
+              ? `\\t(${relStart},${relStart},\\fscx130\\fscy130)\\t(${relStart},${relStart + 180},\\fscx100\\fscy100)`
+              : "";
+            // salta a highlight en su ventana y vuelve a base al acabar
+            return `{${pop}\\t(${relStart},${relStart},\\c${hl})\\t(${relEnd},${relEnd},\\c${base})}${escapeAssText(label)}`;
+          })
+          .join(" ")
+      : cue.words
+          .map((w) => {
+            const label = style.uppercase ? w.text.toUpperCase() : w.text;
+            if (!style.animate) return escapeAssText(label);
+            const relStart = Math.round((w.start - start) * 1000);
+            const pop = `{\\t(${relStart},${relStart},\\fscx130\\fscy130)\\t(${relStart},${relStart + 180},\\fscx100\\fscy100)}`;
+            return `${pop}${escapeAssText(label)}`;
+          })
+          .join(" ");
     return `Dialogue: 0,${toAssTime(start)},${toAssTime(end)},Def,,0,0,0,,${text}`;
   });
 

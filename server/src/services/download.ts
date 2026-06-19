@@ -33,7 +33,10 @@ export async function downloadClip(
       "--newline",
       "--no-playlist",
       "--ffmpeg-location", ffmpegBin,
-      "-f", "best",
+      // Mejor vídeo + mejor audio (YouTube sirve 1080p+ en streams separados);
+      // si no hay separados, cae a la mejor combinada (b). Merge/remux a mp4.
+      "-f", "bv*+ba/b",
+      "--merge-output-format", "mp4",
       "--remux-video", "mp4",
     ]);
 
@@ -77,7 +80,7 @@ function friendlyDownloadError(err: unknown): Error {
   if (blocked) {
     return new Error(
       "Windows bloqueó yt-dlp (Control de aplicaciones inteligente). Para descargar " +
-        "clips de Twitch, desactívalo en Seguridad de Windows, o sube el vídeo a mano " +
+        "vídeos, desactívalo en Seguridad de Windows, o sube el vídeo a mano " +
         "con «Subir vídeo del escritorio».",
     );
   }

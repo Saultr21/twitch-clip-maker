@@ -47,6 +47,7 @@ describe("projectSchema", () => {
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 5, trimOut: 2, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+      crop: null,
     });
     expect(projectSchema.safeParse(p).success).toBe(false);
   });

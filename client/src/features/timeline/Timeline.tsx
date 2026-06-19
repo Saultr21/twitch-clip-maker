@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { Scissors, Trash2 } from "lucide-react";
+import { Crop, Scissors, Trash2 } from "lucide-react";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -39,6 +39,10 @@ export function Timeline({ height }: { height: number }) {
   const setZoom = useUiStore((s) => s.setZoom);
   const clips = useClipsStore((s) => s.clips);
   const hasSelection = useUiStore((s) => s.selection !== null);
+  const cropMode = useUiStore((s) => s.cropMode);
+  const setCropMode = useUiStore((s) => s.setCropMode);
+  const selection = useUiStore((s) => s.selection);
+  const canCrop = selection?.kind === "image" || selection?.kind === "video";
   const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
   const videoCount = project.tracks.video.length;
@@ -150,6 +154,21 @@ export function Timeline({ height }: { height: number }) {
           <Trash2 size={14} aria-hidden="true" />
           Eliminar
         </button>
+        {cropMode ? (
+          <span className="text-[10px] text-accent-soft ml-2">↩ Enter para aplicar · Esc para cancelar</span>
+        ) : (
+          <button
+            type="button"
+            disabled={!canCrop}
+            onClick={() => setCropMode(true)}
+            title="Recortar elemento (C)"
+            aria-label="Recortar elemento seleccionado"
+            className="flex items-center gap-1 text-muted hover:text-text disabled:opacity-40 disabled:hover:text-muted text-xs px-1.5"
+          >
+            <Crop size={14} aria-hidden="true" />
+            Recortar
+          </button>
+        )}
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input
           id="tl-zoom"

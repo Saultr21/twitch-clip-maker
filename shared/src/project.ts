@@ -36,6 +36,15 @@ export const projectSettingsSchema = z.object({
   clipTransition: z.number().min(0).max(2).default(0),
 });
 
+export const cropRectSchema = z.object({
+  x: norm,
+  y: norm,
+  w: z.number().min(0.01).max(1),
+  h: z.number().min(0.01).max(1),
+}).nullable();
+
+export type CropRect = z.infer<typeof cropRectSchema>;
+
 export const videoClipSchema = z
   .object({
     id: z.string().min(1),
@@ -53,6 +62,7 @@ export const videoClipSchema = z
       hue: z.number().min(-180).max(180),
       grayscale: z.number().min(0).max(1),
     }),
+    crop: cropRectSchema.default(null),
   })
   .refine((c) => c.trimOut > c.trimIn, { message: "trimOut debe ser mayor que trimIn" });
 
@@ -86,6 +96,7 @@ export const imageOverlaySchema = z.object({
   y: norm,
   width: norm,
   height: norm,
+  crop: cropRectSchema.default(null),
   ...overlayWindow,
 });
 
@@ -178,6 +189,7 @@ export function createImageOverlay(
     y: 0.5,
     width,
     height,
+    crop: null,
     rotation: 0,
     opacity: 1,
     start,
@@ -217,5 +229,6 @@ export function createVideoClip(
     speed: 1,
     zoom: { x: 0.5, y: 0.5, scale: 1 },
     filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+    crop: null,
   };
 }

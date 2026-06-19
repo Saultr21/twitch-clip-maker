@@ -163,17 +163,44 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               />
             </div>
           )}
-          <video
-            ref={videoRef}
-            preload="auto"
-            // max-w-none: el preflight de Tailwind capa los <video> a max-width 100%
-            // y rompería el zoom cuando el vídeo desborda el lienzo
-            className="absolute max-w-none"
-            style={{
-              visibility: inGap || !videoStyle ? "hidden" : "visible",
-              ...(videoStyle ?? { inset: 0, width: "100%", height: "100%" }),
-            }}
-          />
+          {videoStyle && activeClip?.crop ? (
+            <div
+              style={{
+                position: "absolute",
+                left: videoStyle.left + videoStyle.width * activeClip.crop.x,
+                top: videoStyle.top + videoStyle.height * activeClip.crop.y,
+                width: videoStyle.width * activeClip.crop.w,
+                height: videoStyle.height * activeClip.crop.h,
+                overflow: "hidden",
+                visibility: inGap ? "hidden" : "visible",
+              }}
+            >
+              <video
+                ref={videoRef}
+                preload="auto"
+                className="absolute max-w-none"
+                style={{
+                  width: videoStyle.width,
+                  height: videoStyle.height,
+                  left: -videoStyle.width * activeClip.crop.x,
+                  top: -videoStyle.height * activeClip.crop.y,
+                  filter: videoStyle.filter,
+                }}
+              />
+            </div>
+          ) : (
+            <video
+              ref={videoRef}
+              preload="auto"
+              // max-w-none: el preflight de Tailwind capa los <video> a max-width 100%
+              // y rompería el zoom cuando el vídeo desborda el lienzo
+              className="absolute max-w-none"
+              style={{
+                visibility: inGap || !videoStyle ? "hidden" : "visible",
+                ...(videoStyle ?? { inset: 0, width: "100%", height: "100%" }),
+              }}
+            />
+          )}
           {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
           <div
             aria-hidden="true"

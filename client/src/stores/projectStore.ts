@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, CropRect, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
   createAudioTrack,
   createEmptyProject,
@@ -90,6 +90,8 @@ interface ProjectState {
   addImage: (assetId: string, fileName: string, start: number, w: number, h: number) => string;
   updateText: (id: string, patch: Partial<TextOverlay>, opts?: MutateOptions) => void;
   updateImage: (id: string, patch: Partial<ImageOverlay>, opts?: MutateOptions) => void;
+  setImageCrop: (id: string, crop: CropRect) => void;
+  setVideoCrop: (id: string, crop: CropRect) => void;
   moveOverlay: (kind: "text" | "image" | "audio", id: string, newStart: number, opts?: MutateOptions) => void;
   trimOverlay: (kind: "text" | "image", id: string, edge: "start" | "end", t: number, opts?: MutateOptions) => void;
   addAudio: (assetId: string, fileName: string, start: number, duration: number) => string;
@@ -325,6 +327,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const o = d.tracks.image.find((i) => i.id === id);
         if (o) Object.assign(o, patch);
       }, opts),
+
+    setImageCrop: (id, crop) =>
+      mutate((d) => {
+        const img = d.tracks.image.find((i) => i.id === id);
+        if (img) img.crop = crop;
+      }),
+
+    setVideoCrop: (id, crop) =>
+      mutate((d) => {
+        const clip = d.tracks.video.find((c) => c.id === id);
+        if (clip) clip.crop = crop;
+      }),
 
     addAudio: (assetId, fileName, start, duration) => {
       const track = createAudioTrack(assetId, fileName, start, duration);

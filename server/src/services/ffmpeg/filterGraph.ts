@@ -100,11 +100,18 @@ export function buildFilterGraph(
 
     const inputIdx = inputs.length;
     inputs.push({ kind: "video", fileName: info.fileName });
-    const rect = renderRect(W, H, info.width, info.height, clip.zoom);
+    const srcW = clip.crop ? info.width * clip.crop.w : info.width;
+    const srcH = clip.crop ? info.height * clip.crop.h : info.height;
+    const rect = renderRect(W, H, srcW, srcH, clip.zoom);
     const dur = (clip.trimOut - clip.trimIn) / clip.speed;
-    const setpts =
-      clip.speed === 1 ? "setpts=PTS-STARTPTS" : `setpts=(PTS-STARTPTS)/${num(clip.speed)}`;
-    const trimSetpts = `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)},${setpts}`;
+    const cropStep = clip.crop
+      ? `crop=iw*${clip.crop.w}:ih*${clip.crop.h}:iw*${clip.crop.x}:ih*${clip.crop.y}`
+      : null;
+    const trimSetpts = [
+      `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+      ...(cropStep ? [cropStep] : []),
+      clip.speed === 1 ? "setpts=PTS-STARTPTS" : `setpts=(PTS-STARTPTS)/${num(clip.speed)}`,
+    ].join(",");
     const fgScale = [`scale=${rect.w}:${rect.h}`, ...colorFilters(clip)].join(",");
 
     if (bg.type === "blur") {
@@ -193,7 +200,10 @@ export function buildFilterGraph(
     inputs.push({ kind: "image", fileName: img.fileName });
     const w = Math.round(img.width * W);
     const h = Math.round(img.height * H);
-    const pre = [`scale=${w}:${h}`, "format=rgba", `colorchannelmixer=aa=${num(img.opacity)}`];
+    const cropFilter = img.crop
+      ? `crop=iw*${img.crop.w}:ih*${img.crop.h}:iw*${img.crop.x}:ih*${img.crop.y}`
+      : null;
+    const pre = [...(cropFilter ? [cropFilter] : []), `scale=${w}:${h}`, "format=rgba", `colorchannelmixer=aa=${num(img.opacity)}`];
     if (img.rotation !== 0) {
       const r = `${num(img.rotation)}*PI/180`;
       pre.push(`rotate=${r}:c=none:ow=rotw(${r}):oh=roth(${r})`);

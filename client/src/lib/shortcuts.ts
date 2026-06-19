@@ -64,6 +64,15 @@ export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
       e.preventDefault();
       deps.togglePlay();
       return;
+    case "KeyC": {
+      const sel = ui.selection;
+      const canCrop = sel?.kind === "image" || sel?.kind === "video";
+      if (canCrop && !ui.cropMode) {
+        e.preventDefault();
+        ui.setCropMode(true);
+      }
+      return;
+    }
     case "KeyS":
       e.preventDefault();
       store.splitVideoAt(ui.playhead);

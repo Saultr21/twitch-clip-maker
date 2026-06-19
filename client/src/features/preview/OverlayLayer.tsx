@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import { SubtitlesLayer } from "./SubtitlesLayer";
+import { CropOverlay } from "./CropOverlay";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
@@ -77,6 +78,14 @@ function ImageNode({ overlay, width, height, selected, onGuides }: {
         offsetY={h / 2}
         rotation={overlay.rotation}
         opacity={overlay.opacity}
+        {...(overlay.crop && img ? {
+          crop: {
+            x: overlay.crop.x * img.naturalWidth,
+            y: overlay.crop.y * img.naturalHeight,
+            width: overlay.crop.w * img.naturalWidth,
+            height: overlay.crop.h * img.naturalHeight,
+          }
+        } : {})}
         draggable
         onMouseDown={() => select({ kind: "image", id: overlay.id })}
         onTap={() => select({ kind: "image", id: overlay.id })}
@@ -343,6 +352,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const playhead = useUiStore((s) => s.playhead);
   const selection = useUiStore((s) => s.selection);
   const select = useUiStore((s) => s.select);
+  const cropMode = useUiStore((s) => s.cropMode);
   const texts = useProjectStore((s) => s.project.tracks.text);
   const images = useProjectStore((s) => s.project.tracks.image);
   // Guías de centrado: visibles solo mientras un arrastre engancha al centro
@@ -391,6 +401,9 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
           />
         ))}
         <SubtitlesLayer width={width} height={height} onGuides={onGuides} />
+        {cropMode && (selection?.kind === "image" || selection?.kind === "video") && (
+          <CropOverlay canvasW={width} canvasH={height} />
+        )}
         {guides.vertical && (
           <Line
             points={[width / 2, -STAGE_MARGIN, width / 2, height + STAGE_MARGIN]}

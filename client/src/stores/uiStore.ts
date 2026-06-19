@@ -19,6 +19,8 @@ interface UiState {
   toolPanelWidth: number;
   propertiesWidth: number;
   helpOpen: boolean;
+  cropMode: boolean;
+  setCropMode: (v: boolean) => void;
   select: (sel: Selection | null) => void;
   setPlayhead: (t: number) => void;
   setPlaying: (p: boolean) => void;
@@ -40,6 +42,8 @@ export const useUiStore = create<UiState>((set) => ({
   toolPanelWidth: 224,
   propertiesWidth: 288,
   helpOpen: false,
+  cropMode: false,
+  setCropMode: (cropMode) => set({ cropMode }),
   select: (selection) => set({ selection }),
   setPlayhead: (t) => set({ playhead: Math.max(0, t) }),
   setPlaying: (playing) => set({ playing }),

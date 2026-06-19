@@ -4,7 +4,7 @@ import { hexToAssColor, toAssTime, buildAss } from "./assSubtitles.js";
 
 const style: SubtitleStyle = {
   fontFamily: "Impact", fontSize: 0.05, fill: "#ffffff", highlight: "#9146ff",
-  stroke: "#000000", strokeWidth: 0.004, y: 0.82, uppercase: true,
+  stroke: "#000000", strokeWidth: 0.004, x: 0.5, y: 0.82, uppercase: true,
   wordHighlight: true, animate: false, boxBackground: false,
 };
 

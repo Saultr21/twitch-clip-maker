@@ -1,5 +1,6 @@
-import { useMemo } from "react";
-import { Rect as KonvaRect, Text as KonvaText } from "react-konva";
+import { useEffect, useMemo, useRef } from "react";
+import Konva from "konva";
+import { Rect as KonvaRect, Text as KonvaText, Transformer } from "react-konva";
 import { activeWordIndex, cueEnd, cueStart } from "../../lib/subtitles";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -20,14 +21,23 @@ interface Line {
 }
 
 /** Pinta la cue activa centrada y partida en líneas que caben en el lienzo
- *  (como hace libass al quemar); resalta la palabra bajo el playhead. */
+ *  (como hace libass al quemar); resalta la palabra bajo el playhead.
+ *  La cue activa es arrastrable (mueve style.y) y escalable (cambia style.fontSize). */
 export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
   const playhead = useUiStore((s) => s.playhead);
   const cues = useProjectStore((s) => s.project.subtitles.cues);
   const style = useProjectStore((s) => s.project.subtitles.style);
+  const selection = useUiStore((s) => s.selection);
+  const select = useUiStore((s) => s.select);
+  const setSubtitleStyle = useProjectStore((s) => s.setSubtitleStyle);
+  const beginTransaction = useProjectStore((s) => s.beginTransaction);
+
+  const hitRef = useRef<Konva.Rect>(null);
+  const trRef = useRef<Konva.Transformer>(null);
 
   const cue = cues.find((c) => playhead >= cueStart(c) && playhead < cueEnd(c));
   const activeIdx = cue ? activeWordIndex(cue, playhead) : -1;
+  const selected = !!cue && selection?.kind === "subtitle" && selection.id === cue.id;
 
   const fontSize = style.fontSize * height;
   const space = fontSize * 0.3;
@@ -56,6 +66,12 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
     return out;
   }, [cue, width, fontSize, space, style.fontFamily, style.uppercase]);
 
+  useEffect(() => {
+    if (selected && hitRef.current && trRef.current) {
+      trRef.current.nodes([hitRef.current]);
+    }
+  }, [selected, cue?.id]);
+
   if (!cue || lines.length === 0) return null;
 
   const lineHeight = fontSize * 1.25;
@@ -74,14 +90,20 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
   const blockWidth = Math.max(...lines.map((l) => l.width));
   const pad = fontSize * 0.35;
 
+  // Geometría del rect de hit: coincide con el boxBackground
+  const hitX = width / 2 - blockWidth / 2 - pad;
+  const hitY = top - pad * 0.6;
+  const hitW = blockWidth + pad * 2;
+  const hitH = blockHeight + pad * 1.2;
+
   return (
     <>
       {style.boxBackground && (
         <KonvaRect
-          x={width / 2 - blockWidth / 2 - pad}
-          y={top - pad * 0.6}
-          width={blockWidth + pad * 2}
-          height={blockHeight + pad * 1.2}
+          x={hitX}
+          y={hitY}
+          width={hitW}
+          height={hitH}
           fill="rgba(0,0,0,0.7)"
           cornerRadius={6}
           listening={false}
@@ -117,6 +139,46 @@ export function SubtitlesLayer({ width, height }: SubtitlesLayerProps) {
           return node;
         });
       })}
+      {/* Rect transparente: hit area de clic, arrastre y transform */}
+      <KonvaRect
+        ref={hitRef}
+        x={hitX}
+        y={hitY}
+        width={hitW}
+        height={hitH}
+        fill={selected ? "rgba(255,255,255,0.04)" : "transparent"}
+        stroke={selected ? "#9146ff" : "transparent"}
+        strokeWidth={1}
+        draggable={selected}
+        dragBoundFunc={(pos) => ({
+          x: hitX, // solo movimiento vertical
+          y: Math.max(-pad * 0.6, Math.min(height - hitH + pad * 0.6, pos.y)),
+        })}
+        onMouseDown={() => select({ kind: "subtitle", id: cue.id })}
+        onTap={() => select({ kind: "subtitle", id: cue.id })}
+        onDragStart={() => beginTransaction()}
+        onDragMove={(e) => {
+          // centro del bloque en coordenadas normalizadas
+          const newY = (e.target.y() + hitH / 2) / height;
+          setSubtitleStyle({ y: Math.min(1, Math.max(0, newY)) });
+        }}
+        onTransformStart={() => beginTransaction()}
+        onTransformEnd={(e) => {
+          const node = e.target;
+          const newFontSize = Math.min(0.3, Math.max(0.005, style.fontSize * node.scaleY()));
+          setSubtitleStyle({ fontSize: newFontSize });
+          node.scaleX(1);
+          node.scaleY(1);
+        }}
+      />
+      {selected && (
+        <Transformer
+          ref={trRef}
+          rotateEnabled={false}
+          flipEnabled={false}
+          enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+        />
+      )}
     </>
   );
 }

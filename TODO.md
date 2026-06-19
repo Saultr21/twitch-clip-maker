@@ -1,11 +1,18 @@
 # TODO — VideoForge (editor de vídeo local; antes ClipForge)
 
-> Last updated: 2026-06-13
+> Last updated: 2026-06-19
 > Current phase: maintenance
 > Overall progress: Hitos 1–4 completos en master — proyecto funcional de punta a punta
 
 ## In Progress
 - (nada — proyecto funcional de punta a punta + todas las mejoras de Pendiente.txt hechas; pendiente smoke test del usuario de los subtítulos)
+
+## Descarga multiplataforma (2026-06-19) — hecha
+- [x] Allowlist de plataformas (Twitch, YouTube, TikTok, Instagram, X) vía `matchPlatform` (`server/src/lib/supportedUrl.ts`), sustituye la validación solo-Twitch; quita la regex `/clip/` (acepta también VODs y canal de Twitch)
+- [x] Selector de formato `bv*+ba/b` con merge a mp4 en `download.ts` (sube calidad; arregla el techo de 720p en YouTube). `--no-playlist` evita descargar canales/playlists enteras
+- [x] Textos multiplataforma en Medios, preview y tour de bienvenida
+- [x] Solo contenido público (sin cookies/PO tokens, por decisión de alcance). Spec: `docs/superpowers/specs/2026-06-19-descarga-multiplataforma-design.md`; Plan: `docs/superpowers/plans/2026-06-19-descarga-multiplataforma.md`
+- Verificado: 221 tests verdes (client 71, server 134, shared 16) + typecheck limpio. Pendiente smoke test del usuario con URLs reales de YouTube/TikTok
 
 ## Up Next
 - Smoke test del usuario del export por GPU (NVENC) y del waveform en uso real
@@ -67,6 +74,8 @@
 - [ ] Estilos/animaciones de subtítulo (pop/bounce, caja, emojis, filtro de palabrotas)
 - [ ] Export extra: miniatura, GIF, cola de exports
 - [ ] Revisión de atajos de teclado y acciones de timeline (ripple delete, etc.)
+- [ ] Descarga: cap opcional de duración/tamaño (diferido; vídeos largos de YouTube pueden ser enormes) — Origin: spec multiplataforma 2026-06-19, Priority: low
+- [ ] Descarga: soporte de cookies/PO token para contenido privado/con edad — Origin: spec multiplataforma 2026-06-19, Priority: low
 
 ## Completed
 - [x] `TASK-004` — Hito 4: filtros, velocidad, música, plantillas y pulido (2026-06-13)

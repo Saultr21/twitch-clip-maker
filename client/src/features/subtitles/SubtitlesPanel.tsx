@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { SubtitleCue } from "@clipforge/shared";
 import { censorCues } from "../../lib/profanity";
@@ -30,9 +30,13 @@ export function SubtitlesPanel() {
   const setMaxWordsPerCue = useProjectStore((s) => s.setMaxWordsPerCue);
   const [language, setLanguage] = useState("auto");
   const [model, setModel] = useState<"small" | "medium">("small");
-  const { state, start, cancel } = useTranscribe((cues) =>
-    setSubtitleCues(splitCuesToMaxWords(cues, maxWordsPerCue)),
-  );
+  // Callback estable: lee maxWordsPerCue del store en el momento de aplicar,
+  // evitando que start() se recree en cada render y pierda el evento SSE.
+  const onCues = useCallback((cues: SubtitleCue[]) => {
+    const max = useProjectStore.getState().project.subtitles.maxWordsPerCue;
+    setSubtitleCues(splitCuesToMaxWords(cues, max));
+  }, [setSubtitleCues]);
+  const { state, start, cancel } = useTranscribe(onCues);
 
   const generate = () => {
     const project = useProjectStore.getState().project;
@@ -149,17 +153,19 @@ export function SubtitlesPanel() {
           </ul>
 
           <h3 className="text-[11px] font-bold text-muted tracking-wide mt-2">ESTILO</h3>
-          <label htmlFor="sub-maxwords" className="text-[11px] text-muted">Palabras por frase · {maxWordsPerCue}</label>
-          <input
-            id="sub-maxwords"
-            type="range"
-            min={1}
-            max={20}
-            step={1}
-            value={maxWordsPerCue}
-            onChange={(e) => setMaxWordsPerCue(parseInt(e.target.value, 10))}
-            className="accent-accent h-1.5"
-          />
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="sub-maxwords" className="text-[11px] text-muted">Palabras por frase</label>
+            <input
+              id="sub-maxwords"
+              type="number"
+              min={1}
+              max={30}
+              step={1}
+              value={maxWordsPerCue}
+              onChange={(e) => setMaxWordsPerCue(parseInt(e.target.value, 10))}
+              className="w-14 bg-surface-2 border border-border-2 rounded-md px-2 py-0.5 text-xs text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
           <label className="text-[11px] text-muted">Color base
             <input type="color" value={style.fill} onChange={(e) => setSubtitleStyle({ fill: e.target.value })} className="ml-2 h-6 w-10 align-middle bg-surface-2 rounded border border-border-2" />
           </label>

@@ -3,6 +3,7 @@ import { Plus, Trash2 } from "lucide-react";
 import type { SubtitleCue } from "@clipforge/shared";
 import { censorCues } from "../../lib/profanity";
 import { videoClipAt } from "../../lib/timeline";
+import { confirmDialog } from "../../stores/dialogStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useTranscribe } from "./useTranscribe";
@@ -38,6 +39,15 @@ export function SubtitlesPanel() {
   };
 
   const hasClips = useProjectStore((s) => s.project.tracks.video.length > 0);
+
+  const clearAll = async () => {
+    const n = useProjectStore.getState().project.subtitles.cues.length;
+    const message =
+      n === 1 ? "¿Borrar la frase de subtítulos?" : `¿Borrar las ${n} frases de subtítulos?`;
+    if (await confirmDialog({ message, confirmLabel: "Borrar todas", danger: true })) {
+      clearSubtitles();
+    }
+  };
 
   return (
     <section aria-label="Subtítulos" className="flex-1 min-w-0 bg-surface-2/50 border-r border-border p-3 flex flex-col gap-3 overflow-y-auto">
@@ -116,7 +126,15 @@ export function SubtitlesPanel() {
             <h3 className="text-[11px] font-bold text-muted tracking-wide">FRASES ({cues.length})</h3>
             <div className="flex items-center gap-2">
               <button type="button" onClick={() => setSubtitleCues(censorCues(cues))} className="text-[11px] text-muted hover:text-text" title="Censurar palabrotas">Censurar</button>
-              <button type="button" onClick={clearSubtitles} className="text-[11px] text-muted hover:text-danger">Borrar todas</button>
+              <button
+                type="button"
+                onClick={() => void clearAll()}
+                title="Borrar todas las frases"
+                className="flex items-center gap-1 text-[11px] font-semibold text-danger hover:underline"
+              >
+                <Trash2 size={13} aria-hidden="true" />
+                Borrar todas
+              </button>
             </div>
           </div>
           <ul className="flex flex-col gap-1.5">

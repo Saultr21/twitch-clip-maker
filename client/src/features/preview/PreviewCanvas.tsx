@@ -48,7 +48,6 @@ function TrackVideo({
   track,
   canvas,
   isBase,
-  inGap,
   videoRef,
   register,
   zIndex,
@@ -56,7 +55,6 @@ function TrackVideo({
   track: VideoTrack;
   canvas: { width: number; height: number };
   isBase: boolean;
-  inGap: boolean;
   videoRef?: RefObject<HTMLVideoElement | null>;
   register?: (id: string, el: HTMLVideoElement | null) => void;
   zIndex: number;
@@ -103,7 +101,10 @@ function TrackVideo({
   const r = visibleRect(canvas.width, canvas.height, info, active!.zoom, crop);
   const cssFilter = clipCssFilter(active!.filters);
   const opacity = active!.opacity;
-  const visible = !inGap ? "visible" : "hidden";
+  // Esta pista tiene clip activo (si no, ya retornó arriba): se ve siempre, con
+  // independencia de si la BASE está en un hueco. (Antes colgaba de inGap global y
+  // al vaciarse la base se ocultaban todas las pistas.)
+  const visible = "visible";
 
   const wrapperStyle: CSSProperties = {
     position: "absolute",
@@ -266,7 +267,6 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               key={track.id}
               track={track}
               canvas={canvas}
-              inGap={inGap}
               isBase={i === 0}
               videoRef={i === 0 ? videoRef : undefined}
               register={i === 0 ? undefined : registerOverlayVideo}

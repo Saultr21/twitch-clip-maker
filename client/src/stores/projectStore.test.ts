@@ -316,15 +316,16 @@ describe("pistas de vídeo (multipista)", () => {
     expect(videoLayers(useProjectStore.getState().project)[1].clips).toEqual([]);
   });
 
-  it("reorderVideoTrack reordena solo el vídeo con una capa de imagen intercalada", () => {
+  it("reorderVideoTrack reordena el vídeo y deja intacta la capa de imagen", () => {
     const s = useProjectStore.getState();
     s.addImage("a", "a.png", 0, 0.2, 0.2); // crea capa de imagen → [V0, I]
-    const v1 = s.addVideoTrack("top"); // → [V0, I, V1]
-    expect(useProjectStore.getState().project.tracks.layers.map((l) => l.kind)).toEqual([
-      "video", "image", "video",
-    ]);
+    const v1 = s.addVideoTrack("top"); // los vídeos se mantienen contiguos → [V0, V1, I]
+    const kinds0 = useProjectStore.getState().project.tracks.layers.map((l) => l.kind);
+    expect(kinds0.filter((k) => k === "video")).toHaveLength(2);
+    expect(kinds0).toContain("image");
     s.reorderVideoTrack(1, 0); // mueve V1 (índice de vídeo 1) a la posición de vídeo 0
     const layers = useProjectStore.getState().project.tracks.layers;
+    // V1 queda primero entre los vídeos y la capa de imagen sigue presente
     expect(videoLayers(useProjectStore.getState().project)[0].id).toBe(v1);
     expect(layers.some((l) => l.kind === "image")).toBe(true);
     expect(layers.filter((l) => l.kind === "video")).toHaveLength(2);

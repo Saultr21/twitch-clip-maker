@@ -317,6 +317,8 @@ export function Timeline({ height }: { height: number }) {
                   }}
                   onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
                   onMoveEnd={handleVideoMoveEnd}
+                  trackIndex={i}
+                  onReorder={(from, to) => useProjectStore.getState().reorderVideoTrack(from, to)}
                 />
               );
             })}

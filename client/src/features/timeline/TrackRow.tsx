@@ -36,6 +36,9 @@ interface TrackRowProps {
   onRemoveTrack?: () => void;
   /** Al soltar un arrastre de tipo "move", informa de la Y de pantalla y el start final. */
   onMoveEnd?: (id: string, clientY: number, start: number) => void;
+  /** Índice de pista para reordenar por arrastre de la cabecera (solo vídeo). */
+  trackIndex?: number;
+  onReorder?: (fromIndex: number, toIndex: number) => void;
 }
 
 const CLIP_DND_TYPE = "application/x-clip-id";
@@ -56,6 +59,8 @@ export function TrackRow({
   onDropClip,
   onRemoveTrack,
   onMoveEnd,
+  trackIndex,
+  onReorder,
 }: TrackRowProps) {
   const [dropActive, setDropActive] = useState(false);
   // started: la transacción de historial se abre en el PRIMER movimiento real,
@@ -71,7 +76,21 @@ export function TrackRow({
 
   return (
     <div className="flex border-b border-border/60">
-      <div className="w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10 flex items-center justify-between gap-1">
+      <div
+        className={`w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10 flex items-center justify-between gap-1${trackIndex !== undefined ? " cursor-grab" : ""}`}
+        draggable={trackIndex !== undefined}
+        onDragStart={trackIndex !== undefined ? (e) => {
+          e.dataTransfer.setData("application/x-video-track-index", String(trackIndex));
+          e.dataTransfer.effectAllowed = "move";
+        } : undefined}
+        onDragOver={trackIndex !== undefined ? (e) => {
+          if (e.dataTransfer.types.includes("application/x-video-track-index")) e.preventDefault();
+        } : undefined}
+        onDrop={trackIndex !== undefined ? (e) => {
+          const from = Number(e.dataTransfer.getData("application/x-video-track-index"));
+          if (!Number.isNaN(from) && onReorder) onReorder(from, trackIndex);
+        } : undefined}
+      >
         <span className="truncate">{title}</span>
         {onRemoveTrack && (
           <button type="button" onClick={onRemoveTrack} title="Quitar pista"

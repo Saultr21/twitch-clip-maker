@@ -77,9 +77,13 @@
   - Poder acercar/alejar el lienzo del editor para trabajar con precisión (no confundir con el `zoom.scale` del clip, que reencuadra el vídeo)
   - Notas: afecta al cálculo de tamaño del lienzo en `PreviewCanvas` y a las coordenadas del Stage de Konva (`OverlayLayer`); pan + reset; atajos rueda/Ctrl
   - Priority: medium
-- [ ] `TASK-011` — Apartado de animaciones/transiciones
-  - Transiciones tipo desvanecer, fundido, crossfade, etc., colocables ENTRE medios o al inicio/final
-  - Notas: se solapa con lo ya deferido (fade in/out al export ya existe; "Transiciones v2: crossfade real (xfade)" reescribe el concat → riesgo alto). Requiere modelo de transiciones en el proyecto + preview + export FFmpeg (xfade/acrossfade)
+- [ ] `TASK-011` — Botón de Transiciones + apartado de animaciones/transiciones
+  - Un **botón de Transiciones** en la UI que permita añadir transiciones (desvanecer, fundido, crossfade, etc.) ENTRE clips, al inicio y al final (petición usuario 2026-06-20)
+  - Notas: se solapa con lo ya deferido (fade in/out al export ya existe; "Transiciones v2: crossfade real (xfade)" reescribe el concat → riesgo alto). Requiere modelo de transiciones en el proyecto + UI de selección/colocación + preview + export FFmpeg (xfade/acrossfade)
+  - Priority: medium
+- [ ] `TASK-013` — Botón de Efectos (capa de efectos sobre el vídeo)
+  - Un **botón de Efectos** con, p. ej.: **blur a zonas** del vídeo (difuminar una región), **censurar/pixelar partes** (mosaico sobre una zona), **añadir formas** (rectángulos, círculos, flechas…), y posibles más (viñeta, etc.) — petición usuario 2026-06-20
+  - Notas: feature grande. Probablemente un nuevo tipo de overlay en el modelo (región normalizada + tipo de efecto + ventana de tiempo), render en preview (Konva) y export FFmpeg (boxblur/crop+overlay para zonas, drawbox/geq o delogo/pixelize para censura, drawbox/formas). Requiere diseño propio (brainstorming + spec + plan por fases)
   - Priority: medium
 - [ ] `TASK-012` — Multipista: varias líneas de medios (vídeo/imagen superpuestos, PiP)
   - Picture-in-picture: un vídeo encima de otro, una imagen encima de otra, etc.

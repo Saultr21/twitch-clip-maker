@@ -124,4 +124,18 @@ describe("migrateProject", () => {
     const p = createEmptyProject("x");
     expect(migrateProject(p)).toBe(p);
   });
+
+  it("devuelve sin tocar entradas de versión desconocida o malformadas", () => {
+    const v3 = { version: 3, tracks: {} };
+    expect(migrateProject(v3)).toBe(v3);
+    expect(migrateProject(null)).toBe(null);
+    expect(migrateProject("corrupto")).toBe("corrupto");
+  });
+
+  it("no aliasa el array de clips del proyecto de entrada (independencia para Immer)", () => {
+    const v1 = makeV1WithClip();
+    const migrated = migrateProject(v1) as { tracks: { video: { clips: unknown[] }[] } };
+    expect(migrated.tracks.video[0].clips).not.toBe(v1.tracks.video);
+    expect(migrated.tracks.video[0].clips[0]).not.toBe(v1.tracks.video[0]);
+  });
 });

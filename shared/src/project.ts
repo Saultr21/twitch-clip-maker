@@ -262,7 +262,9 @@ export function migrateProject(raw: unknown): unknown {
   if (!raw || typeof raw !== "object") return raw;
   const p = raw as { version?: number; tracks?: { video?: unknown } };
   if (p.version !== 1) return raw;
-  const flat = Array.isArray(p.tracks?.video) ? p.tracks.video : [];
+  // Copia de los clips (no alias del array de entrada): el proyecto migrado debe
+  // ser independiente del crudo para que Immer pueda draftearlo sin mutarlo
+  const flat = Array.isArray(p.tracks?.video) ? p.tracks.video.map((c) => ({ ...(c as object) })) : [];
   return {
     ...p,
     version: 2,

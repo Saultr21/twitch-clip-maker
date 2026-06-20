@@ -240,6 +240,80 @@ describe("buildFilterGraph — subtítulos ASS", () => {
   });
 });
 
+const info2: ClipInfo = {
+  id: "clip-2", url: "https://x", title: "cam", fileName: "clip-2.mp4",
+  duration: 6, width: 1280, height: 720, createdAt: "2026-06-20T00:00:00.000Z",
+};
+
+describe("buildFilterGraph — multipista (vídeo)", () => {
+  it("una pista superior composita un overlay de vídeo con opacidad y ventana de tiempo", () => {
+    const p = projectWithClip(); // base: clip-1 en [0,5)
+    // pista superior con un facecam en [1, 4) (3s), opacidad 0.8
+    p.tracks.video.push({
+      id: "t2", name: "", clips: [
+        { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 0.8, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
+      ],
+    });
+    const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));
+    // el clip-2 es el segundo input de vídeo (índice 1)
+    expect(g.inputs).toContainEqual({ kind: "video", fileName: "clip-2.mp4" });
+    // cadena de la capa: trim + setpts con offset al timelineStart + scale + rgba + opacidad
+    expect(g.filterComplex).toContain("[1:v]trim=start=0:end=3,setpts=(PTS-STARTPTS)/1+1/TB");
+    expect(g.filterComplex).toContain("format=rgba,colorchannelmixer=aa=0.8[ovsrc0]");
+    // overlay sobre [vcat] con enable entre 1 y 4 (clipEnd = 1 + 3/1)
+    expect(g.filterComplex).toContain("[vcat][ovsrc0]overlay=");
+    expect(g.filterComplex).toContain("enable='between(t,1,4)':eof_action=pass[ov0]");
+    // el vídeo final ya no es [vcat] sino la capa compositada (luego seguirían imágenes/textos)
+    expect(g.videoLabel).toContain("ov0");
+  });
+
+  it("proyecto de una sola pista: NO añade overlays de vídeo (comportamiento idéntico)", () => {
+    const g = buildFilterGraph(projectWithClip(), new Map([["clip-1", info]]));
+    expect(g.filterComplex).not.toContain("ovsrc");
+    expect(g.videoLabel).toBe("[vcat]");
+  });
+});
+
+describe("buildFilterGraph — multipista (audio)", () => {
+  function twoTrackProject() {
+    const p = projectWithClip(); // base clip-1 en [0,5)
+    p.tracks.video.push({
+      id: "t2", name: "", clips: [
+        { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 1, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
+      ],
+    });
+    return p;
+  }
+
+  it("mezcla el audio de la capa (retrasado a su inicio) con el audio base", () => {
+    const g = buildFilterGraph(twoTrackProject(), new Map([["clip-1", info], ["clip-2", info2]]));
+    // audio de la capa: trim + adelay al timelineStart (1s = 1000ms)
+    expect(g.filterComplex).toContain("adelay=1000:all=1[ova0]");
+    // amix de voz = base + capa
+    expect(g.filterComplex).toContain("[acat][ova0]amix=inputs=2:duration=first:normalize=0[voicemix]");
+    expect(g.audioLabel).toBe("[voicemix]");
+  });
+
+  it("con música y ducking, la música baja bajo la voz combinada (base + capa)", () => {
+    const p = twoTrackProject();
+    p.settings.audioDucking = true;
+    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5 });
+    const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));
+    // se construye la voz combinada y la música se duckeа contra ella
+    expect(g.filterComplex).toContain("[acat][ova0]amix=inputs=2:duration=first:normalize=0[voicemix]");
+    expect(g.filterComplex).toContain("sidechaincompress");
+    expect(g.audioLabel).toBe("[amix]");
+  });
+
+  it("una sola pista con música: salida de audio idéntica a la actual (sin voicemix)", () => {
+    const p = projectWithClip();
+    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5 });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).not.toContain("voicemix");
+    expect(g.filterComplex).toContain("[acat][mus0]amix=inputs=2:duration=first:normalize=0[amix]");
+  });
+});
+
 describe("buildFilterGraph — música", () => {
   it("la música entra como input de audio con atrim, volume, adelay y amix", () => {
     const p = projectWithClip(); // vídeo en [0,5)

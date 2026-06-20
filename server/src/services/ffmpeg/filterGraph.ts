@@ -66,6 +66,7 @@ export function buildFilterGraph(
   const inputs: GraphInput[] = [];
   const filters: string[] = [];
   const segLabels: string[] = [];
+  const overlayAudioLabels: string[] = [];
   let segIdx = 0;
   let cursor = 0;
 
@@ -195,6 +196,56 @@ export function buildFilterGraph(
   filters.push(`${segLabels.join("")}concat=n=${segLabels.length}:v=1:a=1[vcat][acat]`);
   let videoLabel = "[vcat]";
 
+  // ── Capas de vídeo superpuestas (pistas por encima de la base) ──
+  // z-order: se compositan sobre [vcat] y antes de imágenes/textos. Para un
+  // proyecto de una sola pista, overlayTracks está vacío → no-op (salida idéntica).
+  const overlayTracks = project.tracks.video.slice(1);
+  let ovIdx = 0;
+  for (const track of overlayTracks) {
+    const layerClips = [...track.clips].sort((a, b) => a.timelineStart - b.timelineStart);
+    for (const clip of layerClips) {
+      const cinfo = clipInfos.get(clip.clipId);
+      if (!cinfo) throw new Error(`Falta la información del clip ${clip.clipId}`);
+      const inputIdx = inputs.length;
+      inputs.push({ kind: "video", fileName: cinfo.fileName });
+      const rect = renderRect(W, H, cinfo.width, cinfo.height, clip.zoom, clip.crop);
+      const start = clip.timelineStart;
+      const end = clipEnd(clip);
+      const cropStep = clip.crop
+        ? `crop=iw*${clip.crop.w}:ih*${clip.crop.h}:iw*${clip.crop.x}:ih*${clip.crop.y}`
+        : null;
+      // setpts: normaliza a 0, aplica velocidad y desplaza el inicio al timelineStart
+      const vchain = [
+        `trim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+        ...(cropStep ? [cropStep] : []),
+        `setpts=(PTS-STARTPTS)/${num(clip.speed)}+${num(start)}/TB`,
+        `scale=${rect.w}:${rect.h}`,
+        ...colorFilters(clip),
+        "format=rgba",
+        `colorchannelmixer=aa=${num(clip.opacity)}`,
+      ];
+      filters.push(`[${inputIdx}:v]${vchain.join(",")}[ovsrc${ovIdx}]`);
+      filters.push(
+        `${videoLabel}[ovsrc${ovIdx}]overlay=x=${rect.left}:y=${rect.top}:enable='between(t,${num(start)},${num(end)})':eof_action=pass[ov${ovIdx}]`,
+      );
+      videoLabel = `[ov${ovIdx}]`;
+
+      // audio de la capa: se retrasa a su timelineStart y se acumula para el amix
+      const achain = [
+        `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+        "asetpts=PTS-STARTPTS",
+        ...atempoChain(clip.speed),
+        `volume=${num(project.originalAudioVolume)}`,
+        "aresample=44100",
+        "aformat=channel_layouts=stereo",
+        `adelay=${Math.round(start * 1000)}:all=1`,
+      ];
+      filters.push(`[${inputIdx}:a]${achain.join(",")}[ova${ovIdx}]`);
+      overlayAudioLabels.push(`[ova${ovIdx}]`);
+      ovIdx++;
+    }
+  }
+
   // Overlays de imagen (inputs extra, en orden)
   project.tracks.image.forEach((img, j) => {
     const inputIdx = inputs.length;
@@ -242,8 +293,19 @@ export function buildFilterGraph(
     videoLabel = "[subs]";
   }
 
-  // Música de fondo: cada pista se recorta, retrasa y mezcla sobre [acat]
+  // ── Audio ──
+  // "Voz" = audio base [acat] + audio de las capas de vídeo (volumen completo).
+  // La música (si hay) se mezcla encima, con ducking opcional bajo la voz.
   let audioLabel = "[acat]";
+  let voiceLabel = "[acat]";
+  if (overlayAudioLabels.length > 0) {
+    filters.push(
+      `[acat]${overlayAudioLabels.join("")}amix=inputs=${overlayAudioLabels.length + 1}:duration=first:normalize=0[voicemix]`,
+    );
+    voiceLabel = "[voicemix]";
+    audioLabel = "[voicemix]";
+  }
+
   if (project.tracks.audio.length > 0) {
     const musLabels: string[] = [];
     project.tracks.audio.forEach((a, m) => {
@@ -262,9 +324,7 @@ export function buildFilterGraph(
       musLabels.push(`[mus${m}]`);
     });
     if (project.settings.audioDucking) {
-      // ducking: la voz (acat) baja la música vía cadena lateral (sidechain),
-      // luego se vuelve a mezclar con la voz a volumen completo
-      filters.push("[acat]asplit=2[avoice][ascv]");
+      filters.push(`${voiceLabel}asplit=2[avoice][ascv]`);
       filters.push("[ascv]aresample=44100,aformat=channel_layouts=stereo[asc]");
       let musmix = musLabels[0];
       if (musLabels.length > 1) {
@@ -275,7 +335,7 @@ export function buildFilterGraph(
       filters.push("[avoice][ducked]amix=inputs=2:duration=first:normalize=0[amix]");
     } else {
       filters.push(
-        `[acat]${musLabels.join("")}amix=inputs=${musLabels.length + 1}:duration=first:normalize=0[amix]`,
+        `${voiceLabel}${musLabels.join("")}amix=inputs=${musLabels.length + 1}:duration=first:normalize=0[amix]`,
       );
     }
     audioLabel = "[amix]";

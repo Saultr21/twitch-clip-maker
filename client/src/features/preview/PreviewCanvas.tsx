@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
 import { ASPECT_PRESETS, type VideoTrack } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
@@ -71,14 +71,17 @@ function TrackVideo({
 
   // ref: la base usa videoRef externo; las capas tienen su ref local y se registran
   const localRef = useRef<HTMLVideoElement>(null);
-  const setEl = (el: HTMLVideoElement | null) => {
+  // Identidad estable: si no se memoiza, React invoca el ref-callback con null y
+  // luego con el elemento en CADA render, re-registrando el <video> (delete→set)
+  // en cada tick del playhead, con riesgo de perder un ciclo de sync
+  const setEl = useCallback((el: HTMLVideoElement | null) => {
     if (isBase && videoRef) {
       (videoRef as MutableRefObject<HTMLVideoElement | null>).current = el;
     } else {
       localRef.current = el;
       register?.(track.id, el);
     }
-  };
+  }, [isBase, videoRef, register, track.id]);
 
   if (!info || !canvas.width) {
     // Mantener el <video> montado pero oculto para no remontar

@@ -24,7 +24,7 @@ describe("addVideoClip", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.addVideoClip(clipInfo);
-    const [a, b] = useProjectStore.getState().project.tracks.video;
+    const [a, b] = useProjectStore.getState().project.tracks.video[0].clips;
     expect(a.timelineStart).toBe(0);
     expect(b.timelineStart).toBe(10);
   });
@@ -33,7 +33,7 @@ describe("addVideoClip", () => {
 describe("addVideoClipAt", () => {
   it("coloca el clip en el instante soltado si el hueco está libre", () => {
     useProjectStore.getState().addVideoClipAt(clipInfo, 5);
-    const v = useProjectStore.getState().project.tracks.video;
+    const v = useProjectStore.getState().project.tracks.video[0].clips;
     expect(v).toHaveLength(1);
     expect(v[0].timelineStart).toBe(5);
   });
@@ -42,7 +42,7 @@ describe("addVideoClipAt", () => {
     const s = useProjectStore.getState();
     s.addVideoClipAt(clipInfo, 5); // 5..15 (duración 10)
     s.addVideoClipAt(clipInfo, 3); // 3..13 solapa con 5..15 → al final
-    const v = useProjectStore.getState().project.tracks.video;
+    const v = useProjectStore.getState().project.tracks.video[0].clips;
     expect(v).toHaveLength(2);
     expect(v[1].timelineStart).toBe(15);
   });
@@ -74,9 +74,9 @@ describe("removeSilencesFromClip", () => {
   it("parte el clip en sus tramos con voz, pegados desde el inicio", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo); // duración 10 → trimIn 0, trimOut 10, start 0
-    const id = useProjectStore.getState().project.tracks.video[0].id;
+    const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
     s.removeSilencesFromClip(id, [{ start: 2, end: 4 }]);
-    const v = useProjectStore.getState().project.tracks.video;
+    const v = useProjectStore.getState().project.tracks.video[0].clips;
     expect(v).toHaveLength(2);
     expect([v[0].trimIn, v[0].trimOut, v[0].timelineStart]).toEqual([0, 2, 0]);
     // 2º tramo: 4..10, pegado tras el primero (que dura 2s en proyecto)
@@ -86,9 +86,9 @@ describe("removeSilencesFromClip", () => {
   it("sin silencios no hace nada", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = useProjectStore.getState().project.tracks.video[0].id;
+    const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
     s.removeSilencesFromClip(id, []);
-    expect(useProjectStore.getState().project.tracks.video).toHaveLength(1);
+    expect(useProjectStore.getState().project.tracks.video[0].clips).toHaveLength(1);
   });
 });
 
@@ -117,11 +117,11 @@ describe("moveVideoClip", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.addVideoClip(clipInfo);
-    const [a, b] = useProjectStore.getState().project.tracks.video;
+    const [a, b] = useProjectStore.getState().project.tracks.video[0].clips;
     s.moveVideoClip(b.id, 25);
-    expect(useProjectStore.getState().project.tracks.video[1].timelineStart).toBe(25);
+    expect(useProjectStore.getState().project.tracks.video[0].clips[1].timelineStart).toBe(25);
     s.moveVideoClip(b.id, 3); // solaparía con a
-    expect(useProjectStore.getState().project.tracks.video[1].timelineStart).toBe(25);
+    expect(useProjectStore.getState().project.tracks.video[0].clips[1].timelineStart).toBe(25);
     expect(a.timelineStart).toBe(0);
   });
 });
@@ -130,9 +130,9 @@ describe("trimVideoClip", () => {
   it("recorta por el borde izquierdo ajustando trimIn y timelineStart", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = useProjectStore.getState().project.tracks.video[0].id;
+    const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
     s.trimVideoClip(id, "start", 2);
-    const c = useProjectStore.getState().project.tracks.video[0];
+    const c = useProjectStore.getState().project.tracks.video[0].clips[0];
     expect(c.timelineStart).toBe(2);
     expect(c.trimIn).toBe(2);
     expect(c.trimOut).toBe(10);
@@ -141,9 +141,9 @@ describe("trimVideoClip", () => {
   it("recorta por el borde derecho ajustando trimOut", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = useProjectStore.getState().project.tracks.video[0].id;
+    const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
     s.trimVideoClip(id, "end", 7);
-    const c = useProjectStore.getState().project.tracks.video[0];
+    const c = useProjectStore.getState().project.tracks.video[0].clips[0];
     expect(c.trimOut).toBeCloseTo(7);
     expect(c.timelineStart).toBe(0);
   });
@@ -151,9 +151,9 @@ describe("trimVideoClip", () => {
   it("impone una duración mínima de 0.1s", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = useProjectStore.getState().project.tracks.video[0].id;
+    const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
     s.trimVideoClip(id, "end", 0.01);
-    expect(useProjectStore.getState().project.tracks.video[0].trimOut).toBeCloseTo(0.1);
+    expect(useProjectStore.getState().project.tracks.video[0].clips[0].trimOut).toBeCloseTo(0.1);
   });
 });
 
@@ -162,7 +162,7 @@ describe("splitVideoAt y removeElement", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.splitVideoAt(4);
-    const track = useProjectStore.getState().project.tracks.video;
+    const track = useProjectStore.getState().project.tracks.video[0].clips;
     expect(track).toHaveLength(2);
     expect(track[0].trimOut).toBe(4);
     expect(track[1].timelineStart).toBe(4);
@@ -318,7 +318,7 @@ describe("applyPreset", () => {
     const p = useProjectStore.getState().project;
     expect(p.tracks.text).toHaveLength(1);
     expect(p.tracks.text[0].id).not.toBe(preset.text[0].id); // id regenerado
-    expect(p.tracks.video).toHaveLength(1); // el vídeo no se toca
+    expect(p.tracks.video[0].clips).toHaveLength(1); // el vídeo no se toca
     s.undo();
     expect(useProjectStore.getState().project.tracks.text).toHaveLength(0);
   });

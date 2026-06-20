@@ -51,6 +51,7 @@ export function Timeline({ height }: { height: number }) {
   const canCrop = selection?.kind === "image" || selection?.kind === "video";
   const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const videoLanesRef = useRef<HTMLDivElement>(null);
   // Clips de la pista base (Fase 1: única pista). Referencia estable vía EMPTY_CLIPS.
   const baseClips = project.tracks.video[0]?.clips ?? EMPTY_CLIPS;
   const videoCount = baseClips.length;
@@ -116,6 +117,21 @@ export function Timeline({ height }: { height: number }) {
         waveform: info ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut } : undefined,
       };
     });
+
+  const LANE_TOTAL = 36; // 4px padding + 32px LANE_HEIGHT (laneCount=1 para pistas de vídeo)
+  const handleVideoMoveEnd = (clipId: string, clientY: number, start: number) => {
+    const cont = videoLanesRef.current;
+    if (!cont) return;
+    const rect = cont.getBoundingClientRect();
+    // Mapeo Y → carril visual (0 = arriba), teniendo en cuenta el render invertido
+    const visualLane = Math.floor((clientY - rect.top) / LANE_TOTAL);
+    const order = videoTracks.map((_, i) => i).reverse(); // [N-1 .. 0]
+    const destIndex = order[Math.max(0, Math.min(order.length - 1, visualLane))];
+    const destTrack = videoTracks[destIndex];
+    const srcTrack = videoTracks.find((t) => t.clips.some((c) => c.id === clipId));
+    if (!destTrack || !srcTrack || srcTrack.id === destTrack.id) return; // misma pista: no-op
+    useProjectStore.getState().moveClipToTrack(clipId, destTrack.id, start);
+  };
 
   // Texto, imagen, audio y subtítulos pueden solaparse en el tiempo: carriles automáticos
   const textLanes = assignLanes(textBlocks);
@@ -192,27 +208,30 @@ export function Timeline({ height }: { height: number }) {
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
           </div>
-          {videoTracks.map((_, i) => i).reverse().map((i) => {
-            const track = videoTracks[i];
-            const isBase = i === 0;
-            return (
-              <TrackRow
-                key={track.id}
-                title={isBase ? "Vídeo" : `Vídeo ${i + 1}`}
-                blocks={blocksForTrack(track.clips)}
-                pxPerSecond={pxPerSecond}
-                onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
-                onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
-                onDropClip={(clipId, t) => {
-                  const clip = clips.find((c) => c.id === clipId);
-                  if (!clip) return;
-                  useProjectStore.getState().addVideoClipToTrack(clip, track.id, t);
-                  useUiStore.getState().select(null);
-                }}
-                onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
-              />
-            );
-          })}
+          <div ref={videoLanesRef}>
+            {videoTracks.map((_, i) => i).reverse().map((i) => {
+              const track = videoTracks[i];
+              const isBase = i === 0;
+              return (
+                <TrackRow
+                  key={track.id}
+                  title={isBase ? "Vídeo" : `Vídeo ${i + 1}`}
+                  blocks={blocksForTrack(track.clips)}
+                  pxPerSecond={pxPerSecond}
+                  onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
+                  onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
+                  onDropClip={(clipId, t) => {
+                    const clip = clips.find((c) => c.id === clipId);
+                    if (!clip) return;
+                    useProjectStore.getState().addVideoClipToTrack(clip, track.id, t);
+                    useUiStore.getState().select(null);
+                  }}
+                  onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
+                  onMoveEnd={handleVideoMoveEnd}
+                />
+              );
+            })}
+          </div>
           <TrackRow
             title="Texto"
             blocks={textBlocks}

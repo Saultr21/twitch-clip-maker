@@ -34,6 +34,8 @@ interface TrackRowProps {
   onDropClip?: (clipId: string, t: number) => void;
   /** Si se define, muestra un botón "×" en la cabecera para borrar la pista. */
   onRemoveTrack?: () => void;
+  /** Al soltar un arrastre de tipo "move", informa de la Y de pantalla y el start final. */
+  onMoveEnd?: (id: string, clientY: number, start: number) => void;
 }
 
 const CLIP_DND_TYPE = "application/x-clip-id";
@@ -53,11 +55,12 @@ export function TrackRow({
   onTrim,
   onDropClip,
   onRemoveTrack,
+  onMoveEnd,
 }: TrackRowProps) {
   const [dropActive, setDropActive] = useState(false);
   // started: la transacción de historial se abre en el PRIMER movimiento real,
   // no en el pointerdown — un simple clic de selección no debe crear entrada de undo
-  const dragRef = useRef<{ id: string; mode: "move" | "trim-start" | "trim-end"; offsetT: number; started: boolean } | null>(null);
+  const dragRef = useRef<{ id: string; mode: "move" | "trim-start" | "trim-end"; offsetT: number; started: boolean; lastStart?: number; lastClientY?: number } | null>(null);
   const selection = useUiStore((s) => s.selection);
   const select = useUiStore((s) => s.select);
   const beginTransaction = useProjectStore((s) => s.beginTransaction);
@@ -155,12 +158,18 @@ export function TrackRow({
                 if (drag.mode === "move") {
                   const snapped = snapTime(Math.max(0, pointerT - drag.offsetT), points, snapThreshold);
                   onMove(b.id, snapped, true);
+                  drag.lastStart = snapped;
+                  drag.lastClientY = e.clientY;
                 } else {
                   const snapped = snapTime(Math.max(0, pointerT), points, snapThreshold);
                   onTrim(b.id, drag.mode === "trim-start" ? "start" : "end", snapped, true);
                 }
               }}
               onPointerUp={() => {
+                const drag = dragRef.current;
+                if (drag?.mode === "move" && drag.started && onMoveEnd) {
+                  onMoveEnd(drag.id, drag.lastClientY ?? 0, drag.lastStart ?? 0);
+                }
                 dragRef.current = null;
               }}
               onPointerCancel={() => {

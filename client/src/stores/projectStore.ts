@@ -190,6 +190,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     removeVideoTrack: (trackId) =>
       mutate((d) => {
         if (d.tracks.video.length <= 1) return; // nunca dejar 0 pistas
+        // Si se borra la pista base (índice 0), la siguiente pasa a ser base.
+        // La UI (Fase 4) puede decidir bloquear/confirmar borrar la base.
         const idx = d.tracks.video.findIndex((t) => t.id === trackId);
         if (idx !== -1) d.tracks.video.splice(idx, 1);
       }),
@@ -202,7 +204,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const start = Math.max(0, newStart);
         // no-solape en la pista destino (excluye el propio clip si ya estuviera ahí)
         if (hasOverlap(dest.clips, start, clipDuration(ctx.clip), clipId)) return;
-        // saca el clip de su pista actual y lo coloca en destino con el nuevo inicio
+        // saca el clip de su pista actual (sigue ordenada tras el splice) y lo
+        // inserta en destino, reordenando solo destino por timelineStart
         ctx.track.clips.splice(ctx.index, 1);
         dest.clips.push({ ...ctx.clip, timelineStart: start });
         dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);

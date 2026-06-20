@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode, type RefObject } from "react";
+import { useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
-import { ASPECT_PRESETS } from "@clipforge/shared";
+import { ASPECT_PRESETS, type VideoTrack } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { usePlayback } from "./PreviewArea";
 import { useElementSize } from "./useElementSize";
+import { visibleRect } from "./trackVideo";
 
 interface PreviewCanvasProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -16,24 +18,137 @@ interface PreviewCanvasProps {
 
 const ASPECT_OPTIONS = ["9:16", "16:9", "1:1", "4:5"] as const;
 
-// Crop neutro (frame entero): se usa cuando el clip no tiene recorte o mientras
-// se está recortando, para mostrar el fotograma completo
-const FULL_FRAME = { x: 0, y: 0, w: 1, h: 1 } as const;
+/** Extrae la cadena CSS `filter` a partir del objeto de filtros de un clip. */
+function clipCssFilter(f: {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  hue: number;
+  grayscale: number;
+}): string | undefined {
+  return (
+    [
+      f.brightness !== 0 ? `brightness(${1 + f.brightness})` : "",
+      f.contrast !== 1 ? `contrast(${f.contrast})` : "",
+      f.saturation !== 1 ? `saturate(${f.saturation})` : "",
+      f.hue !== 0 ? `hue-rotate(${f.hue}deg)` : "",
+      f.grayscale !== 0 ? `grayscale(${f.grayscale})` : "",
+    ]
+      .filter(Boolean)
+      .join(" ") || undefined
+  );
+}
+
+/**
+ * Un <video> por pista, siempre montado (nunca se remonta al cambiar clip/crop).
+ * La pista base (isBase=true) usa videoRef; las capas se registran en el motor
+ * vía registerOverlayVideo para que las sincronice.
+ */
+function TrackVideo({
+  track,
+  canvas,
+  isBase,
+  inGap,
+  videoRef,
+  register,
+  zIndex,
+}: {
+  track: VideoTrack;
+  canvas: { width: number; height: number };
+  isBase: boolean;
+  inGap: boolean;
+  videoRef?: RefObject<HTMLVideoElement | null>;
+  register?: (id: string, el: HTMLVideoElement | null) => void;
+  zIndex: number;
+}) {
+  const playhead = useUiStore((s) => s.playhead);
+  const cropMode = useUiStore((s) => s.cropMode);
+  const selection = useUiStore((s) => s.selection);
+  const clipsInfo = useClipsStore((s) => s.clips);
+
+  const active = videoClipAt(track.clips, playhead);
+  const info = active ? clipsInfo.find((c) => c.id === active.clipId) : undefined;
+
+  // ref: la base usa videoRef externo; las capas tienen su ref local y se registran
+  const localRef = useRef<HTMLVideoElement>(null);
+  const setEl = (el: HTMLVideoElement | null) => {
+    if (isBase && videoRef) {
+      (videoRef as MutableRefObject<HTMLVideoElement | null>).current = el;
+    } else {
+      localRef.current = el;
+      register?.(track.id, el);
+    }
+  };
+
+  if (!info || !canvas.width) {
+    // Mantener el <video> montado pero oculto para no remontar
+    return (
+      <video
+        ref={setEl}
+        preload="auto"
+        className="absolute max-w-none"
+        style={{ visibility: "hidden", inset: 0, width: "100%", height: "100%", zIndex }}
+      />
+    );
+  }
+
+  // En modo crop, el clip seleccionado muestra el frame completo (sin recorte)
+  const isCroppingThis =
+    cropMode && selection?.kind === "video" && selection.id === active!.id;
+  const crop = isCroppingThis ? null : (active!.crop ?? null);
+
+  const r = visibleRect(canvas.width, canvas.height, info, active!.zoom, crop);
+  const cssFilter = clipCssFilter(active!.filters);
+  const opacity = active!.opacity;
+  const visible = !inGap ? "visible" : "hidden";
+
+  const wrapperStyle: CSSProperties = {
+    position: "absolute",
+    left: r.left,
+    top: r.top,
+    width: r.w,
+    height: r.h,
+    overflow: "hidden",
+    visibility: visible,
+    opacity,
+    zIndex,
+  };
+
+  const innerStyle: CSSProperties = {
+    position: "absolute",
+    width: r.fullW,
+    height: r.fullH,
+    left: -r.fullW * r.cropX,
+    top: -r.fullH * r.cropY,
+    filter: cssFilter,
+  };
+
+  return (
+    <div style={wrapperStyle}>
+      <video
+        ref={setEl}
+        preload="auto"
+        // max-w-none: el preflight de Tailwind limita los <video> a max-width 100%
+        // y rompería el zoom al desbordar el lienzo
+        className="absolute max-w-none"
+        style={innerStyle}
+      />
+    </div>
+  );
+}
 
 export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps) {
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
   const select = useUiStore((s) => s.select);
-  // Doble suscripción: la pista de vídeo (ediciones de zoom en tiempo real) y el
-  // playhead (cambio de clip activo). El objeto clip es estable (immer) mientras
-  // no se edite, así que el playhead no re-renderiza a 60fps
-  const videoTrack = useProjectStore((s) => s.project.tracks.video[0]?.clips ?? []);
-  const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
-  const clips = useClipsStore((s) => s.clips);
+  const videoTracks = useProjectStore((s) => s.project.tracks.video);
+  // Para la comprobación "sin clips" del estado vacío, miramos la pista base
+  const baseTrackClips = videoTracks[0]?.clips ?? [];
   const background = settings.background;
   const containerRef = useRef<HTMLDivElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
   const container = useElementSize(containerRef);
+  const { registerOverlayVideo } = usePlayback();
 
   // Fondo blur: un <video> espejo del principal, escalado a cover y desenfocado
   useEffect(() => {
@@ -66,36 +181,6 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
       height: Math.floor(settings.height * scale),
     };
   }, [container, settings.width, settings.height]);
-
-  // El vídeo se dimensiona explícitamente según el aspecto real de su fuente:
-  // zoom.scale=1 = fotograma completo visible (contain, con negro alrededor si
-  // el aspecto difiere); >1 amplía y recorta; zoom.x/y posicionan
-  const videoStyle = useMemo(() => {
-    if (!activeClip || !canvas.width) return null;
-    const info = clips.find((c) => c.id === activeClip.clipId);
-    if (!info) return null;
-    const baseScale = Math.min(canvas.width / info.width, canvas.height / info.height);
-    const w = info.width * baseScale * activeClip.zoom.scale;
-    const h = info.height * baseScale * activeClip.zoom.scale;
-    const f = activeClip.filters;
-    const cssFilter =
-      [
-        f.brightness !== 0 ? `brightness(${1 + f.brightness})` : "",
-        f.contrast !== 1 ? `contrast(${f.contrast})` : "",
-        f.saturation !== 1 ? `saturate(${f.saturation})` : "",
-        f.hue !== 0 ? `hue-rotate(${f.hue}deg)` : "",
-        f.grayscale !== 0 ? `grayscale(${f.grayscale})` : "",
-      ]
-        .filter(Boolean)
-        .join(" ") || undefined;
-    return {
-      width: w,
-      height: h,
-      left: activeClip.zoom.x * (canvas.width - w),
-      top: activeClip.zoom.y * (canvas.height - h),
-      filter: cssFilter,
-    };
-  }, [activeClip, clips, canvas]);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 bg-canvas">
@@ -167,63 +252,30 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               />
             </div>
           )}
-          {/* Estructura SIEMPRE idéntica (wrapper + <video>), tenga crop o no y
-              haya clip o no: así el nodo <video> nunca se remonta al aplicar/quitar
-              recorte ni al cruzar huecos, evitando que pierda src/currentTime y se
-              funda a negro. El recorte se aplica reposicionando el <video> dentro
-              del wrapper, sin recargar. */}
-          {(() => {
-            const crop = activeClip?.crop ?? FULL_FRAME;
-            const zoom = activeClip?.zoom;
-            const visible = videoStyle && !inGap ? "visible" : "hidden";
-            // Posición del rect VISIBLE (frame con su recorte): zoom·(lienzo −
-            // tamaño visible). El <video> dentro del wrapper se desplaza por el
-            // origen del recorte. Coincide con renderRect del export.
-            const vW = videoStyle ? videoStyle.width * crop.w : 0;
-            const vH = videoStyle ? videoStyle.height * crop.h : 0;
-            const wrapperStyle: CSSProperties = videoStyle
-              ? {
-                  position: "absolute",
-                  left: (zoom?.x ?? 0) * (canvas.width - vW),
-                  top: (zoom?.y ?? 0) * (canvas.height - vH),
-                  width: vW,
-                  height: vH,
-                  overflow: "hidden",
-                  visibility: visible,
-                }
-              : { position: "absolute", inset: 0, overflow: "hidden", visibility: "hidden" };
-            const innerStyle: CSSProperties = videoStyle
-              ? {
-                  width: videoStyle.width,
-                  height: videoStyle.height,
-                  left: -videoStyle.width * crop.x,
-                  top: -videoStyle.height * crop.y,
-                  filter: videoStyle.filter,
-                }
-              : { inset: 0, width: "100%", height: "100%" };
-            return (
-              <div style={wrapperStyle}>
-                <video
-                  ref={videoRef}
-                  preload="auto"
-                  // max-w-none: el preflight de Tailwind capa los <video> a
-                  // max-width 100% y rompería el zoom al desbordar el lienzo
-                  className="absolute max-w-none"
-                  style={innerStyle}
-                />
-              </div>
-            );
-          })()}
+          {/* Una TrackVideo por pista en z-order ascendente. La pista base (i=0)
+              conserva videoRef; las superiores se registran en el motor para sync. */}
+          {videoTracks.map((track, i) => (
+            <TrackVideo
+              key={track.id}
+              track={track}
+              canvas={canvas}
+              inGap={inGap}
+              isBase={i === 0}
+              videoRef={i === 0 ? videoRef : undefined}
+              register={i === 0 ? undefined : registerOverlayVideo}
+              zIndex={i}
+            />
+          ))}
           {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
           <div
             aria-hidden="true"
             className="absolute inset-0 pointer-events-none rounded-sm"
-            style={{ boxShadow: "0 0 0 600px rgba(10, 10, 12, 0.85)" }}
+            style={{ boxShadow: "0 0 0 600px rgba(10, 10, 12, 0.85)", zIndex: 100 }}
           />
           {canvas.width > 0 && children?.(canvas)}
         </div>
 
-        {videoTrack.length === 0 && (
+        {baseTrackClips.length === 0 && (
           <div className="absolute inset-0 grid place-items-center p-6 pointer-events-none">
             <div className="max-w-xs text-center flex flex-col items-center gap-3 text-muted">
               <Clapperboard size={40} strokeWidth={1.5} aria-hidden="true" className="text-accent-soft" />

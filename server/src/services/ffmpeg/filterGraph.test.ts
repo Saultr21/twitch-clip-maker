@@ -1,12 +1,33 @@
 import { describe, expect, it } from "vitest";
-import type { ClipInfo } from "@clipforge/shared";
+import type { ClipInfo, ImageLayer, ImageOverlay, Project, TextLayer, TextOverlay, VideoLayer } from "@clipforge/shared";
 import {
   createEmptyProject,
+  createImageLayer,
   createImageOverlay,
+  createTextLayer,
   createTextOverlay,
   createVideoClip,
+  videoLayers,
 } from "@clipforge/shared";
 import { buildFilterGraph } from "./filterGraph.js";
+
+// Helpers para construir proyectos de prueba con el nuevo modelo de capas
+
+function addText(p: Project, overlay: TextOverlay): void {
+  let layer = p.tracks.layers.find((l): l is TextLayer => l.kind === "text");
+  if (!layer) { layer = createTextLayer(); p.tracks.layers.push(layer); }
+  layer.items.push(overlay);
+}
+
+function addImage(p: Project, overlay: ImageOverlay): void {
+  let layer = p.tracks.layers.find((l): l is ImageLayer => l.kind === "image");
+  if (!layer) { layer = createImageLayer(); p.tracks.layers.push(layer); }
+  layer.items.push(overlay);
+}
+
+function addVideoLayer(p: Project, track: Omit<VideoLayer, "kind">): void {
+  p.tracks.layers.push({ kind: "video", ...track });
+}
 
 const info: ClipInfo = {
   id: "clip-1",
@@ -21,7 +42,7 @@ const info: ClipInfo = {
 
 function projectWithClip() {
   const p = createEmptyProject("demo");
-  p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7 });
+  videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7 });
   return p;
 }
 
@@ -43,7 +64,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("hueco inicial entre t=0 y el primer clip: segmento negro con silencio", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4 });
+    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("color=black:s=1080x1920:d=3:r=30[seg0]");
     expect(g.filterComplex).toContain("anullsrc=r=44100:cl=stereo,atrim=duration=3[sega0]");
@@ -53,7 +74,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("un overlay que termina después del último clip añade cola en negro", () => {
     const p = projectWithClip(); // clip en [0,5)
-    p.tracks.text.push({ ...createTextOverlay(4), end: 8 });
+    addText(p, { ...createTextOverlay(4), end: 8 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("color=black:s=1080x1920:d=3:r=30[seg1]");
     expect(g.filterComplex).toContain("concat=n=2:v=1:a=1");
@@ -62,7 +83,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("dos clips contiguos: dos segmentos y n=2", () => {
     const p = projectWithClip(); // ocupa [0,5)
-    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2 });
+    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.inputs).toHaveLength(2);
     expect(g.filterComplex).toContain("[1:v]trim=start=0:end=2");
@@ -120,7 +141,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("la velocidad ajusta setpts, atempo y la duración del segmento", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
+    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("setpts=(PTS-STARTPTS)/2");
     expect(g.filterComplex).toContain("atempo=2");
@@ -130,7 +151,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("los filtros de color generan eq y hue tras el scale", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video[0].clips.push({
+    videoLayers(p)[0].clips.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0.2, contrast: 1.3, saturation: 1.5, hue: 30, grayscale: 0 },
@@ -142,7 +163,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("el blanco y negro reduce la saturación efectiva", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video[0].clips.push({
+    videoLayers(p)[0].clips.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0, contrast: 1, saturation: 2, hue: 0, grayscale: 0.5 },
@@ -174,7 +195,7 @@ describe("buildFilterGraph — vídeo", () => {
 describe("buildFilterGraph — overlays", () => {
   it("imagen: input extra, escala+alpha, overlay con enable y eof_action", () => {
     const p = projectWithClip();
-    p.tracks.image.push({
+    addImage(p, {
       ...createImageOverlay("a1", "a1.png", 1, 0.3, 0.2),
       x: 0.5,
       y: 0.5,
@@ -192,14 +213,14 @@ describe("buildFilterGraph — overlays", () => {
 
   it("imagen con rotación añade rotate con lienzo transparente", () => {
     const p = projectWithClip();
-    p.tracks.image.push({ ...createImageOverlay("a1", "a1.png", 0, 0.3, 0.2), rotation: 45 });
+    addImage(p, { ...createImageOverlay("a1", "a1.png", 0, 0.3, 0.2), rotation: 45 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("rotate=45*PI/180:c=none:ow=rotw(45*PI/180):oh=roth(45*PI/180)");
   });
 
   it("texto: drawtext encadenado tras el concat", () => {
     const p = projectWithClip();
-    p.tracks.text.push({ ...createTextOverlay(1), content: "Hola" });
+    addText(p, { ...createTextOverlay(1), content: "Hola" });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("drawtext=");
     expect(g.filterComplex).toContain("text='Hola'");
@@ -208,7 +229,7 @@ describe("buildFilterGraph — overlays", () => {
 
   it("un texto rotado se renderiza en capa transparente, se rota y se superpone", () => {
     const p = projectWithClip();
-    p.tracks.text.push({ ...createTextOverlay(1), content: "Giro", rotation: 30, x: 0.5, y: 0.25, end: 4 });
+    addText(p, { ...createTextOverlay(1), content: "Giro", rotation: 30, x: 0.5, y: 0.25, end: 4 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("color=c=0x00000000:s=1080x1920");
     expect(g.filterComplex).toContain("rotate=30*PI/180:c=none:ow=rotw(30*PI/180):oh=roth(30*PI/180)");
@@ -219,7 +240,7 @@ describe("buildFilterGraph — overlays", () => {
 
   it("un texto sin rotación sigue usando drawtext directo", () => {
     const p = projectWithClip();
-    p.tracks.text.push({ ...createTextOverlay(1), content: "Plano" });
+    addText(p, { ...createTextOverlay(1), content: "Plano" });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("drawtext=");
     expect(g.filterComplex).not.toContain("rotate=");
@@ -249,7 +270,7 @@ describe("buildFilterGraph — multipista (vídeo)", () => {
   it("una pista superior composita un overlay de vídeo con opacidad y ventana de tiempo", () => {
     const p = projectWithClip(); // base: clip-1 en [0,5)
     // pista superior con un facecam en [1, 4) (3s), opacidad 0.8
-    p.tracks.video.push({
+    addVideoLayer(p, {
       id: "t2", name: "", clips: [
         { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 0.8, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
       ],
@@ -269,12 +290,12 @@ describe("buildFilterGraph — multipista (vídeo)", () => {
 
   it("capa de vídeo + imagen overlay: etiquetas distintas, sin colisión", () => {
     const p = projectWithClip();
-    p.tracks.video.push({
+    addVideoLayer(p, {
       id: "t2", name: "", clips: [
         { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 1, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
       ],
     });
-    p.tracks.image.push(createImageOverlay("img-1", "logo.png", 0, 0.2, 0.2));
+    addImage(p, createImageOverlay("img-1", "logo.png", 0, 0.2, 0.2));
     const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));
     // la capa de vídeo produce [vlay0] y la imagen se composita ENCIMA de ella ([ov0])
     expect(g.filterComplex).toContain("[vlay0][img0]overlay=");
@@ -291,7 +312,7 @@ describe("buildFilterGraph — multipista (vídeo)", () => {
 describe("buildFilterGraph — multipista (audio)", () => {
   function twoTrackProject() {
     const p = projectWithClip(); // base clip-1 en [0,5)
-    p.tracks.video.push({
+    addVideoLayer(p, {
       id: "t2", name: "", clips: [
         { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 1, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
       ],
@@ -371,7 +392,7 @@ describe("buildFilterGraph — música", () => {
   it("transición entre clips: fade a negro en los límites (out del 1.º, in del 2.º)", () => {
     const p = createEmptyProject("demo");
     p.settings.clipTransition = 0.5;
-    p.tracks.video[0].clips.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
+    videoLayers(p)[0].clips.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // clip 0 (dur 4): solo fade-out al final
     expect(g.filterComplex).toContain("[seg0]fade=t=out:st=3.5:d=0.5[segt0]");

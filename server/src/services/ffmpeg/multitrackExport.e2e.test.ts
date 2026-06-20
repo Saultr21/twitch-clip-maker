@@ -22,7 +22,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { execa } from "execa";
-import { createEmptyProject, createVideoClip, type ClipInfo } from "@clipforge/shared";
+import { createEmptyProject, createVideoClip, videoLayers, type ClipInfo } from "@clipforge/shared";
 import { buildFilterGraph } from "./filterGraph.js";
 import { ffmpegBin, ffprobeBin } from "../binaries.js";
 
@@ -70,12 +70,13 @@ describe("export multipista e2e", () => {
       project.settings.height = 640;
       project.settings.fps = 30;
 
-      project.tracks.video[0].clips.push({
+      videoLayers(project)[0].clips.push({
         ...createVideoClip("ca", 0, 5),
         trimIn: 0,
         trimOut: 5,
       });
-      project.tracks.video.push({
+      project.tracks.layers.push({
+        kind: "video",
         id: "t2",
         name: "facecam",
         clips: [

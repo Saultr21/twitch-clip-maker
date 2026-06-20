@@ -1,32 +1,70 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, CropRect, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip, VideoTrack } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, CropRect, ImageLayer, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextLayer, TextOverlay, VideoClip, VideoLayer } from "@clipforge/shared";
 import {
   allVideoClips,
   createAudioTrack,
   createEmptyProject,
+  createImageLayer,
   createImageOverlay,
+  createTextLayer,
   createTextOverlay,
   createVideoClip,
-  createVideoTrack,
+  createVideoLayer,
+  imageItems,
+  textItems,
 } from "@clipforge/shared";
 import { clipDuration, clipEnd, hasOverlap, splitVideoClip, videoClipAt } from "../lib/timeline";
 import { cueEnd, cueStart, redistributeWordTimes, scaleCueWords, shiftCueWords } from "../lib/subtitles";
 import { useUiStore } from "./uiStore";
 
-/** Localiza un clip de vídeo por id en cualquier pista. */
-function findClipCtx(d: Project, id: string): { track: VideoTrack; clip: VideoClip; index: number } | null {
-  for (const track of d.tracks.video) {
-    const index = track.clips.findIndex((c) => c.id === id);
-    if (index !== -1) return { track, clip: track.clips[index], index };
+// ── Helpers internos sobre layers ──────────────────────────────────────────
+
+/** Primera capa de vídeo (base). La crea si no hay ninguna. */
+function baseVideoLayer(d: Project): VideoLayer {
+  let base = d.tracks.layers.find((l): l is VideoLayer => l.kind === "video");
+  if (!base) { base = createVideoLayer(); d.tracks.layers.unshift(base); }
+  return base;
+}
+
+function findClipCtx(d: Project, id: string): { layer: VideoLayer; clip: VideoClip; index: number } | null {
+  for (const l of d.tracks.layers) {
+    if (l.kind !== "video") continue;
+    const index = l.clips.findIndex((c) => c.id === id);
+    if (index !== -1) return { layer: l, clip: l.clips[index], index };
   }
   return null;
 }
 
-/** Pista base (índice 0). Garantizada por createEmptyProject/migrateProject. */
-function baseTrack(d: Project): VideoTrack {
-  if (d.tracks.video.length === 0) d.tracks.video.push(createVideoTrack());
-  return d.tracks.video[0];
+/** Capa de imagen donde añadir (la primera; crea una si no hay). */
+function imageLayerFor(d: Project): ImageLayer {
+  let l = d.tracks.layers.find((x): x is ImageLayer => x.kind === "image");
+  if (!l) { l = createImageLayer(); d.tracks.layers.push(l); }
+  return l;
+}
+
+function textLayerFor(d: Project): TextLayer {
+  let l = d.tracks.layers.find((x): x is TextLayer => x.kind === "text");
+  if (!l) { l = createTextLayer(); d.tracks.layers.push(l); }
+  return l;
+}
+
+function findImage(d: Project, id: string): { layer: ImageLayer; item: ImageOverlay; index: number } | null {
+  for (const l of d.tracks.layers) {
+    if (l.kind !== "image") continue;
+    const index = l.items.findIndex((i) => i.id === id);
+    if (index !== -1) return { layer: l, item: l.items[index], index };
+  }
+  return null;
+}
+
+function findText(d: Project, id: string): { layer: TextLayer; item: TextOverlay; index: number } | null {
+  for (const l of d.tracks.layers) {
+    if (l.kind !== "text") continue;
+    const index = l.items.findIndex((i) => i.id === id);
+    if (index !== -1) return { layer: l, item: l.items[index], index };
+  }
+  return null;
 }
 
 // Tras undo/redo el elemento seleccionado puede haber dejado de existir;
@@ -42,8 +80,18 @@ function pruneSelection(project: Project): void {
     if (!allVideoClips(project).some((c) => c.id === sel.id)) useUiStore.getState().select(null);
     return;
   }
-  const track = project.tracks[sel.kind as "text" | "image" | "audio"] as Array<{ id: string }>;
-  if (!track.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
+  if (sel.kind === "image") {
+    if (!imageItems(project).some((x) => x.id === sel.id)) useUiStore.getState().select(null);
+    return;
+  }
+  if (sel.kind === "text") {
+    if (!textItems(project).some((x) => x.id === sel.id)) useUiStore.getState().select(null);
+    return;
+  }
+  if (sel.kind === "audio") {
+    if (!project.tracks.audio.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
+    return;
+  }
 }
 
 const HISTORY_LIMIT = 100;
@@ -185,99 +233,121 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }),
 
     addVideoTrack: (position = "top") => {
-      const track = createVideoTrack();
+      const layer = createVideoLayer();
       mutate((d) => {
-        if (position === "bottom") d.tracks.video.unshift(track);
-        else d.tracks.video.push(track);
+        // Las capas de vídeo se insertan respecto a las capas de vídeo existentes.
+        // "bottom" = nueva pista base (unshift en el array total antes del primer vídeo)
+        // "top" = pista superior (push, antes de imagen/texto si los hay)
+        if (position === "bottom") {
+          // Insertar al principio del array (será la nueva pista base)
+          d.tracks.layers.unshift(layer);
+        } else {
+          // Insertar después de la última capa de vídeo (antes de imagen/texto)
+          const lastVideoIdx = d.tracks.layers.reduce((acc, l, i) => l.kind === "video" ? i : acc, -1);
+          if (lastVideoIdx === -1) {
+            d.tracks.layers.unshift(layer);
+          } else {
+            d.tracks.layers.splice(lastVideoIdx + 1, 0, layer);
+          }
+        }
       });
-      return track.id;
+      return layer.id;
     },
 
     reorderVideoTrack: (fromIndex, toIndex) =>
       mutate((d) => {
-        const n = d.tracks.video.length;
+        const videoLayers = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
+        const n = videoLayers.length;
         if (fromIndex < 0 || fromIndex >= n) return;
         const to = Math.max(0, Math.min(n - 1, toIndex));
-        const [moved] = d.tracks.video.splice(fromIndex, 1);
-        d.tracks.video.splice(to, 0, moved);
+        // Reordenar dentro del array total localizando por ids
+        const fromId = videoLayers[fromIndex].id;
+        const toId = videoLayers[to].id;
+        const fromLayerIdx = d.tracks.layers.findIndex((l) => l.id === fromId);
+        const toLayerIdx = d.tracks.layers.findIndex((l) => l.id === toId);
+        if (fromLayerIdx === -1 || toLayerIdx === -1) return;
+        const [moved] = d.tracks.layers.splice(fromLayerIdx, 1);
+        const insertAt = d.tracks.layers.findIndex((l) => l.id === toId);
+        d.tracks.layers.splice(insertAt >= 0 ? insertAt : toLayerIdx, 0, moved);
       }),
 
     removeVideoTrack: (trackId) =>
       mutate((d) => {
-        if (d.tracks.video.length <= 1) return; // nunca dejar 0 pistas
-        // Si se borra la pista base (índice 0), la siguiente pasa a ser base.
-        // La UI (Fase 4) puede decidir bloquear/confirmar borrar la base.
-        const idx = d.tracks.video.findIndex((t) => t.id === trackId);
-        if (idx !== -1) d.tracks.video.splice(idx, 1);
+        const videoLayersArr = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
+        if (videoLayersArr.length <= 1) return; // nunca dejar 0 capas de vídeo
+        const idx = d.tracks.layers.findIndex((l) => l.id === trackId);
+        if (idx !== -1) d.tracks.layers.splice(idx, 1);
       }),
 
     moveClipToTrack: (clipId, destTrackId, newStart, opts) =>
       mutate((d) => {
         const ctx = findClipCtx(d, clipId);
-        const dest = d.tracks.video.find((t) => t.id === destTrackId);
+        const dest = d.tracks.layers.find((l): l is VideoLayer => l.kind === "video" && l.id === destTrackId);
         if (!ctx || !dest) return;
         const start = Math.max(0, newStart);
-        // no-solape en la pista destino (excluye el propio clip si ya estuviera ahí)
+        // no-solape en la capa destino (excluye el propio clip si ya estuviera ahí)
         if (hasOverlap(dest.clips, start, clipDuration(ctx.clip), clipId)) return;
-        // saca el clip de su pista actual (sigue ordenada tras el splice) y lo
-        // inserta en destino, reordenando solo destino por timelineStart
-        ctx.track.clips.splice(ctx.index, 1);
+        // saca el clip de su capa actual y lo inserta en destino
+        ctx.layer.clips.splice(ctx.index, 1);
         dest.clips.push({ ...ctx.clip, timelineStart: start });
         dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);
       }, opts),
 
     addVideoClip: (clip) =>
       mutate((d) => {
-        const track = baseTrack(d);
-        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
-        track.clips.push(createVideoClip(clip.id, lastEnd, clip.duration));
+        const layer = baseVideoLayer(d);
+        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
+        layer.clips.push(createVideoClip(clip.id, lastEnd, clip.duration));
       }),
 
     // suelta el clip en el instante indicado si el hueco está libre; si pisa otro
-    // bloque, cae al final de la secuencia (evita solapes en la pista de vídeo)
+    // bloque, cae al final de la secuencia (evita solapes en la capa de vídeo)
     addVideoClipAt: (clip, start) =>
       mutate((d) => {
-        const track = baseTrack(d);
+        const layer = baseVideoLayer(d);
         const dur = clip.duration;
         const desired = Math.max(0, start);
-        const overlaps = track.clips.some(
+        const overlaps = layer.clips.some(
           (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
         );
-        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
-        track.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
+        layer.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
       }),
 
     addVideoClipToTrack: (clip, trackId, start) =>
       mutate((d) => {
-        const idx = d.tracks.video.findIndex((t) => t.id === trackId);
-        if (idx === -1) return;
-        const track = d.tracks.video[idx];
+        const layerIdx = d.tracks.layers.findIndex((l) => l.kind === "video" && l.id === trackId);
+        if (layerIdx === -1) return;
+        const layer = d.tracks.layers[layerIdx] as VideoLayer;
         const dur = clip.duration;
         const desired = Math.max(0, start);
-        const overlaps = track.clips.some(
+        const overlaps = layer.clips.some(
           (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
         );
-        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
+        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
         const newClip = createVideoClip(clip.id, overlaps ? lastEnd : desired, dur);
-        // En pistas superiores (no base) el clip entra como PiP: a media escala y
+        // En capas superiores (no base, índice 0) el clip entra como PiP: a media escala y
         // centrado, así hay margen para moverlo y no tapa el vídeo de base. La base
-        // (índice 0) mantiene el frame completo (scale 1).
-        if (idx !== 0) newClip.zoom = { x: 0.5, y: 0.5, scale: 0.5 };
-        track.clips.push(newClip);
-        track.clips.sort((a, b) => a.timelineStart - b.timelineStart);
+        // mantiene el frame completo (scale 1).
+        const videoLayersArr = d.tracks.layers.filter((l) => l.kind === "video");
+        const videoLayerIndex = videoLayersArr.findIndex((l) => l.id === trackId);
+        if (videoLayerIndex !== 0) newClip.zoom = { x: 0.5, y: 0.5, scale: 0.5 };
+        layer.clips.push(newClip);
+        layer.clips.sort((a, b) => a.timelineStart - b.timelineStart);
       }),
 
     // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente
     removeVideoClipsBySource: (clipId) =>
       mutate((d) => {
-        for (const track of d.tracks.video) {
-          track.clips = track.clips.filter((v) => v.clipId !== clipId);
+        for (const l of d.tracks.layers) {
+          if (l.kind !== "video") continue;
+          l.clips = l.clips.filter((v) => v.clipId !== clipId);
         }
       }),
 
     // parte el clip en sus tramos con voz (quita los silencios) y los deja
     // pegados desde su inicio; los bloques de vídeo posteriores se desplazan a
-    // la izquierda lo recortado (ripple en la pista de vídeo)
+    // la izquierda lo recortado (ripple en la capa de vídeo)
     removeSilencesFromClip: (id, silences) => {
       let firstPieceId: string | null = null;
       mutate((d) => {
@@ -306,9 +376,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         });
         firstPieceId = pieces[0].id;
         const removed = (c.trimOut - c.trimIn) / c.speed - (start - c.timelineStart);
-        // TODO(fase2): el ripple solo desplaza la pista del clip (ctx.track); en
-        // multipista habrá que decidir si arrastra también las otras pistas
-        ctx.track.clips = ctx.track.clips
+        // TODO(fase2): el ripple solo desplaza la capa del clip (ctx.layer); en
+        // multipista habrá que decidir si arrastra también las otras capas
+        ctx.layer.clips = ctx.layer.clips
           .flatMap((v) => {
             if (v.id === id) return pieces;
             // ripple: los clips que iban después se adelantan lo recortado
@@ -348,7 +418,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           return piece;
         });
         firstPieceId = pieces[0].id;
-        ctx.track.clips = ctx.track.clips
+        ctx.layer.clips = ctx.layer.clips
           .flatMap((v) => (v.id === id ? pieces : [v]))
           .sort((a, b) => a.timelineStart - b.timelineStart);
       });
@@ -362,7 +432,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const ctx = findClipCtx(d, id);
         if (!ctx) return;
         const start = Math.max(0, newStart);
-        if (hasOverlap(ctx.track.clips, start, clipDuration(ctx.clip), id)) return;
+        if (hasOverlap(ctx.layer.clips, start, clipDuration(ctx.clip), id)) return;
         ctx.clip.timelineStart = start;
       }, opts),
 
@@ -392,44 +462,44 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     splitVideoAt: (t) =>
       mutate((d) => {
-        // TODO(fase2): parte solo en la pista base; en multipista habrá que
-        // partir el clip activo de cada pista (o el de la pista seleccionada)
-        const track = baseTrack(d);
-        const c = videoClipAt(track.clips, t);
+        // TODO(fase2): parte solo en la capa base; en multipista habrá que
+        // partir el clip activo de cada capa (o el de la capa seleccionada)
+        const layer = baseVideoLayer(d);
+        const c = videoClipAt(layer.clips, t);
         if (!c || t <= c.timelineStart || t >= clipEnd(c)) return;
         const [left, right] = splitVideoClip(c, t);
-        const idx = track.clips.findIndex((v) => v.id === c.id);
-        track.clips.splice(idx, 1, left, right);
+        const idx = layer.clips.findIndex((v) => v.id === c.id);
+        layer.clips.splice(idx, 1, left, right);
       }),
 
     addText: (start) => {
       const overlay = createTextOverlay(start);
-      mutate((d) => void d.tracks.text.push(overlay));
+      mutate((d) => void textLayerFor(d).items.push(overlay));
       return overlay.id;
     },
 
     addImage: (assetId, fileName, start, w, h) => {
       const overlay = createImageOverlay(assetId, fileName, start, w, h);
-      mutate((d) => void d.tracks.image.push(overlay));
+      mutate((d) => void imageLayerFor(d).items.push(overlay));
       return overlay.id;
     },
 
     updateText: (id, patch, opts) =>
       mutate((d) => {
-        const o = d.tracks.text.find((t) => t.id === id);
-        if (o) Object.assign(o, patch);
+        const ctx = findText(d, id);
+        if (ctx) Object.assign(ctx.item, patch);
       }, opts),
 
     updateImage: (id, patch, opts) =>
       mutate((d) => {
-        const o = d.tracks.image.find((i) => i.id === id);
-        if (o) Object.assign(o, patch);
+        const ctx = findImage(d, id);
+        if (ctx) Object.assign(ctx.item, patch);
       }, opts),
 
     setImageCrop: (id, crop) =>
       mutate((d) => {
-        const img = d.tracks.image.find((i) => i.id === id);
-        if (img) img.crop = crop;
+        const ctx = findImage(d, id);
+        if (ctx) ctx.item.crop = crop;
       }),
 
     setVideoCrop: (id, crop) =>
@@ -467,7 +537,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     moveOverlay: (kind, id, newStart, opts) =>
       mutate((d) => {
-        const o = (d.tracks[kind] as Array<{ id: string; start: number; end: number }>).find((x) => x.id === id);
+        let o: { id: string; start: number; end: number } | undefined;
+        if (kind === "audio") {
+          o = d.tracks.audio.find((x) => x.id === id);
+        } else if (kind === "image") {
+          o = findImage(d, id)?.item;
+        } else {
+          o = findText(d, id)?.item;
+        }
         if (!o) return;
         const dur = o.end - o.start;
         o.start = Math.max(0, newStart);
@@ -476,7 +553,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     trimOverlay: (kind, id, edge, t, opts) =>
       mutate((d) => {
-        const o = d.tracks[kind].find((x) => x.id === id);
+        let o: { id: string; start: number; end: number } | undefined;
+        if (kind === "image") {
+          o = findImage(d, id)?.item;
+        } else {
+          o = findText(d, id)?.item;
+        }
         if (!o) return;
         if (edge === "start") o.start = Math.min(Math.max(0, t), o.end - MIN_CLIP_DURATION);
         else o.end = Math.max(o.start + MIN_CLIP_DURATION, t);
@@ -490,12 +572,23 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         }
         if (kind === "video") {
           const ctx = findClipCtx(d, id);
-          if (ctx) ctx.track.clips.splice(ctx.index, 1);
+          if (ctx) ctx.layer.clips.splice(ctx.index, 1);
           return;
         }
-        const track = d.tracks[kind as "text" | "image" | "audio"] as Array<{ id: string }>;
-        const idx = track.findIndex((x) => x.id === id);
-        if (idx !== -1) track.splice(idx, 1);
+        if (kind === "image") {
+          const ctx = findImage(d, id);
+          if (ctx) ctx.layer.items.splice(ctx.index, 1);
+          return;
+        }
+        if (kind === "text") {
+          const ctx = findText(d, id);
+          if (ctx) ctx.layer.items.splice(ctx.index, 1);
+          return;
+        }
+        if (kind === "audio") {
+          const idx = d.tracks.audio.findIndex((x) => x.id === id);
+          if (idx !== -1) d.tracks.audio.splice(idx, 1);
+        }
       }),
 
     setSubtitleCues: (cues) => mutate((d) => void (d.subtitles.cues = cues)),
@@ -551,9 +644,19 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     applyPreset: (preset) =>
       mutate((d) => {
         d.settings = { ...preset.settings };
+        // Elimina las capas de imagen y texto actuales, conserva las de vídeo
+        d.tracks.layers = d.tracks.layers.filter((l) => l.kind === "video");
         // ids regenerados: aplicar dos veces la misma plantilla no colisiona
-        d.tracks.text = preset.text.map((t) => ({ ...t, id: globalThis.crypto.randomUUID() }));
-        d.tracks.image = preset.image.map((i) => ({ ...i, id: globalThis.crypto.randomUUID() }));
+        if (preset.image.length > 0) {
+          d.tracks.layers.push(createImageLayer());
+          const imgLayer = d.tracks.layers[d.tracks.layers.length - 1] as ImageLayer;
+          imgLayer.items = preset.image.map((i) => ({ ...i, id: globalThis.crypto.randomUUID() }));
+        }
+        if (preset.text.length > 0) {
+          d.tracks.layers.push(createTextLayer());
+          const txtLayer = d.tracks.layers[d.tracks.layers.length - 1] as TextLayer;
+          txtLayer.items = preset.text.map((t) => ({ ...t, id: globalThis.crypto.randomUUID() }));
+        }
       }),
 
     setOriginalAudioVolume: (v) => mutate((d) => void (d.originalAudioVolume = v)),

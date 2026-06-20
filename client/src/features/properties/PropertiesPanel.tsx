@@ -1,6 +1,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import { Music, Scissors, Crop } from "lucide-react";
 import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
+import { allVideoClips, imageItems, textItems } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -199,9 +200,9 @@ function VideoProperties({ clipId }: { clipId: string }) {
   const applyReframe = useProjectStore((s) => s.applyReframe);
   const settings = useProjectStore((s) => s.project.settings);
   const clipInfos = useClipsStore((s) => s.clips);
-  // busca el clip en CUALQUIER pista (no solo la base): los clips de capas
+  // busca el clip en CUALQUIER capa (no solo la base): los clips de capas
   // superiores también deben mostrar sus propiedades
-  const clip = useProjectStore((s) => s.project.tracks.video.flatMap((t) => t.clips).find((c) => c.id === clipId));
+  const clip = useProjectStore((s) => allVideoClips(s.project).find((c) => c.id === clipId));
   const [silence, setSilence] = useState<SilenceState>("idle");
   const [reframe, setReframe] = useState<ReframeState>({ phase: "idle" });
   if (!clip) return null;
@@ -554,10 +555,10 @@ function SubtitleCueProperties({ cueId }: { cueId: string }) {
 export function PropertiesPanel() {
   const selection = useUiStore((s) => s.selection);
   const text = useProjectStore((s) =>
-    selection?.kind === "text" ? s.project.tracks.text.find((t) => t.id === selection.id) : undefined,
+    selection?.kind === "text" ? textItems(s.project).find((t) => t.id === selection.id) : undefined,
   );
   const image = useProjectStore((s) =>
-    selection?.kind === "image" ? s.project.tracks.image.find((i) => i.id === selection.id) : undefined,
+    selection?.kind === "image" ? imageItems(s.project).find((i) => i.id === selection.id) : undefined,
   );
 
   return (

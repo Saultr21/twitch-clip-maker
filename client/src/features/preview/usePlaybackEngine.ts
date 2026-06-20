@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, type RefObject } from "react";
+import { videoLayers } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { usePlayerStore } from "../../stores/playerStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -26,7 +27,7 @@ export function usePlaybackEngine(
       const project = useProjectStore.getState().project;
       const clips = useClipsStore.getState().clips;
       const volume = usePlayerStore.getState().volume;
-      for (const track of project.tracks.video.slice(1)) {
+      for (const track of videoLayers(project).slice(1)) {
         const el = map.get(track.id);
         if (!el) continue;
         const active = videoClipAt(track.clips, playhead);
@@ -57,7 +58,7 @@ export function usePlaybackEngine(
       const { playhead, playing } = useUiStore.getState();
       const project = useProjectStore.getState().project;
       const clips = useClipsStore.getState().clips;
-      const active = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead);
+      const active = videoClipAt(videoLayers(project)[0]?.clips ?? [], playhead);
 
       if (!active) {
         video.pause();
@@ -113,7 +114,7 @@ export function usePlaybackEngine(
           useUiStore.getState().setPlayhead(total);
           return;
         }
-        const active = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead);
+        const active = videoClipAt(videoLayers(project)[0]?.clips ?? [], playhead);
         const video = videoRef.current;
         if (active && video) {
           if (video.currentTime >= active.trimOut) {
@@ -163,7 +164,7 @@ export function usePlaybackEngine(
   /** True si el playhead está en un hueco (sin clip de vídeo activo). */
   const inGap = useUiStore((s) => {
     const project = useProjectStore.getState().project;
-    return videoClipAt(project.tracks.video[0]?.clips ?? [], s.playhead) === null;
+    return videoClipAt(videoLayers(project)[0]?.clips ?? [], s.playhead) === null;
   });
 
   return { seek, togglePlay, inGap };

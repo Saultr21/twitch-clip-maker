@@ -3,7 +3,8 @@ import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import { SubtitlesLayer } from "./SubtitlesLayer";
 import { CropOverlay } from "./CropOverlay";
-import type { ImageOverlay, TextOverlay, VideoClip, VideoTrack } from "@clipforge/shared";
+import type { ImageOverlay, TextOverlay, VideoClip, VideoLayer } from "@clipforge/shared";
+import { imageItems, textItems, videoLayers } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -257,8 +258,8 @@ function VideoFrameNode({ clip, width, height, onGuides, cropMode }: {
   // Lee el clip fresco del store (evita stale closure en gestos)
   const clipNow = (): VideoClip | undefined => {
     const project = useProjectStore.getState().project;
-    for (const track of project.tracks.video) {
-      const found = track.clips.find((c) => c.id === clip.id);
+    for (const layer of videoLayers(project)) {
+      const found = layer.clips.find((c) => c.id === clip.id);
       if (found) return found;
     }
     return undefined;
@@ -362,9 +363,9 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const selection = useUiStore((s) => s.selection);
   const select = useUiStore((s) => s.select);
   const cropMode = useUiStore((s) => s.cropMode);
-  const texts = useProjectStore((s) => s.project.tracks.text);
-  const images = useProjectStore((s) => s.project.tracks.image);
-  const videoTracks = useProjectStore((s) => s.project.tracks.video);
+  const texts = useProjectStore((s) => textItems(s.project));
+  const images = useProjectStore((s) => imageItems(s.project));
+  const videoTracks = useProjectStore((s) => videoLayers(s.project));
   // Guías de centrado: visibles solo mientras un arrastre engancha al centro
   const [guides, setGuides] = useState({ vertical: false, horizontal: false });
   const onGuides: GuidesCallback = (vertical, horizontal) =>
@@ -375,13 +376,13 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const visibleTexts = texts.filter((t) => playhead >= t.start && playhead < t.end);
   const visibleImages = images.filter((i) => playhead >= i.start && playhead < i.end);
 
-  // Clips activos por pista (una entrada por pista que tiene clip en el playhead)
-  const activeClipsByTrack: Array<{ track: VideoTrack; clip: VideoClip }> = videoTracks
+  // Clips activos por capa (una entrada por capa que tiene clip en el playhead)
+  const activeClipsByTrack: Array<{ track: VideoLayer; clip: VideoClip }> = videoTracks
     .map((track) => {
       const active = videoClipAt(track.clips, playhead);
       return active ? { track, clip: active } : null;
     })
-    .filter((x): x is { track: VideoTrack; clip: VideoClip } => x !== null);
+    .filter((x): x is { track: VideoLayer; clip: VideoClip } => x !== null);
 
   return (
     <Stage

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
-import { ASPECT_PRESETS, type VideoTrack } from "@clipforge/shared";
+import { ASPECT_PRESETS, videoLayers, type VideoLayer } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -40,8 +40,8 @@ function clipCssFilter(f: {
 }
 
 /**
- * Un <video> por pista, siempre montado (nunca se remonta al cambiar clip/crop).
- * La pista base (isBase=true) usa videoRef; las capas se registran en el motor
+ * Un <video> por capa, siempre montado (nunca se remonta al cambiar clip/crop).
+ * La capa base (isBase=true) usa videoRef; las capas se registran en el motor
  * vía registerOverlayVideo para que las sincronice.
  */
 function TrackVideo({
@@ -52,7 +52,7 @@ function TrackVideo({
   register,
   zIndex,
 }: {
-  track: VideoTrack;
+  track: VideoLayer;
   canvas: { width: number; height: number };
   isBase: boolean;
   videoRef?: RefObject<HTMLVideoElement | null>;
@@ -149,8 +149,8 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
   const select = useUiStore((s) => s.select);
-  const videoTracks = useProjectStore((s) => s.project.tracks.video);
-  // Para la comprobación "sin clips" del estado vacío, miramos la pista base
+  const videoTracks = useProjectStore((s) => videoLayers(s.project));
+  // Para la comprobación "sin clips" del estado vacío, miramos la capa base
   const baseTrackClips = videoTracks[0]?.clips ?? [];
   const background = settings.background;
   const containerRef = useRef<HTMLDivElement>(null);

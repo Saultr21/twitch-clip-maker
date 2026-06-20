@@ -1,5 +1,5 @@
 import type { Project, VideoClip } from "@clipforge/shared";
-import { allVideoClips } from "@clipforge/shared";
+import { allVideoClips, imageItems, textItems } from "@clipforge/shared";
 
 export function clipDuration(c: VideoClip): number {
   return (c.trimOut - c.trimIn) / c.speed;
@@ -12,8 +12,8 @@ export function clipEnd(c: VideoClip): number {
 export function projectDuration(p: Project): number {
   const ends = [
     ...allVideoClips(p).map(clipEnd),
-    ...p.tracks.text.map((t) => t.end),
-    ...p.tracks.image.map((i) => i.end),
+    ...textItems(p).map((t) => t.end),
+    ...imageItems(p).map((i) => i.end),
     ...p.tracks.audio.map((a) => a.end),
   ];
   return ends.length ? Math.max(...ends) : 0;
@@ -49,12 +49,10 @@ export function findSnapPoints(p: Project, excludeId?: string): number[] {
     points.add(c.timelineStart);
     points.add(clipEnd(c));
   }
-  for (const list of [p.tracks.text, p.tracks.image, p.tracks.audio]) {
-    for (const o of list) {
-      if (o.id === excludeId) continue;
-      points.add(o.start);
-      points.add(o.end);
-    }
+  for (const o of [...textItems(p), ...imageItems(p), ...p.tracks.audio]) {
+    if (o.id === excludeId) continue;
+    points.add(o.start);
+    points.add(o.end);
   }
   return [...points];
 }

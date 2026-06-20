@@ -6,6 +6,7 @@ import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { clampTransformBox, composeCrop } from "../../lib/cropBox";
 import type { CropRect } from "@clipforge/shared";
+import { allVideoClips, imageItems } from "@clipforge/shared";
 
 interface Bounds { left: number; top: number; w: number; h: number; }
 
@@ -70,10 +71,10 @@ const FULL: NonNullable<CropRect> = { x: 0, y: 0, w: 1, h: 1 };
 /** Recorte ya aplicado al elemento (normalizado, relativo al source), o FULL. */
 function getCurrentCrop(selection: { kind: string; id: string } | null): NonNullable<CropRect> {
   if (selection?.kind === "image") {
-    return useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id)?.crop ?? FULL;
+    return imageItems(useProjectStore.getState().project).find(i => i.id === selection.id)?.crop ?? FULL;
   }
   if (selection?.kind === "video") {
-    return useProjectStore.getState().project.tracks.video[0]?.clips.find(v => v.id === selection.id)?.crop ?? FULL;
+    return allVideoClips(useProjectStore.getState().project).find(v => v.id === selection.id)?.crop ?? FULL;
   }
   return FULL;
 }
@@ -94,7 +95,7 @@ function computeBounds(
   if (selection.kind === "image") {
     // La imagen recortada se estira para llenar su caja (crop nativo de Konva):
     // el rect visible es siempre la caja completa del overlay
-    const img = useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id);
+    const img = imageItems(useProjectStore.getState().project).find(i => i.id === selection.id);
     if (!img) return null;
     const w = img.width * canvasW;
     const h = img.height * canvasH;
@@ -104,7 +105,7 @@ function computeBounds(
   if (selection.kind === "video") {
     // El vídeo recortado se muestra MÁS pequeño (sub-rect del fotograma): el rect
     // visible parte de la colocación del frame completo y aplica el recorte actual
-    const clip = useProjectStore.getState().project.tracks.video[0]?.clips.find(c => c.id === selection.id);
+    const clip = allVideoClips(useProjectStore.getState().project).find(c => c.id === selection.id);
     if (!clip) return null;
     const info = useClipsStore.getState().clips.find(c => c.id === clip.clipId);
     if (!info) return null;

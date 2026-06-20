@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Crop, Scissors, Trash2 } from "lucide-react";
 import type { VideoClip } from "@clipforge/shared";
+import { imageItems, textItems, videoLayers } from "@clipforge/shared";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -100,8 +101,8 @@ export function Timeline({ height }: { height: number }) {
     widthPx: number;
     targetTrackId: string | null;
   } | null>(null);
-  // Clips de la pista base (Fase 1: única pista). Referencia estable vía EMPTY_CLIPS.
-  const baseClips = project.tracks.video[0]?.clips ?? EMPTY_CLIPS;
+  // Clips de la capa base (Fase 1: única pista). Referencia estable vía EMPTY_CLIPS.
+  const baseClips = videoLayers(project)[0]?.clips ?? EMPTY_CLIPS;
   const videoCount = baseClips.length;
   const prevVideoCount = useRef(videoCount);
   // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
@@ -118,7 +119,7 @@ export function Timeline({ height }: { height: number }) {
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
 
-  const textBlocks: BlockDescriptor[] = project.tracks.text.map((t) => ({
+  const textBlocks: BlockDescriptor[] = textItems(project).map((t) => ({
     id: t.id,
     kind: "text" as const,
     start: t.start,
@@ -127,7 +128,7 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-emerald-500/20 text-emerald-200",
   }));
 
-  const imageBlocks: BlockDescriptor[] = project.tracks.image.map((i) => ({
+  const imageBlocks: BlockDescriptor[] = imageItems(project).map((i) => ({
     id: i.id,
     kind: "image" as const,
     start: i.start,
@@ -155,7 +156,7 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-pink-500/20 text-pink-200",
   }));
 
-  const videoTracks = project.tracks.video;
+  const videoTracks = videoLayers(project);
   const blocksForTrack = (clipsOfTrack: VideoClip[]): BlockDescriptor[] =>
     clipsOfTrack.map((c) => {
       const info = clips.find((i) => i.id === c.clipId);

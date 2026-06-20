@@ -1,4 +1,5 @@
 import type { Background, ClipInfo, Project, VideoClip } from "@clipforge/shared";
+import { imageItems, textItems, videoLayers } from "@clipforge/shared";
 import { drawtextFilter, drawtextFilterCentered } from "./drawtext.js";
 import { renderRect } from "./geometry.js";
 import { atempoChain } from "./speed.js";
@@ -60,7 +61,7 @@ export function buildFilterGraph(
   assPath?: string,
 ): FilterGraph {
   const { width: W, height: H, fps, background: bg } = project.settings;
-  const clips = [...(project.tracks.video[0]?.clips ?? [])].sort((a, b) => a.timelineStart - b.timelineStart);
+  const clips = [...(videoLayers(project)[0]?.clips ?? [])].sort((a, b) => a.timelineStart - b.timelineStart);
   if (clips.length === 0) throw new Error("El proyecto no tiene clips de vídeo");
 
   const inputs: GraphInput[] = [];
@@ -175,8 +176,8 @@ export function buildFilterGraph(
   // Cola final: si un texto/imagen termina después del último clip, la preview
   // muestra negro con el overlay — el export añade el mismo tramo en negro
   const overlayEnds = [
-    ...project.tracks.text.map((t) => t.end),
-    ...project.tracks.image.map((i) => i.end),
+    ...textItems(project).map((t) => t.end),
+    ...imageItems(project).map((i) => i.end),
   ];
   const totalDuration = Math.max(cursor, ...(overlayEnds.length ? overlayEnds : [0]));
   if (totalDuration > cursor + 0.001) pushGap(totalDuration - cursor);
@@ -199,7 +200,7 @@ export function buildFilterGraph(
   // ── Capas de vídeo superpuestas (pistas por encima de la base) ──
   // z-order: se compositan sobre [vcat] y antes de imágenes/textos. Para un
   // proyecto de una sola pista, overlayTracks está vacío → no-op (salida idéntica).
-  const overlayTracks = project.tracks.video.slice(1);
+  const overlayTracks = videoLayers(project).slice(1);
   let ovIdx = 0;
   for (const track of overlayTracks) {
     const layerClips = [...track.clips].sort((a, b) => a.timelineStart - b.timelineStart);
@@ -249,7 +250,7 @@ export function buildFilterGraph(
   }
 
   // Overlays de imagen (inputs extra, en orden)
-  project.tracks.image.forEach((img, j) => {
+  imageItems(project).forEach((img, j) => {
     const inputIdx = inputs.length;
     inputs.push({ kind: "image", fileName: img.fileName });
     const w = Math.round(img.width * W);
@@ -270,7 +271,7 @@ export function buildFilterGraph(
   });
 
   // Textos (drawtext directo si rotation=0; capa transparente rotada si no)
-  project.tracks.text.forEach((t, k) => {
+  textItems(project).forEach((t, k) => {
     if (t.rotation === 0) {
       filters.push(`${videoLabel}${drawtextFilter(t, W, H)}[txt${k}]`);
     } else {

@@ -1,3 +1,4 @@
+import { imageItems, textItems } from "@clipforge/shared";
 import { saveNow } from "../features/projects/useAutosave";
 import { useProjectStore } from "../stores/projectStore";
 import { useUiStore } from "../stores/uiStore";
@@ -101,10 +102,10 @@ export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
   const step = e.shiftKey ? NUDGE_FAST : NUDGE;
 
   if (sel?.kind === "text") {
-    const o = store.project.tracks.text.find((t) => t.id === sel.id);
+    const o = textItems(store.project).find((t) => t.id === sel.id);
     if (o) store.updateText(sel.id, { x: clampN(o.x + dir[0] * step), y: clampN(o.y + dir[1] * step) });
   } else if (sel?.kind === "image") {
-    const o = store.project.tracks.image.find((i) => i.id === sel.id);
+    const o = imageItems(store.project).find((i) => i.id === sel.id);
     if (o) store.updateImage(sel.id, { x: clampN(o.x + dir[0] * step), y: clampN(o.y + dir[1] * step) });
   } else if (dir[0] !== 0) {
     const fps = store.project.settings.fps;

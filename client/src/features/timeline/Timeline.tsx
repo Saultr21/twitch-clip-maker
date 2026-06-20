@@ -270,21 +270,6 @@ export function Timeline({ height }: { height: number }) {
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
           </div>
-          {/* Botón "+" en la columna de etiquetas, encima de los carriles de vídeo */}
-          <div className="flex border-b border-border/60">
-            <div className="w-20 shrink-0 px-2 py-0.5 border-r border-border bg-surface sticky left-0 z-10">
-              <button
-                type="button"
-                onClick={() => useProjectStore.getState().addVideoTrack("top")}
-                title="Añadir pista de vídeo"
-                aria-label="Añadir pista de vídeo"
-                className="text-muted hover:text-text text-sm leading-none"
-              >
-                +
-              </button>
-            </div>
-            <div className="flex-1" />
-          </div>
           {/* GapDrop superior — hermana de videoLanesRef (no hija) */}
           <GapDrop
             position="top"
@@ -317,6 +302,7 @@ export function Timeline({ height }: { height: number }) {
                     useUiStore.getState().select(null);
                   }}
                   onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
+                  onAddTrack={() => useProjectStore.getState().addVideoTrack("top")}
                   onMoveEnd={handleVideoMoveEnd}
                   trackIndex={i}
                   onReorder={(from, to) => useProjectStore.getState().reorderVideoTrack(from, to)}

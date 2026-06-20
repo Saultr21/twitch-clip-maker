@@ -397,17 +397,25 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
-        {/* Un VideoFrameNode por clip activo de cada pista, en z-order */}
-        {activeClipsByTrack.map(({ track, clip }) => (
-          <VideoFrameNode
-            key={track.id}
-            clip={clip}
-            width={width}
-            height={height}
-            onGuides={onGuides}
-            cropMode={cropMode}
-          />
-        ))}
+        {/* Un VideoFrameNode por clip activo de cada pista. El clip SELECCIONADO
+            se renderiza el último (encima) para que su recuadro reciba el arrastre
+            y no quede tapado por el rect transparente de otra pista. */}
+        {[...activeClipsByTrack]
+          .sort((a, b) => {
+            const aSel = selection?.kind === "video" && selection.id === a.clip.id ? 1 : 0;
+            const bSel = selection?.kind === "video" && selection.id === b.clip.id ? 1 : 0;
+            return aSel - bSel;
+          })
+          .map(({ track, clip }) => (
+            <VideoFrameNode
+              key={track.id}
+              clip={clip}
+              width={width}
+              height={height}
+              onGuides={onGuides}
+              cropMode={cropMode}
+            />
+          ))}
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}

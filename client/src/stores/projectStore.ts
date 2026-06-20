@@ -249,15 +249,21 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     addVideoClipToTrack: (clip, trackId, start) =>
       mutate((d) => {
-        const track = d.tracks.video.find((t) => t.id === trackId);
-        if (!track) return;
+        const idx = d.tracks.video.findIndex((t) => t.id === trackId);
+        if (idx === -1) return;
+        const track = d.tracks.video[idx];
         const dur = clip.duration;
         const desired = Math.max(0, start);
         const overlaps = track.clips.some(
           (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
         );
         const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
-        track.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+        const newClip = createVideoClip(clip.id, overlaps ? lastEnd : desired, dur);
+        // En pistas superiores (no base) el clip entra como PiP: a media escala y
+        // centrado, así hay margen para moverlo y no tapa el vídeo de base. La base
+        // (índice 0) mantiene el frame completo (scale 1).
+        if (idx !== 0) newClip.zoom = { x: 0.5, y: 0.5, scale: 0.5 };
+        track.clips.push(newClip);
         track.clips.sort((a, b) => a.timelineStart - b.timelineStart);
       }),
 

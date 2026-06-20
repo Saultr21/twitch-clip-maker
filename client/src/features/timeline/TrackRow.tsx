@@ -34,6 +34,8 @@ interface TrackRowProps {
   onDropClip?: (clipId: string, t: number) => void;
   /** Si se define, muestra un botón "×" en la cabecera para borrar la pista. */
   onRemoveTrack?: () => void;
+  /** Si se define, muestra un botón "+" en la cabecera para añadir otra pista. */
+  onAddTrack?: () => void;
   /** Al soltar un arrastre de tipo "move", informa de la Y de pantalla y el start final. */
   onMoveEnd?: (id: string, clientY: number, start: number) => void;
   /** Índice de pista para reordenar por arrastre de la cabecera (solo vídeo). */
@@ -58,6 +60,7 @@ export function TrackRow({
   onTrim,
   onDropClip,
   onRemoveTrack,
+  onAddTrack,
   onMoveEnd,
   trackIndex,
   onReorder,
@@ -93,10 +96,16 @@ export function TrackRow({
         } : undefined}
       >
         <span className="truncate">{title}</span>
-        {onRemoveTrack && (
-          <button type="button" onClick={onRemoveTrack} title="Quitar pista"
-            aria-label={`Quitar pista ${title}`} className="text-muted hover:text-danger shrink-0">×</button>
-        )}
+        <span className="flex items-center gap-1 shrink-0">
+          {onAddTrack && (
+            <button type="button" onClick={onAddTrack} title="Añadir pista de vídeo"
+              aria-label="Añadir pista de vídeo" className="text-muted hover:text-text text-sm leading-none">+</button>
+          )}
+          {onRemoveTrack && (
+            <button type="button" onClick={onRemoveTrack} title="Quitar pista"
+              aria-label={`Quitar pista ${title}`} className="text-muted hover:text-danger leading-none">×</button>
+          )}
+        </span>
       </div>
       <div
         className={`relative flex-1 ${dropActive ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}

@@ -271,15 +271,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       return layer.id;
     },
 
-    reorderLayer: (fromIndex, toIndex) =>
+    reorderLayer: (fromIndex, toIndex) => {
+      const n = get().project.tracks.layers.length;
+      if (fromIndex < 0 || fromIndex >= n) return;
+      const to = Math.max(0, Math.min(n - 1, toIndex));
+      if (fromIndex === to) return;
       mutate((d) => {
-        const n = d.tracks.layers.length;
-        if (fromIndex < 0 || fromIndex >= n) return;
-        const to = Math.max(0, Math.min(n - 1, toIndex));
-        if (fromIndex === to) return;
         const [moved] = d.tracks.layers.splice(fromIndex, 1);
         d.tracks.layers.splice(to, 0, moved);
-      }),
+      });
+    },
 
     removeLayer: (id) =>
       mutate((d) => {

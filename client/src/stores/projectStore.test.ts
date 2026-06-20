@@ -316,6 +316,20 @@ describe("pistas de vídeo (multipista)", () => {
     expect(videoLayers(useProjectStore.getState().project)[1].clips).toEqual([]);
   });
 
+  it("reorderVideoTrack reordena solo el vídeo con una capa de imagen intercalada", () => {
+    const s = useProjectStore.getState();
+    s.addImage("a", "a.png", 0, 0.2, 0.2); // crea capa de imagen → [V0, I]
+    const v1 = s.addVideoTrack("top"); // → [V0, I, V1]
+    expect(useProjectStore.getState().project.tracks.layers.map((l) => l.kind)).toEqual([
+      "video", "image", "video",
+    ]);
+    s.reorderVideoTrack(1, 0); // mueve V1 (índice de vídeo 1) a la posición de vídeo 0
+    const layers = useProjectStore.getState().project.tracks.layers;
+    expect(videoLayers(useProjectStore.getState().project)[0].id).toBe(v1);
+    expect(layers.some((l) => l.kind === "image")).toBe(true);
+    expect(layers.filter((l) => l.kind === "video")).toHaveLength(2);
+  });
+
   it("removeVideoTrack elimina la pista y sus clips, pero nunca deja 0 pistas", () => {
     const s = useProjectStore.getState();
     s.addVideoTrack();

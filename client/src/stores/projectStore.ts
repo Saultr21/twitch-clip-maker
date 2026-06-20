@@ -256,19 +256,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     reorderVideoTrack: (fromIndex, toIndex) =>
       mutate((d) => {
-        const videoLayers = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
-        const n = videoLayers.length;
+        // fromIndex/toIndex son índices en la SUBLISTA de capas de vídeo; se
+        // traducen a ids y se reordena el array TOTAL de capas (que puede tener
+        // imagen/texto intercaladas) insertando junto a la capa de vídeo destino.
+        const vids = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
+        const n = vids.length;
         if (fromIndex < 0 || fromIndex >= n) return;
         const to = Math.max(0, Math.min(n - 1, toIndex));
-        // Reordenar dentro del array total localizando por ids
-        const fromId = videoLayers[fromIndex].id;
-        const toId = videoLayers[to].id;
+        if (fromIndex === to) return; // no-op
+        const fromId = vids[fromIndex].id;
+        const toId = vids[to].id; // distinto de fromId porque from !== to
         const fromLayerIdx = d.tracks.layers.findIndex((l) => l.id === fromId);
-        const toLayerIdx = d.tracks.layers.findIndex((l) => l.id === toId);
-        if (fromLayerIdx === -1 || toLayerIdx === -1) return;
         const [moved] = d.tracks.layers.splice(fromLayerIdx, 1);
         const insertAt = d.tracks.layers.findIndex((l) => l.id === toId);
-        d.tracks.layers.splice(insertAt >= 0 ? insertAt : toLayerIdx, 0, moved);
+        d.tracks.layers.splice(insertAt, 0, moved);
       }),
 
     removeVideoTrack: (trackId) =>

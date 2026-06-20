@@ -90,7 +90,7 @@ function TrackVideo({
         ref={setEl}
         preload="auto"
         className="absolute max-w-none"
-        style={{ visibility: "hidden", inset: 0, width: "100%", height: "100%", zIndex }}
+        style={{ visibility: "hidden", inset: 0, width: "100%", height: "100%", zIndex, pointerEvents: "none" }}
       />
     );
   }
@@ -115,6 +115,10 @@ function TrackVideo({
     visibility: visible,
     opacity,
     zIndex,
+    // Solo visual: la interacción (seleccionar/mover) es vía la capa Konva que va
+    // encima. Sin esto, el wrapper de una pista superior (zIndex≥1) quedaría por
+    // encima de Konva y se tragaría los clics → no se podrían seleccionar esos clips.
+    pointerEvents: "none",
   };
 
   const innerStyle: CSSProperties = {

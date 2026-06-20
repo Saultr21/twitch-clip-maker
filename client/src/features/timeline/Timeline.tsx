@@ -40,17 +40,21 @@ function GapDrop({
   position,
   pxPerSecond,
   onDrop,
+  highlight = false,
 }: {
   position: "top" | "bottom";
   pxPerSecond: number;
   onDrop: (pos: "top" | "bottom", t: number, clipId: string) => void;
+  /** Resaltado controlado (p. ej. mientras se arrastra un elemento hacia el borde). */
+  highlight?: boolean;
 }) {
   const [active, setActive] = useState(false);
+  const on = active || highlight;
   return (
     <div className="flex">
       <div className="w-20 shrink-0 border-r border-border bg-surface sticky left-0 z-10" />
       <div
-        className={`flex-1 h-2 ${active ? "bg-accent/30 ring-1 ring-inset ring-accent" : ""}`}
+        className={`flex-1 grid place-items-center transition-all ${on ? "h-5 bg-accent/25 ring-1 ring-inset ring-accent" : "h-2"}`}
         onDragOver={(e) => {
           if (e.dataTransfer.types.includes("application/x-clip-id")) {
             e.preventDefault();
@@ -66,7 +70,9 @@ function GapDrop({
           const rect = e.currentTarget.getBoundingClientRect();
           onDrop(position, Math.max(0, (e.clientX - rect.left) / pxPerSecond), clipId);
         }}
-      />
+      >
+        {on && <span className="text-[9px] text-accent-soft leading-none">+ nueva capa</span>}
+      </div>
     </div>
   );
 }
@@ -103,6 +109,9 @@ export function Timeline({ height }: { height: number }) {
     y: number;
     widthPx: number;
     targetLayerId: string | null;
+    // Si el cursor está en la zona de inserción (por encima/por debajo del bloque
+    // de capas), se creará una capa nueva ahí al soltar (estilo Adobe).
+    insertEdge: "top" | "bottom" | null;
   } | null>(null);
 
   // Clips de la capa base (pista de vídeo 0). Referencia estable vía EMPTY_CLIPS.
@@ -379,6 +388,7 @@ export function Timeline({ height }: { height: number }) {
           <GapDrop
             position="top"
             pxPerSecond={pxPerSecond}
+            highlight={ghost?.insertEdge === "top"}
             onDrop={(pos, t, clipId) => {
               const clip = clips.find((c) => c.id === clipId);
               if (!clip) return;
@@ -432,15 +442,25 @@ export function Timeline({ height }: { height: number }) {
                       : undefined
                   }
                   onMoveEnd={handleUnifiedMoveEnd}
-                  onMoveDrag={(p) =>
+                  onMoveDrag={(p) => {
+                    const cont = layersContainerRef.current;
+                    const rect = cont?.getBoundingClientRect();
+                    const insertEdge: "top" | "bottom" | null = !rect
+                      ? null
+                      : p.clientY < rect.top
+                        ? "top"
+                        : p.clientY >= rect.bottom
+                          ? "bottom"
+                          : null;
                     setGhost({
                       label: p.label,
                       x: p.clientX,
                       y: p.clientY,
                       widthPx: p.widthPx,
-                      targetLayerId: laneAtClientYUnified(p.clientY)?.layerId ?? null,
-                    })
-                  }
+                      targetLayerId: insertEdge ? null : laneAtClientYUnified(p.clientY)?.layerId ?? null,
+                      insertEdge,
+                    });
+                  }}
                   onMoveDragEnd={() => setGhost(null)}
                   highlight={ghost?.targetLayerId === layer.id}
                   trackIndex={i}
@@ -453,6 +473,7 @@ export function Timeline({ height }: { height: number }) {
           <GapDrop
             position="bottom"
             pxPerSecond={pxPerSecond}
+            highlight={ghost?.insertEdge === "bottom"}
             onDrop={(pos, t, clipId) => {
               const clip = clips.find((c) => c.id === clipId);
               if (!clip) return;

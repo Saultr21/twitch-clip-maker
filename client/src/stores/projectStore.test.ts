@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createEmptyProject, projectToPreset, videoLayers, textItems } from "@clipforge/shared";
+import { createEmptyProject, projectToPreset, videoLayers, textItems, imageItems } from "@clipforge/shared";
 import type { ClipInfo, SubtitleCue } from "@clipforge/shared";
 import { useProjectStore, nonSilentSegments } from "./projectStore";
 import { useUiStore } from "./uiStore";
@@ -440,5 +440,157 @@ describe("applyPreset", () => {
     expect(videoLayers(p)[0].clips).toHaveLength(1); // el vídeo no se toca
     s.undo();
     expect(textItems(useProjectStore.getState().project)).toHaveLength(0);
+  });
+});
+
+describe("addImageLayer / addTextLayer", () => {
+  it("addImageLayer añade una capa de imagen vacía y devuelve su id", () => {
+    const s = useProjectStore.getState();
+    const id = s.addImageLayer();
+    const p = useProjectStore.getState().project;
+    const imgLayers = p.tracks.layers.filter(l => l.kind === "image");
+    expect(imgLayers).toHaveLength(1);
+    expect(imgLayers[0].id).toBe(id);
+    expect((imgLayers[0] as any).items).toEqual([]);
+  });
+
+  it("addTextLayer añade una capa de texto vacía y devuelve su id", () => {
+    const s = useProjectStore.getState();
+    const id = s.addTextLayer();
+    const p = useProjectStore.getState().project;
+    const txtLayers = p.tracks.layers.filter(l => l.kind === "text");
+    expect(txtLayers).toHaveLength(1);
+    expect(txtLayers[0].id).toBe(id);
+    expect((txtLayers[0] as any).items).toEqual([]);
+  });
+});
+
+describe("reorderLayer", () => {
+  it("reordena cualquier capa por índice de array total", () => {
+    const s = useProjectStore.getState();
+    // layers start with [VideoLayer]. Add image and text layers.
+    s.addImageLayer(); // index 1
+    s.addTextLayer();  // index 2
+    const layersBefore = useProjectStore.getState().project.tracks.layers;
+    expect(layersBefore.map(l => l.kind)).toEqual(["video", "image", "text"]);
+    s.reorderLayer(0, 2); // move video to end
+    const layers = useProjectStore.getState().project.tracks.layers;
+    expect(layers.map(l => l.kind)).toEqual(["image", "text", "video"]);
+  });
+
+  it("no-op si fromIndex === toIndex", () => {
+    const s = useProjectStore.getState();
+    s.addImageLayer();
+    const before = useProjectStore.getState().project.tracks.layers.map(l => l.id);
+    s.reorderLayer(0, 0);
+    const after = useProjectStore.getState().project.tracks.layers.map(l => l.id);
+    expect(before).toEqual(after);
+  });
+
+  it("clampea toIndex a [0, length-1]", () => {
+    const s = useProjectStore.getState();
+    s.addImageLayer();
+    // 2 layers: [V, I]. reorderLayer(0, 99) should clamp to index 1.
+    s.reorderLayer(0, 99);
+    const layers = useProjectStore.getState().project.tracks.layers;
+    expect(layers.map(l => l.kind)).toEqual(["image", "video"]);
+  });
+});
+
+describe("removeLayer", () => {
+  it("elimina una capa por id", () => {
+    const s = useProjectStore.getState();
+    const imgId = s.addImageLayer();
+    s.removeLayer(imgId);
+    const layers = useProjectStore.getState().project.tracks.layers;
+    expect(layers.filter(l => l.kind === "image")).toHaveLength(0);
+  });
+
+  it("nunca deja 0 capas: si era la última, inserta una de vídeo vacía", () => {
+    const s = useProjectStore.getState();
+    const baseId = useProjectStore.getState().project.tracks.layers[0].id;
+    s.removeLayer(baseId);
+    const layers = useProjectStore.getState().project.tracks.layers;
+    expect(layers).toHaveLength(1);
+    expect(layers[0].kind).toBe("video");
+  });
+});
+
+describe("moveElementToLayer", () => {
+  it("mueve un clip de vídeo a otra capa de vídeo si no hay solape", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const destId = s.addVideoTrack("top");
+    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    s.moveElementToLayer(srcClipId, destId, 0);
+    const p = useProjectStore.getState().project;
+    expect(videoLayers(p)[0].clips).toHaveLength(0);
+    expect(videoLayers(p)[1].clips.map(c => c.id)).toContain(srcClipId);
+  });
+
+  it("rechaza mover a capa de distinto tipo", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const imgId = s.addImageLayer();
+    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    s.moveElementToLayer(srcClipId, imgId, 0); // video → image: no-op
+    const p = useProjectStore.getState().project;
+    expect(videoLayers(p)[0].clips).toHaveLength(1); // unchanged
+  });
+
+  it("rechaza mover si solaparía en destino (video)", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const destId = s.addVideoTrack("top");
+    s.addVideoClipToTrack({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" }, destId, 0);
+    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    s.moveElementToLayer(srcClipId, destId, 2); // overlaps [0,5)
+    const p = useProjectStore.getState().project;
+    expect(videoLayers(p)[0].clips.map(c => c.id)).toContain(srcClipId); // stays in source
+  });
+
+  it("mueve un item de imagen a otra capa de imagen si no hay solape", () => {
+    const s = useProjectStore.getState();
+    // Create two image layers
+    const layer1Id = s.addImageLayer(); // index 1 in tracks.layers
+    const layer2Id = s.addImageLayer(); // index 2 in tracks.layers
+    // Add image item to layer 1
+    s.addImage("a1", "a.png", 0, 0.2, 0.2); // goes to first image layer (layer1)
+    const imgItemId = imageItems(useProjectStore.getState().project)[0].id;
+    s.moveElementToLayer(imgItemId, layer2Id, 10);
+    const p = useProjectStore.getState().project;
+    const imgLayer1 = p.tracks.layers.find(l => l.id === layer1Id) as any;
+    const imgLayer2 = p.tracks.layers.find(l => l.id === layer2Id) as any;
+    expect(imgLayer1.items).toHaveLength(0);
+    expect(imgLayer2.items).toHaveLength(1);
+    expect(imgLayer2.items[0].start).toBe(10);
+  });
+});
+
+describe("no-solape en addText / addImage", () => {
+  it("addText cae al final si el start solaparía en la capa", () => {
+    const s = useProjectStore.getState();
+    s.addText(0); // creates text layer, item [0, 4)
+    s.addText(2); // overlaps [0,4) → should land at end=4
+    const items = textItems(useProjectStore.getState().project);
+    expect(items).toHaveLength(2);
+    expect(items[1].start).toBe(4);
+  });
+
+  it("addText en hueco libre lo pone en el start dado", () => {
+    const s = useProjectStore.getState();
+    s.addText(0);  // [0, 4)
+    s.addText(10); // [10, 14) — no overlap
+    const items = textItems(useProjectStore.getState().project);
+    expect(items[1].start).toBe(10);
+  });
+
+  it("addImage cae al final si el start solaparía en la capa", () => {
+    const s = useProjectStore.getState();
+    s.addImage("a1", "a.png", 0, 0.2, 0.2); // [0, 4)
+    s.addImage("a2", "b.png", 1, 0.2, 0.2); // overlaps → lands at 4
+    const items = imageItems(useProjectStore.getState().project);
+    expect(items).toHaveLength(2);
+    expect(items[1].start).toBe(4);
   });
 });

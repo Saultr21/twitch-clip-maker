@@ -144,9 +144,14 @@ interface ProjectState {
   setAudioDucking: (on: boolean) => void;
   setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
   addVideoTrack: (position?: "top" | "bottom") => string;
+  addImageLayer: () => string;
+  addTextLayer: () => string;
   reorderVideoTrack: (fromIndex: number, toIndex: number) => void;
+  reorderLayer: (fromIndex: number, toIndex: number) => void;
   removeVideoTrack: (trackId: string) => void;
+  removeLayer: (id: string) => void;
   moveClipToTrack: (clipId: string, destTrackId: string, newStart: number, opts?: MutateOptions) => void;
+  moveElementToLayer: (elementId: string, destLayerId: string, newStart: number) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   addVideoClipToTrack: (clip: ClipInfo, trackId: string, start: number) => void;
@@ -253,6 +258,93 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       });
       return layer.id;
     },
+
+    addImageLayer: () => {
+      const layer = createImageLayer();
+      mutate((d) => void d.tracks.layers.push(layer));
+      return layer.id;
+    },
+
+    addTextLayer: () => {
+      const layer = createTextLayer();
+      mutate((d) => void d.tracks.layers.push(layer));
+      return layer.id;
+    },
+
+    reorderLayer: (fromIndex, toIndex) =>
+      mutate((d) => {
+        const n = d.tracks.layers.length;
+        if (fromIndex < 0 || fromIndex >= n) return;
+        const to = Math.max(0, Math.min(n - 1, toIndex));
+        if (fromIndex === to) return;
+        const [moved] = d.tracks.layers.splice(fromIndex, 1);
+        d.tracks.layers.splice(to, 0, moved);
+      }),
+
+    removeLayer: (id) =>
+      mutate((d) => {
+        const idx = d.tracks.layers.findIndex((l) => l.id === id);
+        if (idx === -1) return;
+        d.tracks.layers.splice(idx, 1);
+        if (d.tracks.layers.length === 0) d.tracks.layers.push(createVideoLayer());
+      }),
+
+    moveElementToLayer: (elementId, destLayerId, newStart) =>
+      mutate((d) => {
+        const destLayer = d.tracks.layers.find((l) => l.id === destLayerId);
+        if (!destLayer) return;
+
+        // Try video clip
+        const clipCtx = findClipCtx(d, elementId);
+        if (clipCtx) {
+          if (destLayer.kind !== "video") return;
+          const dest = destLayer as VideoLayer;
+          const start = Math.max(0, newStart);
+          if (hasOverlap(dest.clips, start, clipDuration(clipCtx.clip), elementId)) return;
+          clipCtx.layer.clips.splice(clipCtx.index, 1);
+          dest.clips.push({ ...clipCtx.clip, timelineStart: start });
+          dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);
+          return;
+        }
+
+        // Try image item
+        const imgCtx = findImage(d, elementId);
+        if (imgCtx) {
+          if (destLayer.kind !== "image") return;
+          const dest = destLayer as ImageLayer;
+          const item = imgCtx.item;
+          const duration = item.end - item.start;
+          const start = Math.max(0, newStart);
+          const end = start + duration;
+          const overlaps = dest.items.some(
+            (o) => o.id !== elementId && start < o.end && end > o.start,
+          );
+          if (overlaps) return;
+          imgCtx.layer.items.splice(imgCtx.index, 1);
+          dest.items.push({ ...item, start, end });
+          dest.items.sort((a, b) => a.start - b.start);
+          return;
+        }
+
+        // Try text item
+        const txtCtx = findText(d, elementId);
+        if (txtCtx) {
+          if (destLayer.kind !== "text") return;
+          const dest = destLayer as TextLayer;
+          const item = txtCtx.item;
+          const duration = item.end - item.start;
+          const start = Math.max(0, newStart);
+          const end = start + duration;
+          const overlaps = dest.items.some(
+            (o) => o.id !== elementId && start < o.end && end > o.start,
+          );
+          if (overlaps) return;
+          txtCtx.layer.items.splice(txtCtx.index, 1);
+          dest.items.push({ ...item, start, end });
+          dest.items.sort((a, b) => a.start - b.start);
+          return;
+        }
+      }),
 
     reorderVideoTrack: (fromIndex, toIndex) =>
       mutate((d) => {
@@ -475,13 +567,35 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     addText: (start) => {
       const overlay = createTextOverlay(start);
-      mutate((d) => void textLayerFor(d).items.push(overlay));
+      mutate((d) => {
+        const layer = textLayerFor(d);
+        const duration = overlay.end - overlay.start;
+        const newEnd = start + duration;
+        const overlaps = layer.items.some((o) => start < o.end && newEnd > o.start);
+        const effectiveStart = overlaps
+          ? (layer.items.length ? Math.max(...layer.items.map((i) => i.end)) : 0)
+          : Math.max(0, start);
+        overlay.start = effectiveStart;
+        overlay.end = effectiveStart + duration;
+        layer.items.push(overlay);
+      });
       return overlay.id;
     },
 
     addImage: (assetId, fileName, start, w, h) => {
       const overlay = createImageOverlay(assetId, fileName, start, w, h);
-      mutate((d) => void imageLayerFor(d).items.push(overlay));
+      mutate((d) => {
+        const layer = imageLayerFor(d);
+        const duration = overlay.end - overlay.start;
+        const newEnd = start + duration;
+        const overlaps = layer.items.some((o) => start < o.end && newEnd > o.start);
+        const effectiveStart = overlaps
+          ? (layer.items.length ? Math.max(...layer.items.map((i) => i.end)) : 0)
+          : Math.max(0, start);
+        overlay.start = effectiveStart;
+        overlay.end = effectiveStart + duration;
+        layer.items.push(overlay);
+      });
       return overlay.id;
     },
 

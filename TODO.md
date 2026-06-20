@@ -7,6 +7,13 @@
 ## In Progress
 - (nada — multipista y su gestión de pistas completas)
 
+## Ajustes UX del multipista (2026-06-20) — hecho
+- [x] Botón **+** movido a la cabecera de cada pista de vídeo (no en fila aparte)
+- [x] Fix lienzo: el clip seleccionado se dibuja encima (recibe el arrastre aunque otro lo tape) y los clips que entran en pista superior lo hacen como **PiP a media escala/centrado** (antes a frame completo → no se podían mover)
+- [x] **Clip "fantasma"** que sigue al cursor + resalte del carril destino al arrastrar (feedback visual)
+  - Files: `Timeline.tsx`, `TrackRow.tsx`, `OverlayLayer.tsx`, `projectStore.ts`. 257 tests verdes. Pendiente smoke test del usuario.
+  - Minors de pulido pendientes (no bloqueantes): DRY del mapeo Y→carril (`laneAtClientY`/`handleVideoMoveEnd`), clamp del ghost al borde del viewport.
+
 ## Gestión de pistas en el timeline (Fase 4b, 2026-06-20) — hecha
 - [x] Botón **+** compacto en la columna de etiquetas (izquierda) para añadir pista de vídeo (sustituye al "+ Pista" de la barra)
 - [x] Crear pista soltando un clip en un **hueco** por encima/debajo de los carriles: vale para clips de Medios (DnD) y para clips existentes (arrastre por pointer, vía ramas de hueco en `handleVideoMoveEnd`)

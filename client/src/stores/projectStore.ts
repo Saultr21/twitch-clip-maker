@@ -239,6 +239,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         });
         firstPieceId = pieces[0].id;
         const removed = (c.trimOut - c.trimIn) / c.speed - (start - c.timelineStart);
+        // TODO(fase2): el ripple solo desplaza la pista del clip (ctx.track); en
+        // multipista habrá que decidir si arrastra también las otras pistas
         ctx.track.clips = ctx.track.clips
           .flatMap((v) => {
             if (v.id === id) return pieces;
@@ -323,6 +325,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     splitVideoAt: (t) =>
       mutate((d) => {
+        // TODO(fase2): parte solo en la pista base; en multipista habrá que
+        // partir el clip activo de cada pista (o el de la pista seleccionada)
         const track = baseTrack(d);
         const c = videoClipAt(track.clips, t);
         if (!c || t <= c.timelineStart || t >= clipEnd(c)) return;

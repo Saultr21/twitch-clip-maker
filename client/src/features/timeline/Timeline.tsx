@@ -9,6 +9,11 @@ import { usePlayback } from "../preview/PreviewArea";
 import { TimeRuler } from "./TimeRuler";
 import { TrackRow, type BlockDescriptor } from "./TrackRow";
 
+// Referencia estable para el fallback de "sin clips": evita crear un array nuevo
+// por render, que rompería la memoización de los hooks que dependen de los clips.
+// (Fase 1: solo la pista base; en multipista esto será por pista.)
+const EMPTY_CLIPS: never[] = [];
+
 // Componente propio: el playhead cambia a 60fps durante la reproducción y
 // suscribirlo aquí evita re-renderizar el Timeline completo en cada frame
 function PlayheadLine({ pxPerSecond }: { pxPerSecond: number }) {
@@ -45,26 +50,27 @@ export function Timeline({ height }: { height: number }) {
   const canCrop = selection?.kind === "image" || selection?.kind === "video";
   const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const videoCount = project.tracks.video[0]?.clips.length ?? 0;
+  // Clips de la pista base (Fase 1: única pista). Referencia estable vía EMPTY_CLIPS.
+  const baseClips = project.tracks.video[0]?.clips ?? EMPTY_CLIPS;
+  const videoCount = baseClips.length;
   const prevVideoCount = useRef(videoCount);
   // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
   useEffect(() => {
-    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && (project.tracks.video[0]?.clips.length ?? 0) > 0) {
-      const clips = project.tracks.video[0].clips;
-      const last = clips[clips.length - 1];
+    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && baseClips.length > 0) {
+      const last = baseClips[baseClips.length - 1];
       const left = 80 + last.timelineStart * pxPerSecond - 60;
       scrollRef.current.scrollLeft = Math.max(0, left);
     }
     prevVideoCount.current = videoCount;
-  }, [videoCount, project.tracks.video[0]?.clips, pxPerSecond, dirty]);
-  const canSplit = (project.tracks.video[0]?.clips.length ?? 0) > 0;
+  }, [videoCount, baseClips, pxPerSecond, dirty]);
+  const canSplit = baseClips.length > 0;
 
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
 
   const videoBlocks: BlockDescriptor[] = useMemo(
     () =>
-      (project.tracks.video[0]?.clips ?? []).map((c) => {
+      baseClips.map((c) => {
         const info = clips.find((i) => i.id === c.clipId);
         return {
           id: c.id,
@@ -78,7 +84,7 @@ export function Timeline({ height }: { height: number }) {
             : undefined,
         };
       }),
-    [project.tracks.video[0]?.clips, clips],
+    [baseClips, clips],
   );
 
   const textBlocks: BlockDescriptor[] = project.tracks.text.map((t) => ({

@@ -1,16 +1,33 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, CropRect, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, CropRect, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip, VideoTrack } from "@clipforge/shared";
 import {
+  allVideoClips,
   createAudioTrack,
   createEmptyProject,
   createImageOverlay,
   createTextOverlay,
   createVideoClip,
+  createVideoTrack,
 } from "@clipforge/shared";
 import { clipDuration, clipEnd, hasOverlap, splitVideoClip, videoClipAt } from "../lib/timeline";
 import { cueEnd, cueStart, redistributeWordTimes, scaleCueWords, shiftCueWords } from "../lib/subtitles";
 import { useUiStore } from "./uiStore";
+
+/** Localiza un clip de vídeo por id en cualquier pista. */
+function findClipCtx(d: Project, id: string): { track: VideoTrack; clip: VideoClip; index: number } | null {
+  for (const track of d.tracks.video) {
+    const index = track.clips.findIndex((c) => c.id === id);
+    if (index !== -1) return { track, clip: track.clips[index], index };
+  }
+  return null;
+}
+
+/** Pista base (índice 0). Garantizada por createEmptyProject/migrateProject. */
+function baseTrack(d: Project): VideoTrack {
+  if (d.tracks.video.length === 0) d.tracks.video.push(createVideoTrack());
+  return d.tracks.video[0];
+}
 
 // Tras undo/redo el elemento seleccionado puede haber dejado de existir;
 // se poda la selección solo en ese caso para no deseleccionar al deshacer ediciones
@@ -21,7 +38,11 @@ function pruneSelection(project: Project): void {
     if (!project.subtitles.cues.some((c) => c.id === sel.id)) useUiStore.getState().select(null);
     return;
   }
-  const track = project.tracks[sel.kind as Exclude<typeof sel.kind, "subtitle">] as Array<{ id: string }>;
+  if (sel.kind === "video") {
+    if (!allVideoClips(project).some((c) => c.id === sel.id)) useUiStore.getState().select(null);
+    return;
+  }
+  const track = project.tracks[sel.kind as "text" | "image" | "audio"] as Array<{ id: string }>;
   if (!track.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
 }
 
@@ -160,29 +181,31 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     addVideoClip: (clip) =>
       mutate((d) => {
-        const lastEnd = d.tracks.video.length
-          ? Math.max(...d.tracks.video.map(clipEnd))
-          : 0;
-        d.tracks.video.push(createVideoClip(clip.id, lastEnd, clip.duration));
+        const track = baseTrack(d);
+        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
+        track.clips.push(createVideoClip(clip.id, lastEnd, clip.duration));
       }),
 
     // suelta el clip en el instante indicado si el hueco está libre; si pisa otro
     // bloque, cae al final de la secuencia (evita solapes en la pista de vídeo)
     addVideoClipAt: (clip, start) =>
       mutate((d) => {
+        const track = baseTrack(d);
         const dur = clip.duration;
         const desired = Math.max(0, start);
-        const overlaps = d.tracks.video.some(
+        const overlaps = track.clips.some(
           (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
         );
-        const lastEnd = d.tracks.video.length ? Math.max(...d.tracks.video.map(clipEnd)) : 0;
-        d.tracks.video.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
+        track.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
       }),
 
     // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente
     removeVideoClipsBySource: (clipId) =>
       mutate((d) => {
-        d.tracks.video = d.tracks.video.filter((v) => v.clipId !== clipId);
+        for (const track of d.tracks.video) {
+          track.clips = track.clips.filter((v) => v.clipId !== clipId);
+        }
       }),
 
     // parte el clip en sus tramos con voz (quita los silencios) y los deja
@@ -191,8 +214,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     removeSilencesFromClip: (id, silences) => {
       let firstPieceId: string | null = null;
       mutate((d) => {
-        const c = d.tracks.video.find((v) => v.id === id);
-        if (!c) return;
+        const ctx = findClipCtx(d, id);
+        if (!ctx) return;
+        const c = ctx.clip;
         const segs = nonSilentSegments(c.trimIn, c.trimOut, silences);
         // sin silencios reales (un único segmento == clip entero) o todo silencio
         if (segs.length === 0 || (segs.length === 1 && segs[0][0] === c.trimIn && segs[0][1] === c.trimOut)) {
@@ -215,7 +239,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         });
         firstPieceId = pieces[0].id;
         const removed = (c.trimOut - c.trimIn) / c.speed - (start - c.timelineStart);
-        d.tracks.video = d.tracks.video
+        ctx.track.clips = ctx.track.clips
           .flatMap((v) => {
             if (v.id === id) return pieces;
             // ripple: los clips que iban después se adelantan lo recortado
@@ -237,8 +261,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     applyReframe: (id, segments) => {
       let firstPieceId: string | null = null;
       mutate((d) => {
-        const c = d.tracks.video.find((v) => v.id === id);
-        if (!c || segments.length === 0) return;
+        const ctx = findClipCtx(d, id);
+        if (!ctx || segments.length === 0) return;
+        const c = ctx.clip;
         let start = c.timelineStart;
         const pieces = segments.map((s) => {
           const piece = {
@@ -254,7 +279,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           return piece;
         });
         firstPieceId = pieces[0].id;
-        d.tracks.video = d.tracks.video
+        ctx.track.clips = ctx.track.clips
           .flatMap((v) => (v.id === id ? pieces : [v]))
           .sort((a, b) => a.timelineStart - b.timelineStart);
       });
@@ -265,17 +290,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     moveVideoClip: (id, newStart, opts) =>
       mutate((d) => {
-        const c = d.tracks.video.find((v) => v.id === id);
-        if (!c) return;
+        const ctx = findClipCtx(d, id);
+        if (!ctx) return;
         const start = Math.max(0, newStart);
-        if (hasOverlap(d.tracks.video, start, clipDuration(c), id)) return;
-        c.timelineStart = start;
+        if (hasOverlap(ctx.track.clips, start, clipDuration(ctx.clip), id)) return;
+        ctx.clip.timelineStart = start;
       }, opts),
 
     trimVideoClip: (id, edge, t, opts) =>
       mutate((d) => {
-        const c = d.tracks.video.find((v) => v.id === id);
-        if (!c) return;
+        const ctx = findClipCtx(d, id);
+        if (!ctx) return;
+        const c = ctx.clip;
         if (edge === "start") {
           const maxStart = clipEnd(c) - MIN_CLIP_DURATION;
           const newTimelineStart = Math.min(Math.max(0, t), maxStart);
@@ -291,17 +317,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     updateVideoClip: (id, patch, opts) =>
       mutate((d) => {
-        const c = d.tracks.video.find((v) => v.id === id);
-        if (c) Object.assign(c, patch);
+        const ctx = findClipCtx(d, id);
+        if (ctx) Object.assign(ctx.clip, patch);
       }, opts),
 
     splitVideoAt: (t) =>
       mutate((d) => {
-        const c = videoClipAt(d.tracks.video, t);
+        const track = baseTrack(d);
+        const c = videoClipAt(track.clips, t);
         if (!c || t <= c.timelineStart || t >= clipEnd(c)) return;
         const [left, right] = splitVideoClip(c, t);
-        const idx = d.tracks.video.findIndex((v) => v.id === c.id);
-        d.tracks.video.splice(idx, 1, left, right);
+        const idx = track.clips.findIndex((v) => v.id === c.id);
+        track.clips.splice(idx, 1, left, right);
       }),
 
     addText: (start) => {
@@ -336,8 +363,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     setVideoCrop: (id, crop) =>
       mutate((d) => {
-        const clip = d.tracks.video.find((c) => c.id === id);
-        if (clip) clip.crop = crop;
+        const ctx = findClipCtx(d, id);
+        if (ctx) ctx.clip.crop = crop;
       }),
 
     addAudio: (assetId, fileName, start, duration) => {
@@ -390,7 +417,12 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           d.subtitles.cues = d.subtitles.cues.filter((c) => c.id !== id);
           return;
         }
-        const track = d.tracks[kind as Exclude<ElementKind, "subtitle">] as Array<{ id: string }>;
+        if (kind === "video") {
+          const ctx = findClipCtx(d, id);
+          if (ctx) ctx.track.clips.splice(ctx.index, 1);
+          return;
+        }
+        const track = d.tracks[kind as "text" | "image" | "audio"] as Array<{ id: string }>;
         const idx = track.findIndex((x) => x.id === id);
         if (idx !== -1) track.splice(idx, 1);
       }),

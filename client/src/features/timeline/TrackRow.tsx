@@ -87,6 +87,7 @@ export function TrackRow({
           if (e.dataTransfer.types.includes("application/x-video-track-index")) e.preventDefault();
         } : undefined}
         onDrop={trackIndex !== undefined ? (e) => {
+          e.preventDefault();
           const from = Number(e.dataTransfer.getData("application/x-video-track-index"));
           if (!Number.isNaN(from) && onReorder) onReorder(from, trackIndex);
         } : undefined}

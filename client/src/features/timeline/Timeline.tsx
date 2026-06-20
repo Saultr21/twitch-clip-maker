@@ -189,8 +189,9 @@ export function Timeline({ height }: { height: number }) {
       return clientY >= r.top && clientY < r.bottom;
     });
     if (visualLane === -1) {
-      // dentro del rect del cont pero entre carriles: clampa al primero/último
-      visualLane = clientY < contRect.top ? 0 : order.length - 1;
+      // dentro del rect del cont pero en una junta sub-pixel entre carriles:
+      // las ramas de hueco (arriba/abajo) ya retornaron, así que clampa al último
+      visualLane = order.length - 1;
     }
     const destIndex = order[Math.max(0, Math.min(order.length - 1, visualLane))];
     const destTrack = videoTracks[destIndex];

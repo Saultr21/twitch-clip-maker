@@ -95,7 +95,8 @@ interface ProjectState {
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   setAudioDucking: (on: boolean) => void;
   setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
-  addVideoTrack: () => void;
+  addVideoTrack: (position?: "top" | "bottom") => string;
+  reorderVideoTrack: (fromIndex: number, toIndex: number) => void;
   removeVideoTrack: (trackId: string) => void;
   moveClipToTrack: (clipId: string, destTrackId: string, newStart: number, opts?: MutateOptions) => void;
   addVideoClip: (clip: ClipInfo) => void;
@@ -183,9 +184,22 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         Object.assign(d.settings.background, patch);
       }),
 
-    addVideoTrack: () =>
+    addVideoTrack: (position = "top") => {
+      const track = createVideoTrack();
       mutate((d) => {
-        d.tracks.video.push(createVideoTrack());
+        if (position === "bottom") d.tracks.video.unshift(track);
+        else d.tracks.video.push(track);
+      });
+      return track.id;
+    },
+
+    reorderVideoTrack: (fromIndex, toIndex) =>
+      mutate((d) => {
+        const n = d.tracks.video.length;
+        if (fromIndex < 0 || fromIndex >= n) return;
+        const to = Math.max(0, Math.min(n - 1, toIndex));
+        const [moved] = d.tracks.video.splice(fromIndex, 1);
+        d.tracks.video.splice(to, 0, moved);
       }),
 
     removeVideoTrack: (trackId) =>

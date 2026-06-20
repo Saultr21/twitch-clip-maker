@@ -386,6 +386,31 @@ describe("addVideoClipToTrack", () => {
   });
 });
 
+describe("addVideoTrack con posición y reorderVideoTrack", () => {
+  it("addVideoTrack('top') añade arriba (último índice) y devuelve su id", () => {
+    const s = useProjectStore.getState();
+    const id = s.addVideoTrack("top");
+    const v = useProjectStore.getState().project.tracks.video;
+    expect(v[v.length - 1].id).toBe(id);
+    expect(v).toHaveLength(2);
+  });
+
+  it("addVideoTrack('bottom') añade abajo (índice 0)", () => {
+    const s = useProjectStore.getState();
+    const id = s.addVideoTrack("bottom");
+    expect(useProjectStore.getState().project.tracks.video[0].id).toBe(id);
+  });
+
+  it("reorderVideoTrack mueve una pista a otro índice", () => {
+    const s = useProjectStore.getState();
+    const top = s.addVideoTrack("top"); // [base, top]
+    s.reorderVideoTrack(1, 0);          // [top, base]
+    const v = useProjectStore.getState().project.tracks.video;
+    expect(v[0].id).toBe(top);
+    expect(v).toHaveLength(2);
+  });
+});
+
 describe("applyPreset", () => {
   it("sustituye formato, textos e imágenes conservando vídeo, con ids nuevos y undo", () => {
     const s = useProjectStore.getState();

@@ -63,8 +63,18 @@ export const videoClipSchema = z
       grayscale: z.number().min(0).max(1),
     }),
     crop: cropRectSchema.default(null),
+    // opacidad de la capa (1 = opaca). Sin efecto hasta la fase de compositación
+    opacity: norm.default(1),
   })
   .refine((c) => c.trimOut > c.trimIn, { message: "trimOut debe ser mayor que trimIn" });
+
+export const videoTrackSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().default(""),
+  clips: z.array(videoClipSchema),
+});
+
+export type VideoTrack = z.infer<typeof videoTrackSchema>;
 
 const overlayWindow = {
   start: z.number().min(0),
@@ -114,10 +124,10 @@ export const audioTrackSchema = z.object({
 export const projectSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(80),
-  version: z.literal(1),
+  version: z.literal(2),
   settings: projectSettingsSchema,
   tracks: z.object({
-    video: z.array(videoClipSchema),
+    video: z.array(videoTrackSchema),
     text: z.array(textOverlaySchema),
     image: z.array(imageOverlaySchema),
     audio: z.array(audioTrackSchema),
@@ -125,6 +135,15 @@ export const projectSchema = z.object({
   originalAudioVolume: norm,
   subtitles: subtitlesSchema,
 });
+
+export function createVideoTrack(name = ""): VideoTrack {
+  return { id: globalThis.crypto.randomUUID(), name, clips: [] };
+}
+
+/** Todos los clips de vídeo de todas las pistas, en orden de pista (z-order). */
+export function allVideoClips(project: Project): VideoClip[] {
+  return project.tracks.video.flatMap((t) => t.clips);
+}
 
 export type Background = z.infer<typeof backgroundSchema>;
 export type ProjectSettings = z.infer<typeof projectSettingsSchema>;
@@ -138,7 +157,7 @@ export function createEmptyProject(name: string): Project {
   return {
     id: globalThis.crypto.randomUUID(),
     name,
-    version: 1,
+    version: 2,
     settings: {
       aspect: "9:16",
       ...ASPECT_PRESETS["9:16"],
@@ -149,7 +168,7 @@ export function createEmptyProject(name: string): Project {
       fadeOut: 0,
       clipTransition: 0,
     },
-    tracks: { video: [], text: [], image: [], audio: [] },
+    tracks: { video: [createVideoTrack()], text: [], image: [], audio: [] },
     originalAudioVolume: 1,
     subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 },
   };
@@ -230,5 +249,26 @@ export function createVideoClip(
     zoom: { x: 0.5, y: 0.5, scale: 1 },
     filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
     crop: null,
+    opacity: 1,
+  };
+}
+
+/**
+ * Migra un proyecto crudo (leído de disco/API) al esquema actual. v1 tenía
+ * `tracks.video` como array plano de clips; v2 lo envuelve en una sola pista.
+ * Pura e idempotente: un proyecto ya v2 se devuelve tal cual.
+ */
+export function migrateProject(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const p = raw as { version?: number; tracks?: { video?: unknown } };
+  if (p.version !== 1) return raw;
+  const flat = Array.isArray(p.tracks?.video) ? p.tracks.video : [];
+  return {
+    ...p,
+    version: 2,
+    tracks: {
+      ...(p.tracks ?? {}),
+      video: [{ id: globalThis.crypto.randomUUID(), name: "", clips: flat }],
+    },
   };
 }

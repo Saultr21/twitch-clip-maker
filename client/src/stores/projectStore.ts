@@ -653,18 +653,25 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     moveOverlay: (kind, id, newStart, opts) =>
       mutate((d) => {
-        let o: { id: string; start: number; end: number } | undefined;
         if (kind === "audio") {
-          o = d.tracks.audio.find((x) => x.id === id);
-        } else if (kind === "image") {
-          o = findImage(d, id)?.item;
-        } else {
-          o = findText(d, id)?.item;
+          // El audio puede solaparse (varias pistas de música): sin no-solape
+          const a = d.tracks.audio.find((x) => x.id === id);
+          if (!a) return;
+          const dur = a.end - a.start;
+          a.start = Math.max(0, newStart);
+          a.end = a.start + dur;
+          return;
         }
-        if (!o) return;
-        const dur = o.end - o.start;
-        o.start = Math.max(0, newStart);
-        o.end = o.start + dur;
+        // Imagen/texto: no-solape dentro de su carril (rechaza, como moveVideoClip)
+        const ctx = kind === "image" ? findImage(d, id) : findText(d, id);
+        if (!ctx) return;
+        const dur = ctx.item.end - ctx.item.start;
+        const start = Math.max(0, newStart);
+        const end = start + dur;
+        const overlaps = ctx.layer.items.some((s) => s.id !== id && start < s.end && end > s.start);
+        if (overlaps) return;
+        ctx.item.start = start;
+        ctx.item.end = end;
       }, opts),
 
     trimOverlay: (kind, id, edge, t, opts) =>

@@ -9,12 +9,47 @@ const SYNC_TOLERANCE = 0.15; // s de deriva admitida antes de re-sincronizar
 
 export function usePlaybackEngine(
   videoRef: RefObject<HTMLVideoElement | null>,
-  _overlayVideos: RefObject<Map<string, HTMLVideoElement>>,
+  overlayVideos: RefObject<Map<string, HTMLVideoElement>>,
 ) {
   const rafRef = useRef(0);
   const lastTickRef = useRef(0);
 
-  /** Sincroniza el <video> con el playhead: src, currentTime y play/pause. */
+  /**
+   * Sincroniza los <video> esclavos (pistas superiores) con el playhead.
+   * Si no hay esclavos registrados, es un no-op (proyecto de una sola pista).
+   */
+  const syncOverlays = useCallback(
+    (seeking: boolean) => {
+      const map = overlayVideos.current;
+      if (!map || map.size === 0) return;
+      const { playhead, playing } = useUiStore.getState();
+      const project = useProjectStore.getState().project;
+      const clips = useClipsStore.getState().clips;
+      const volume = usePlayerStore.getState().volume;
+      for (const track of project.tracks.video.slice(1)) {
+        const el = map.get(track.id);
+        if (!el) continue;
+        const active = videoClipAt(track.clips, playhead);
+        if (!active) {
+          if (!el.paused) el.pause();
+          continue;
+        }
+        const info = clips.find((c) => c.id === active.clipId);
+        if (!info) continue;
+        const src = `/files/${info.fileName}`;
+        if (el.getAttribute("src") !== src) el.src = src;
+        el.volume = volume;
+        if (el.playbackRate !== active.speed) el.playbackRate = active.speed;
+        const target = sourceTimeFor(active, playhead);
+        if (seeking || Math.abs(el.currentTime - target) > SYNC_TOLERANCE) el.currentTime = target;
+        if (playing && el.paused) void el.play().catch(() => {});
+        if (!playing && !el.paused) el.pause();
+      }
+    },
+    [overlayVideos],
+  );
+
+  /** Sincroniza el <video> base con el playhead: src, currentTime y play/pause. */
   const sync = useCallback(
     (seeking: boolean) => {
       const video = videoRef.current;
@@ -26,6 +61,7 @@ export function usePlaybackEngine(
 
       if (!active) {
         video.pause();
+        syncOverlays(seeking);
         return;
       }
       const info = clips.find((c) => c.id === active.clipId);
@@ -43,8 +79,9 @@ export function usePlaybackEngine(
       }
       if (playing && video.paused) void video.play();
       if (!playing && !video.paused) video.pause();
+      syncOverlays(seeking);
     },
-    [videoRef],
+    [videoRef, syncOverlays],
   );
 
   // Ediciones del proyecto (añadir/recortar/mover clips) re-sincronizan el
@@ -94,6 +131,8 @@ export function usePlaybackEngine(
           useUiStore.getState().setPlayhead(playhead + delta);
           sync(false);
         }
+        // Corregir deriva de los esclavos cada frame (además del sync principal)
+        syncOverlays(false);
         lastTickRef.current = now;
         rafRef.current = requestAnimationFrame(tick);
       };
@@ -104,7 +143,7 @@ export function usePlaybackEngine(
       unsub();
       cancelAnimationFrame(rafRef.current);
     };
-  }, [sync, videoRef]);
+  }, [sync, syncOverlays, videoRef]);
 
   /** Mueve el playhead (scrub, clic en regla, transporte). */
   const seek = useCallback(

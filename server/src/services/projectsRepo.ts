@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Project } from "@clipforge/shared";
-import { projectSchema } from "@clipforge/shared";
+import { migrateProject, projectSchema } from "@clipforge/shared";
 import { PROJECTS_DIR } from "../lib/paths.js";
 
 // Nombres de dispositivo de Win32: CON.json se resuelve como handle de dispositivo
@@ -47,7 +47,8 @@ export function saveProject(name: string, project: Project, dir: string = PROJEC
 
 function tryRead(file: string): Project | null {
   try {
-    const parsed = projectSchema.safeParse(JSON.parse(fs.readFileSync(file, "utf8")));
+    const raw = migrateProject(JSON.parse(fs.readFileSync(file, "utf8")));
+    const parsed = projectSchema.safeParse(raw);
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

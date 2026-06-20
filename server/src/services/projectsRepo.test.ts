@@ -71,4 +71,17 @@ describe("projectsRepo", () => {
   it("devuelve null si no existe", () => {
     expect(loadProject("nada", dir)).toBeNull();
   });
+
+  it("migra un proyecto v1 en disco al cargarlo (v2 con una pista)", () => {
+    // v1 = proyecto v2 válido degradado (tracks.video plano, version 1)
+    const v2 = createEmptyProject("demo") as unknown as Record<string, any>;
+    const clip = { id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
+      zoom: { x: 0.5, y: 0.5, scale: 1 },
+      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 }, crop: null };
+    const v1 = { ...v2, version: 1, tracks: { ...v2.tracks, video: [clip] } };
+    fs.writeFileSync(path.join(dir, "demo.json"), JSON.stringify(v1));
+    const loaded = loadProject("demo", dir);
+    expect(loaded?.version).toBe(2);
+    expect(loaded?.tracks.video[0].clips[0].id).toBe("v1");
+  });
 });

@@ -7,7 +7,10 @@ import { clipEnd, projectDuration, sourceTimeFor, videoClipAt } from "../../lib/
 
 const SYNC_TOLERANCE = 0.15; // s de deriva admitida antes de re-sincronizar
 
-export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) {
+export function usePlaybackEngine(
+  videoRef: RefObject<HTMLVideoElement | null>,
+  _overlayVideos: RefObject<Map<string, HTMLVideoElement>>,
+) {
   const rafRef = useRef(0);
   const lastTickRef = useRef(0);
 

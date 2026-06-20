@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef, useState, type ReactNode, type RefObject } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode, type RefObject } from "react";
 import { OverlayLayer } from "./OverlayLayer";
 import { PreviewCanvas } from "./PreviewCanvas";
 import { TransportBar } from "./TransportBar";
@@ -10,6 +10,7 @@ interface PlaybackApi {
   togglePlay: () => void;
   inGap: boolean;
   videoRef: RefObject<HTMLVideoElement | null>;
+  registerOverlayVideo: (trackId: string, el: HTMLVideoElement | null) => void;
 }
 
 const PlaybackContext = createContext<PlaybackApi | null>(null);
@@ -22,10 +23,16 @@ export function usePlayback(): PlaybackApi {
 
 export function PlaybackProvider({ children }: { children: ReactNode }) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const engine = usePlaybackEngine(videoRef);
+  // Registro de los <video> de las pistas superiores (esclavos), por id de pista
+  const overlayVideos = useRef<Map<string, HTMLVideoElement>>(new Map());
+  const registerOverlayVideo = useCallback((trackId: string, el: HTMLVideoElement | null) => {
+    if (el) overlayVideos.current.set(trackId, el);
+    else overlayVideos.current.delete(trackId);
+  }, []);
+  const engine = usePlaybackEngine(videoRef, overlayVideos);
   useMusicEngine();
   return (
-    <PlaybackContext.Provider value={{ ...engine, videoRef }}>
+    <PlaybackContext.Provider value={{ ...engine, videoRef, registerOverlayVideo }}>
       {children}
     </PlaybackContext.Provider>
   );

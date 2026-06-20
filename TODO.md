@@ -1,11 +1,18 @@
 # TODO — VideoForge (editor de vídeo local; antes ClipForge)
 
-> Last updated: 2026-06-19
-> Current phase: maintenance
-> Overall progress: Hitos 1–4 completos en master — proyecto funcional de punta a punta
+> Last updated: 2026-06-20
+> Current phase: development
+> Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master
 
 ## In Progress
-- (nada — proyecto funcional de punta a punta + todas las mejoras de Pendiente.txt hechas; pendiente smoke test del usuario de los subtítulos)
+- (nada — multipista y su gestión de pistas completas)
+
+## Gestión de pistas en el timeline (Fase 4b, 2026-06-20) — hecha
+- [x] Botón **+** compacto en la columna de etiquetas (izquierda) para añadir pista de vídeo (sustituye al "+ Pista" de la barra)
+- [x] Crear pista soltando un clip en un **hueco** por encima/debajo de los carriles: vale para clips de Medios (DnD) y para clips existentes (arrastre por pointer, vía ramas de hueco en `handleVideoMoveEnd`)
+- [x] **Reordenar pistas (z-order) arrastrando la cabecera** del carril (DnD nativo con tipo propio `application/x-video-track-index`, aislado del resto)
+- [x] Store: `addVideoTrack(position)` devuelve id, `reorderVideoTrack(from,to)`
+  - Plan: `docs/superpowers/plans/2026-06-20-multipista-fase4b-gestion-pistas.md`. Revisión por subagentes; 257 tests verdes (21+92+144) + typecheck limpio. Pendiente smoke test del usuario.
 
 ## Recorte directo (2026-06-19) — hecho
 - [x] UX de recorte de vídeo/imagen rehecha (commit 98adfe8, directo a master)

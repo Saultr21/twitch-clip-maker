@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import { SubtitlesLayer } from "./SubtitlesLayer";
 import { CropOverlay } from "./CropOverlay";
 import type { ImageOverlay, TextOverlay, VideoClip, VideoLayer } from "@clipforge/shared";
-import { imageItems, textItems, videoLayers } from "@clipforge/shared";
+import { videoLayers } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -363,9 +363,14 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const selection = useUiStore((s) => s.selection);
   const select = useUiStore((s) => s.select);
   const cropMode = useUiStore((s) => s.cropMode);
-  const texts = useProjectStore((s) => textItems(s.project));
-  const images = useProjectStore((s) => imageItems(s.project));
-  const videoTracks = useProjectStore((s) => videoLayers(s.project));
+  // Suscribirse a la referencia ESTABLE de layers y derivar con useMemo: los
+  // selectores videoLayers/imageItems/textItems crean un array nuevo cada llamada,
+  // y devolverlos directos desde el selector de Zustand provoca un bucle infinito
+  // en useSyncExternalStore ("getSnapshot should be cached") → app en negro.
+  const layers = useProjectStore((s) => s.project.tracks.layers);
+  const texts = useMemo(() => layers.flatMap((l) => (l.kind === "text" ? l.items : [])), [layers]);
+  const images = useMemo(() => layers.flatMap((l) => (l.kind === "image" ? l.items : [])), [layers]);
+  const videoTracks = useMemo(() => layers.filter((l): l is VideoLayer => l.kind === "video"), [layers]);
   // Guías de centrado: visibles solo mientras un arrastre engancha al centro
   const [guides, setGuides] = useState({ vertical: false, horizontal: false });
   const onGuides: GuidesCallback = (vertical, horizontal) =>

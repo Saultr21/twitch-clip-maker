@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
-import { ASPECT_PRESETS, videoLayers, type VideoLayer } from "@clipforge/shared";
+import { ASPECT_PRESETS, type VideoLayer } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -149,7 +149,11 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
   const select = useUiStore((s) => s.select);
-  const videoTracks = useProjectStore((s) => videoLayers(s.project));
+  // Suscribirse a la referencia ESTABLE de layers y derivar con useMemo (un
+  // selector que devuelve videoLayers(...) crea array nuevo cada vez → bucle
+  // infinito en useSyncExternalStore → app en negro).
+  const layers = useProjectStore((s) => s.project.tracks.layers);
+  const videoTracks = useMemo(() => layers.filter((l): l is VideoLayer => l.kind === "video"), [layers]);
   // Para la comprobación "sin clips" del estado vacío, miramos la capa base
   const baseTrackClips = videoTracks[0]?.clips ?? [];
   const background = settings.background;

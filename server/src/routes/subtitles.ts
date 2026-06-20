@@ -19,6 +19,7 @@ const startBody = z.object({
       hue: z.number(), grayscale: z.number(),
     }),
     crop: z.object({ x: z.number(), y: z.number(), w: z.number(), h: z.number() }).nullable().default(null),
+    opacity: z.number().default(1),
   }),
   language: z.string().optional(),
   model: z.enum(["small", "medium"]).optional(),

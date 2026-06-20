@@ -7,7 +7,7 @@ function clip(over: Partial<VideoClip>): VideoClip {
     id: "v1", clipId: "c1", timelineStart: 10, trimIn: 2, trimOut: 8, speed: 1,
     zoom: { x: 0.5, y: 0.5, scale: 1 },
     filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-    crop: null,
+    crop: null, opacity: 1,
     ...over,
   };
 }

@@ -19,7 +19,7 @@ interface ExportDialogProps {
 
 export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const projectName = useProjectStore((s) => s.project.name);
-  const hasClips = useProjectStore((s) => s.project.tracks.video.length > 0);
+  const hasClips = useProjectStore((s) => (s.project.tracks.video[0]?.clips.length ?? 0) > 0);
   const { state, start, cancel, reset, openFolder } = useExport();
   const [preset, setPreset] = useState<QualityPresetId>("tiktok");
   const [fileName, setFileName] = useState("");

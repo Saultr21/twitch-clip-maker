@@ -199,7 +199,7 @@ function VideoProperties({ clipId }: { clipId: string }) {
   const applyReframe = useProjectStore((s) => s.applyReframe);
   const settings = useProjectStore((s) => s.project.settings);
   const clipInfos = useClipsStore((s) => s.clips);
-  const clip = useProjectStore((s) => s.project.tracks.video.find((c) => c.id === clipId));
+  const clip = useProjectStore((s) => s.project.tracks.video[0]?.clips.find((c) => c.id === clipId));
   const [silence, setSilence] = useState<SilenceState>("idle");
   const [reframe, setReframe] = useState<ReframeState>({ phase: "idle" });
   if (!clip) return null;

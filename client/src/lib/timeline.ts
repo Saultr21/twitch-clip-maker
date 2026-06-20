@@ -1,4 +1,5 @@
 import type { Project, VideoClip } from "@clipforge/shared";
+import { allVideoClips } from "@clipforge/shared";
 
 export function clipDuration(c: VideoClip): number {
   return (c.trimOut - c.trimIn) / c.speed;
@@ -10,7 +11,7 @@ export function clipEnd(c: VideoClip): number {
 
 export function projectDuration(p: Project): number {
   const ends = [
-    ...p.tracks.video.map(clipEnd),
+    ...allVideoClips(p).map(clipEnd),
     ...p.tracks.text.map((t) => t.end),
     ...p.tracks.image.map((i) => i.end),
     ...p.tracks.audio.map((a) => a.end),
@@ -43,7 +44,7 @@ export function hasOverlap(
 /** Puntos de imán: 0 y los bordes de todos los bloques de todas las pistas. */
 export function findSnapPoints(p: Project, excludeId?: string): number[] {
   const points = new Set<number>([0]);
-  for (const c of p.tracks.video) {
+  for (const c of allVideoClips(p)) {
     if (c.id === excludeId) continue;
     points.add(c.timelineStart);
     points.add(clipEnd(c));

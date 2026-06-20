@@ -45,25 +45,26 @@ export function Timeline({ height }: { height: number }) {
   const canCrop = selection?.kind === "image" || selection?.kind === "video";
   const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const videoCount = project.tracks.video.length;
+  const videoCount = project.tracks.video[0]?.clips.length ?? 0;
   const prevVideoCount = useRef(videoCount);
   // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
   useEffect(() => {
-    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && project.tracks.video.length > 0) {
-      const last = project.tracks.video[project.tracks.video.length - 1];
+    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && (project.tracks.video[0]?.clips.length ?? 0) > 0) {
+      const clips = project.tracks.video[0].clips;
+      const last = clips[clips.length - 1];
       const left = 80 + last.timelineStart * pxPerSecond - 60;
       scrollRef.current.scrollLeft = Math.max(0, left);
     }
     prevVideoCount.current = videoCount;
-  }, [videoCount, project.tracks.video, pxPerSecond, dirty]);
-  const canSplit = project.tracks.video.length > 0;
+  }, [videoCount, project.tracks.video[0]?.clips, pxPerSecond, dirty]);
+  const canSplit = (project.tracks.video[0]?.clips.length ?? 0) > 0;
 
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
 
   const videoBlocks: BlockDescriptor[] = useMemo(
     () =>
-      project.tracks.video.map((c) => {
+      (project.tracks.video[0]?.clips ?? []).map((c) => {
         const info = clips.find((i) => i.id === c.clipId);
         return {
           id: c.id,
@@ -77,7 +78,7 @@ export function Timeline({ height }: { height: number }) {
             : undefined,
         };
       }),
-    [project.tracks.video, clips],
+    [project.tracks.video[0]?.clips, clips],
   );
 
   const textBlocks: BlockDescriptor[] = project.tracks.text.map((t) => ({

@@ -60,7 +60,7 @@ export function buildFilterGraph(
   assPath?: string,
 ): FilterGraph {
   const { width: W, height: H, fps, background: bg } = project.settings;
-  const clips = [...project.tracks.video].sort((a, b) => a.timelineStart - b.timelineStart);
+  const clips = [...(project.tracks.video[0]?.clips ?? [])].sort((a, b) => a.timelineStart - b.timelineStart);
   if (clips.length === 0) throw new Error("El proyecto no tiene clips de vídeo");
 
   const inputs: GraphInput[] = [];

@@ -42,12 +42,12 @@ export function SubtitlesPanel() {
     const project = useProjectStore.getState().project;
     const playhead = useUiStore.getState().playhead;
     // clip bajo el playhead, o el primero si el playhead está en un hueco
-    const clip = videoClipAt(project.tracks.video, playhead) ?? project.tracks.video[0];
+    const clip = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead) ?? project.tracks.video[0]?.clips[0];
     if (!clip) return;
     void start(clip, language, model);
   };
 
-  const hasClips = useProjectStore((s) => s.project.tracks.video.length > 0);
+  const hasClips = useProjectStore((s) => (s.project.tracks.video[0]?.clips.length ?? 0) > 0);
 
   const clearAll = async () => {
     const n = useProjectStore.getState().project.subtitles.cues.length;

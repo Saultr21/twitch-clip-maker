@@ -32,7 +32,7 @@ export function ToolRail() {
       // color y velocidad están en el panel de propiedades)
       const { project } = useProjectStore.getState();
       const playhead = useUiStore.getState().playhead;
-      const clip = videoClipAt(project.tracks.video, playhead) ?? project.tracks.video[0];
+      const clip = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead) ?? project.tracks.video[0]?.clips[0];
       if (clip) useUiStore.getState().select({ kind: "video", id: clip.id });
       return;
     }

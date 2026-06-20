@@ -73,7 +73,7 @@ function getCurrentCrop(selection: { kind: string; id: string } | null): NonNull
     return useProjectStore.getState().project.tracks.image.find(i => i.id === selection.id)?.crop ?? FULL;
   }
   if (selection?.kind === "video") {
-    return useProjectStore.getState().project.tracks.video.find(v => v.id === selection.id)?.crop ?? FULL;
+    return useProjectStore.getState().project.tracks.video[0]?.clips.find(v => v.id === selection.id)?.crop ?? FULL;
   }
   return FULL;
 }
@@ -104,7 +104,7 @@ function computeBounds(
   if (selection.kind === "video") {
     // El vídeo recortado se muestra MÁS pequeño (sub-rect del fotograma): el rect
     // visible parte de la colocación del frame completo y aplica el recorte actual
-    const clip = useProjectStore.getState().project.tracks.video.find(c => c.id === selection.id);
+    const clip = useProjectStore.getState().project.tracks.video[0]?.clips.find(c => c.id === selection.id);
     if (!clip) return null;
     const info = useClipsStore.getState().clips.find(c => c.id === clip.clipId);
     if (!info) return null;

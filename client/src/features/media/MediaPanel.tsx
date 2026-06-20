@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Trash2, Upload } from "lucide-react";
 import type { ClipInfo } from "@clipforge/shared";
+import { allVideoClips } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -40,7 +41,7 @@ export function MediaPanel() {
 
   const addToTimeline = (clip: ClipInfo) => {
     useProjectStore.getState().addVideoClip(clip);
-    const tracks = useProjectStore.getState().project.tracks.video;
+    const tracks = useProjectStore.getState().project.tracks.video[0]?.clips ?? [];
     const newClip = tracks[tracks.length - 1];
     if (newClip) {
       useUiStore.getState().select({ kind: "video", id: newClip.id });
@@ -48,7 +49,7 @@ export function MediaPanel() {
   };
 
   const onDelete = async (clip: ClipInfo) => {
-    const inTimeline = useProjectStore.getState().project.tracks.video.some((v) => v.clipId === clip.id);
+    const inTimeline = allVideoClips(useProjectStore.getState().project).some((v) => v.clipId === clip.id);
     const msg = inTimeline
       ? `¿Borrar «${clip.title}»? Se quitará también de la línea de tiempo.`
       : `¿Borrar «${clip.title}»? Esta acción no se puede deshacer.`;

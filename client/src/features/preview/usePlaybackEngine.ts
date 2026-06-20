@@ -19,7 +19,7 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
       const { playhead, playing } = useUiStore.getState();
       const project = useProjectStore.getState().project;
       const clips = useClipsStore.getState().clips;
-      const active = videoClipAt(project.tracks.video, playhead);
+      const active = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead);
 
       if (!active) {
         video.pause();
@@ -73,7 +73,7 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
           useUiStore.getState().setPlayhead(total);
           return;
         }
-        const active = videoClipAt(project.tracks.video, playhead);
+        const active = videoClipAt(project.tracks.video[0]?.clips ?? [], playhead);
         const video = videoRef.current;
         if (active && video) {
           if (video.currentTime >= active.trimOut) {
@@ -121,7 +121,7 @@ export function usePlaybackEngine(videoRef: RefObject<HTMLVideoElement | null>) 
   /** True si el playhead está en un hueco (sin clip de vídeo activo). */
   const inGap = useUiStore((s) => {
     const project = useProjectStore.getState().project;
-    return videoClipAt(project.tracks.video, s.playhead) === null;
+    return videoClipAt(project.tracks.video[0]?.clips ?? [], s.playhead) === null;
   });
 
   return { seek, togglePlay, inGap };

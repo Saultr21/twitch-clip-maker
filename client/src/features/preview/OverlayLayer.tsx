@@ -235,7 +235,7 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
   const clips = useClipsStore((s) => s.clips);
   // clip activo: depende del playhead y de la pista (referencias estables)
-  const videoTrack = useProjectStore((s) => s.project.tracks.video);
+  const videoTrack = useProjectStore((s) => s.project.tracks.video[0]?.clips ?? []);
   const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
   const selected =
     !!activeClip && selection?.kind === "video" && selection.id === activeClip.id;
@@ -263,7 +263,7 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
   const vTop = activeClip.zoom.y * (height - vH);
 
   const clipNow = () =>
-    useProjectStore.getState().project.tracks.video.find((c) => c.id === activeClip.id);
+    useProjectStore.getState().project.tracks.video[0]?.clips.find((c) => c.id === activeClip.id);
 
   return (
     <>

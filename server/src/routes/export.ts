@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { execa } from "execa";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
@@ -99,11 +101,21 @@ export function exportRoutes(app: FastifyInstance): void {
     return reply.code(204).send();
   });
 
-  // Abre la carpeta de exports en el Explorador. Se invoca explorer.exe con la
-  // ruta del directorio directamente: abrir un directorio siempre lanza el
-  // Explorador (nunca el verbo "editar" de un script). explorer.exe devuelve
-  // código ≠ 0 aun teniendo éxito, por eso reject:false.
-  app.post("/api/exports/open", async () => {
+  // Revela el archivo exportado en el Explorador. `explorer.exe /select,<archivo>`
+  // SIEMPRE abre y enfoca una ventana con el archivo resaltado — a diferencia de
+  // abrir solo la carpeta, que Windows ignora si ya hay una ventana de esa carpeta
+  // abierta (el bug que veía el usuario: "no pasa nada"). Si no llega un archivo
+  // válido (o no existe), cae a abrir la carpeta. explorer.exe devuelve código ≠ 0
+  // aun teniendo éxito, por eso reject:false. `path.basename` evita path traversal.
+  app.post("/api/exports/open", async (req) => {
+    const { fileName } = z.object({ fileName: z.string().optional() }).parse(req.body ?? {});
+    if (fileName) {
+      const full = path.join(EXPORTS_DIR, path.basename(fileName));
+      if (fs.existsSync(full)) {
+        void execa("explorer.exe", [`/select,${full}`], { reject: false });
+        return { opened: true };
+      }
+    }
     void execa("explorer.exe", [EXPORTS_DIR], { reject: false });
     return { opened: true };
   });

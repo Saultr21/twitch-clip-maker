@@ -182,7 +182,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
               <p className="flex items-center gap-1.5 text-[10px]">
                 <CheckCircle2 size={13} aria-hidden="true" className="shrink-0 text-accent-soft" />
                 <span><span className="font-mono text-accent-soft">{extra.name}</span> guardado.</span>
-                <button type="button" onClick={openFolder} className="ml-auto text-accent-soft hover:underline">Abrir carpeta</button>
+                <button type="button" onClick={() => openFolder(extra.name)} className="ml-auto text-accent-soft hover:underline">Abrir carpeta</button>
               </p>
             )}
             {extra.phase === "error" && <p role="alert" className="text-[10px] text-danger">No se pudo generar.</p>}
@@ -219,7 +219,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
               <span>Exportado como <span className="font-mono text-accent-soft">{state.fileName}</span></span>
             </p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={openFolder} className="flex items-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
+              <button type="button" onClick={() => openFolder(state.fileName)} className="flex items-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
                 <FolderOpen size={14} aria-hidden="true" />
                 Abrir carpeta
               </button>

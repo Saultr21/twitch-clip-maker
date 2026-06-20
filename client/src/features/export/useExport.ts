@@ -69,8 +69,14 @@ export function useExport() {
 
   const reset = useCallback(() => setState({ phase: "idle" }), []);
 
-  const openFolder = useCallback(() => {
-    void fetch("/api/exports/open", { method: "POST" });
+  // Revela el archivo exportado en el Explorador (resaltado). Si no se pasa
+  // nombre, el servidor abre la carpeta de exports a secas.
+  const openFolder = useCallback((fileName?: string) => {
+    void fetch("/api/exports/open", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ fileName }),
+    });
   }, []);
 
   return { state, start, cancel, reset, openFolder };

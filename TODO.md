@@ -5,7 +5,10 @@
 > Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master + migración a modelo de capas (layers) completada
 
 ## In Progress
-- (nada — migración a `tracks.layers` completada: Tasks 4, 5, 6 commiteadas)
+- [ ] `TASK-015` Capas unificadas (vídeo+imagen+texto en un z-stack) — épico en curso
+  - Spec: `docs/superpowers/specs/2026-06-20-capas-unificadas-design.md`
+  - **Fase 1 (modelo `layers[]` + migración v3) — HECHA**: `tracks.layers: Layer[]` (capas tipadas), `migrateLayers` v2→v3 (encadenada tras `migrateProject`), store/lectores/tests migrados vía selectores. Comportamiento preservado (una capa imagen + una texto; composición vídeo→imagen→texto). 263 tests verdes + typecheck limpio. Plan: `docs/superpowers/plans/2026-06-20-capas-fase1-modelo.md`.
+  - **Pendiente**: Fase 2 (export por orden de capas), Fase 3 (timeline unificado), Fase 4 (preview rearquitecturado opción A — diseño propio), Fase 5 (pulido).
 
 ## Ajustes UX del multipista (2026-06-20) — hecho
 - [x] Botón **+** movido a la cabecera de cada pista de vídeo (no en fila aparte)

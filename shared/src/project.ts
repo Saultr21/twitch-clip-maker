@@ -110,6 +110,32 @@ export const imageOverlaySchema = z.object({
   ...overlayWindow,
 });
 
+export const videoLayerSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("video"),
+  name: z.string().default(""),
+  clips: z.array(videoClipSchema),
+});
+export const imageLayerSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("image"),
+  name: z.string().default(""),
+  items: z.array(imageOverlaySchema),
+});
+export const textLayerSchema = z.object({
+  id: z.string().min(1),
+  kind: z.literal("text"),
+  name: z.string().default(""),
+  items: z.array(textOverlaySchema),
+});
+export const layerSchema = z.discriminatedUnion("kind", [
+  videoLayerSchema, imageLayerSchema, textLayerSchema,
+]);
+export type VideoLayer = z.infer<typeof videoLayerSchema>;
+export type ImageLayer = z.infer<typeof imageLayerSchema>;
+export type TextLayer = z.infer<typeof textLayerSchema>;
+export type Layer = z.infer<typeof layerSchema>;
+
 export const audioTrackSchema = z.object({
   id: z.string().min(1),
   assetId: z.string().min(1),
@@ -124,12 +150,10 @@ export const audioTrackSchema = z.object({
 export const projectSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(80),
-  version: z.literal(2),
+  version: z.literal(3),
   settings: projectSettingsSchema,
   tracks: z.object({
-    video: z.array(videoTrackSchema),
-    text: z.array(textOverlaySchema),
-    image: z.array(imageOverlaySchema),
+    layers: z.array(layerSchema),
     audio: z.array(audioTrackSchema),
   }),
   originalAudioVolume: norm,
@@ -140,9 +164,34 @@ export function createVideoTrack(name = ""): VideoTrack {
   return { id: globalThis.crypto.randomUUID(), name, clips: [] };
 }
 
-/** Todos los clips de vídeo de todas las pistas, en orden de pista (z-order). */
-export function allVideoClips(project: Project): VideoClip[] {
-  return project.tracks.video.flatMap((t) => t.clips);
+export function createVideoLayer(name = ""): VideoLayer {
+  return { id: globalThis.crypto.randomUUID(), kind: "video", name, clips: [] };
+}
+export function createImageLayer(name = ""): ImageLayer {
+  return { id: globalThis.crypto.randomUUID(), kind: "image", name, items: [] };
+}
+export function createTextLayer(name = ""): TextLayer {
+  return { id: globalThis.crypto.randomUUID(), kind: "text", name, items: [] };
+}
+
+export function videoLayers(p: Project): VideoLayer[] {
+  return p.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
+}
+export function imageLayers(p: Project): ImageLayer[] {
+  return p.tracks.layers.filter((l): l is ImageLayer => l.kind === "image");
+}
+export function textLayers(p: Project): TextLayer[] {
+  return p.tracks.layers.filter((l): l is TextLayer => l.kind === "text");
+}
+/** Todos los clips de vídeo (todas las capas vídeo), en orden de capa. */
+export function allVideoClips(p: Project): VideoClip[] {
+  return videoLayers(p).flatMap((l) => l.clips);
+}
+export function imageItems(p: Project): ImageOverlay[] {
+  return imageLayers(p).flatMap((l) => l.items);
+}
+export function textItems(p: Project): TextOverlay[] {
+  return textLayers(p).flatMap((l) => l.items);
 }
 
 export type Background = z.infer<typeof backgroundSchema>;
@@ -157,7 +206,7 @@ export function createEmptyProject(name: string): Project {
   return {
     id: globalThis.crypto.randomUUID(),
     name,
-    version: 2,
+    version: 3,
     settings: {
       aspect: "9:16",
       ...ASPECT_PRESETS["9:16"],
@@ -168,7 +217,7 @@ export function createEmptyProject(name: string): Project {
       fadeOut: 0,
       clipTransition: 0,
     },
-    tracks: { video: [createVideoTrack()], text: [], image: [], audio: [] },
+    tracks: { layers: [createVideoLayer()], audio: [] },
     originalAudioVolume: 1,
     subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 },
   };
@@ -251,6 +300,32 @@ export function createVideoClip(
     crop: null,
     opacity: 1,
   };
+}
+
+/**
+ * v2 (tracks.video/image/text separados) → v3 (tracks.layers). Pura e idempotente.
+ * Orden de capas: vídeo (atrás) → imagen → texto (frente), conservando el z visual de v2.
+ * Fase 1: una sola capa de imagen y una de texto (sin trocear por solape; eso se hará
+ * en la fase de timeline). El no-solape por carril de imagen/texto se relaja aquí.
+ */
+export function migrateLayers(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object") return raw;
+  const p = raw as { version?: number; tracks?: any };
+  if (p.version !== 2) return raw;
+  const t = p.tracks ?? {};
+  const videoLayersArr = (Array.isArray(t.video) ? t.video : []).map((trk: any) => ({
+    id: trk.id ?? globalThis.crypto.randomUUID(),
+    kind: "video", name: trk.name ?? "", clips: trk.clips ?? [],
+  }));
+  const layers: any[] = [...videoLayersArr];
+  if (Array.isArray(t.image) && t.image.length) {
+    layers.push({ id: globalThis.crypto.randomUUID(), kind: "image", name: "", items: t.image });
+  }
+  if (Array.isArray(t.text) && t.text.length) {
+    layers.push({ id: globalThis.crypto.randomUUID(), kind: "text", name: "", items: t.text });
+  }
+  if (layers.length === 0) layers.push({ id: globalThis.crypto.randomUUID(), kind: "video", name: "", clips: [] });
+  return { ...p, version: 3, tracks: { layers, audio: t.audio ?? [] } };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { Project } from "./project.js";
-import { imageOverlaySchema, projectSettingsSchema, textOverlaySchema } from "./project.js";
+import { imageItems, imageOverlaySchema, projectSettingsSchema, textItems, textOverlaySchema } from "./project.js";
 
 export const presetSchema = z.object({
   name: z.string().min(1).max(80),
@@ -16,7 +16,7 @@ export function projectToPreset(name: string, project: Project): Preset {
   return {
     name,
     settings: { ...project.settings },
-    text: project.tracks.text.map((t) => ({ ...t })),
-    image: project.tracks.image.map((i) => ({ ...i })),
+    text: textItems(project).map((t) => ({ ...t })),
+    image: imageItems(project).map((i) => ({ ...i })),
   };
 }

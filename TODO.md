@@ -1,15 +1,16 @@
 # TODO — VideoForge (editor de vídeo local; antes ClipForge)
 
-> Last updated: 2026-06-20 23:00
+> Last updated: 2026-06-20 23:15
 > Current phase: development
-> Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master + migración a modelo de capas (layers) + export por orden de capas completados
+> Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master + migración a modelo de capas (layers) + export por orden de capas + timeline unificado de capas completados
 
 ## In Progress
 - [ ] `TASK-015` Capas unificadas (vídeo+imagen+texto en un z-stack) — épico en curso
   - Spec: `docs/superpowers/specs/2026-06-20-capas-unificadas-design.md`
   - **Fase 1 (modelo `layers[]` + migración v3) — HECHA**: `tracks.layers: Layer[]` (capas tipadas), `migrateLayers` v2→v3 (encadenada tras `migrateProject`), store/lectores/tests migrados vía selectores. Comportamiento preservado (una capa imagen + una texto; composición vídeo→imagen→texto). 263 tests verdes + typecheck limpio. Plan: `docs/superpowers/plans/2026-06-20-capas-fase1-modelo.md`.
   - **Fase 2 (export por orden de capas) — HECHA (2026-06-20)**: `buildFilterGraph` reescrito — modelo concat-base + overlays fijos → fondo único `[bg]` de duración total + overlays temporizados en orden de `tracks.layers`. Cualquier z-stack (texto detrás de un vídeo, imagen entre vídeos, etc.) ahora funciona en el export. clipTransition conservado en la primera capa de vídeo. Blur derivado del primer clip activo de la primera capa (negro en huecos). Audio = todos los clips de todas las capas con adelay+amix. Tests de equivalencia v2, orden inverso, imagen entre vídeos, regresión de colisión de etiquetas. E2e con capas intercaladas `[video, text, video, image]` verificado con ffprobe (1 vídeo + 1 audio). 150 tests server verdes, typecheck limpio. Plan: `docs/superpowers/plans/2026-06-20-capas-fase2-export.md`. Commit: `c650edc`.
-  - **Pendiente**: Fase 3 (timeline unificado), Fase 4 (preview rearquitecturado opción A — diseño propio), Fase 5 (pulido).
+  - **Fase 3 (timeline unificado) — HECHA (2026-06-20)**: Timeline reescrito sobre `tracks.layers` — un carril por capa (vídeo, imagen, texto) con etiqueta de tipo, botones `addVideoLayer`/`addImageLayer`/`addTextLayer`, arrastre de clips entre capas del mismo tipo via `moveElementToLayer` (rechaza tipo distinto y solapes), reordenado de capas con DnD nativo (`reorderLayer`), y eliminación de capas con `removeLayer` (guarda mínimo una de vídeo). 107 client + 25 shared + 150 server tests verdes, typecheck limpio en los 3 paquetes. Plan: `docs/superpowers/plans/2026-06-20-capas-fase3-timeline.md`.
+  - **Pendiente**: Fase 4 (preview rearquitecturado opción A — diseño propio), Fase 5 (pulido).
 
 ## Ajustes UX del multipista (2026-06-20) — hecho
 - [x] Botón **+** movido a la cabecera de cada pista de vídeo (no en fila aparte)

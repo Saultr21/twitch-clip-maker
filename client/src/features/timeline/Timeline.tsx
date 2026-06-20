@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Crop, Scissors, Trash2 } from "lucide-react";
+import type { VideoClip } from "@clipforge/shared";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -68,25 +69,6 @@ export function Timeline({ height }: { height: number }) {
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
 
-  const videoBlocks: BlockDescriptor[] = useMemo(
-    () =>
-      baseClips.map((c) => {
-        const info = clips.find((i) => i.id === c.clipId);
-        return {
-          id: c.id,
-          kind: "video" as const,
-          start: c.timelineStart,
-          end: clipEnd(c),
-          label: info?.title ?? "clip",
-          color: "bg-accent/25 text-accent-soft",
-          waveform: info
-            ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut }
-            : undefined,
-        };
-      }),
-    [baseClips, clips],
-  );
-
   const textBlocks: BlockDescriptor[] = project.tracks.text.map((t) => ({
     id: t.id,
     kind: "text" as const,
@@ -123,6 +105,17 @@ export function Timeline({ height }: { height: number }) {
     label: c.words.map((w) => w.text).join(" "),
     color: "bg-pink-500/20 text-pink-200",
   }));
+
+  const videoTracks = project.tracks.video;
+  const blocksForTrack = (clipsOfTrack: VideoClip[]): BlockDescriptor[] =>
+    clipsOfTrack.map((c) => {
+      const info = clips.find((i) => i.id === c.clipId);
+      return {
+        id: c.id, kind: "video" as const, start: c.timelineStart, end: clipEnd(c),
+        label: info?.title ?? "clip", color: "bg-accent/25 text-accent-soft",
+        waveform: info ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut } : undefined,
+      };
+    });
 
   // Texto, imagen, audio y subtítulos pueden solaparse en el tiempo: carriles automáticos
   const textLanes = assignLanes(textBlocks);
@@ -176,6 +169,11 @@ export function Timeline({ height }: { height: number }) {
             Recortar
           </button>
         )}
+        <button type="button" onClick={() => useProjectStore.getState().addVideoTrack()}
+          title="Añadir pista de vídeo" aria-label="Añadir pista de vídeo"
+          className="flex items-center gap-1 text-muted hover:text-text text-xs px-1.5">
+          + Pista
+        </button>
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input
           id="tl-zoom"
@@ -194,19 +192,27 @@ export function Timeline({ height }: { height: number }) {
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
           </div>
-          <TrackRow
-            title="Vídeo"
-            blocks={videoBlocks}
-            pxPerSecond={pxPerSecond}
-            onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
-            onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
-            onDropClip={(clipId, t) => {
-              const clip = clips.find((c) => c.id === clipId);
-              if (!clip) return;
-              useProjectStore.getState().addVideoClipAt(clip, t);
-              useUiStore.getState().select(null);
-            }}
-          />
+          {videoTracks.map((_, i) => i).reverse().map((i) => {
+            const track = videoTracks[i];
+            const isBase = i === 0;
+            return (
+              <TrackRow
+                key={track.id}
+                title={isBase ? "Vídeo" : `Vídeo ${i + 1}`}
+                blocks={blocksForTrack(track.clips)}
+                pxPerSecond={pxPerSecond}
+                onMove={(id, t, transient) => moveVideoClip(id, t, { transient })}
+                onTrim={(id, edge, t, transient) => trimVideoClip(id, edge, t, { transient })}
+                onDropClip={(clipId, t) => {
+                  const clip = clips.find((c) => c.id === clipId);
+                  if (!clip) return;
+                  useProjectStore.getState().addVideoClipToTrack(clip, track.id, t);
+                  useUiStore.getState().select(null);
+                }}
+                onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
+              />
+            );
+          })}
           <TrackRow
             title="Texto"
             blocks={textBlocks}

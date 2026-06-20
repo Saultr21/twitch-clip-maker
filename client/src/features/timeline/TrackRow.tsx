@@ -32,6 +32,8 @@ interface TrackRowProps {
   onTrim: (id: string, edge: "start" | "end", t: number, transient: boolean) => void;
   /** Soltar un clip de Medios (arrastrado) en el instante t de esta pista. */
   onDropClip?: (clipId: string, t: number) => void;
+  /** Si se define, muestra un botón "×" en la cabecera para borrar la pista. */
+  onRemoveTrack?: () => void;
 }
 
 const CLIP_DND_TYPE = "application/x-clip-id";
@@ -50,6 +52,7 @@ export function TrackRow({
   onMove,
   onTrim,
   onDropClip,
+  onRemoveTrack,
 }: TrackRowProps) {
   const [dropActive, setDropActive] = useState(false);
   // started: la transacción de historial se abre en el PRIMER movimiento real,
@@ -65,8 +68,12 @@ export function TrackRow({
 
   return (
     <div className="flex border-b border-border/60">
-      <div className="w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10">
-        {title}
+      <div className="w-20 shrink-0 px-2 py-1 text-[10px] text-muted border-r border-border bg-surface sticky left-0 z-10 flex items-center justify-between gap-1">
+        <span className="truncate">{title}</span>
+        {onRemoveTrack && (
+          <button type="button" onClick={onRemoveTrack} title="Quitar pista"
+            aria-label={`Quitar pista ${title}`} className="text-muted hover:text-danger shrink-0">×</button>
+        )}
       </div>
       <div
         className={`relative flex-1 ${dropActive ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}

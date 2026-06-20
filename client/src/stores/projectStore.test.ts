@@ -358,6 +358,34 @@ describe("pistas de vídeo (multipista)", () => {
   });
 });
 
+describe("addVideoClipToTrack", () => {
+  it("addVideoClipToTrack añade el clip a la pista indicada en el instante dado", () => {
+    const s = useProjectStore.getState();
+    s.addVideoTrack();
+    const destId = useProjectStore.getState().project.tracks.video[1].id;
+    s.addVideoClipToTrack(
+      { id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" },
+      destId, 2,
+    );
+    const st = useProjectStore.getState().project.tracks.video;
+    expect(st[0].clips).toHaveLength(0);
+    expect(st[1].clips).toHaveLength(1);
+    expect(st[1].clips[0].timelineStart).toBe(2);
+  });
+
+  it("addVideoClipToTrack cae al final si el instante solaparía en esa pista", () => {
+    const s = useProjectStore.getState();
+    s.addVideoTrack();
+    const destId = useProjectStore.getState().project.tracks.video[1].id;
+    const info = { id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" };
+    s.addVideoClipToTrack(info, destId, 0); // ocupa [0,5)
+    s.addVideoClipToTrack(info, destId, 2); // solaparía → al final (5)
+    const clips = useProjectStore.getState().project.tracks.video[1].clips;
+    expect(clips).toHaveLength(2);
+    expect(Math.max(...clips.map((c) => c.timelineStart))).toBe(5);
+  });
+});
+
 describe("applyPreset", () => {
   it("sustituye formato, textos e imágenes conservando vídeo, con ids nuevos y undo", () => {
     const s = useProjectStore.getState();

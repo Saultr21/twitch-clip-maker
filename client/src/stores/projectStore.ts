@@ -100,6 +100,7 @@ interface ProjectState {
   moveClipToTrack: (clipId: string, destTrackId: string, newStart: number, opts?: MutateOptions) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
+  addVideoClipToTrack: (clip: ClipInfo, trackId: string, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
   removeSilencesFromClip: (id: string, silences: Array<{ start: number; end: number }>) => void;
   applyReframe: (
@@ -230,6 +231,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         );
         const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
         track.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+      }),
+
+    addVideoClipToTrack: (clip, trackId, start) =>
+      mutate((d) => {
+        const track = d.tracks.video.find((t) => t.id === trackId);
+        if (!track) return;
+        const dur = clip.duration;
+        const desired = Math.max(0, start);
+        const overlaps = track.clips.some(
+          (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
+        );
+        const lastEnd = track.clips.length ? Math.max(...track.clips.map(clipEnd)) : 0;
+        track.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+        track.clips.sort((a, b) => a.timelineStart - b.timelineStart);
       }),
 
     // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente

@@ -397,25 +397,22 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
-        {/* Un VideoFrameNode por clip activo de cada pista. El clip SELECCIONADO
-            se renderiza el último (encima) para que su recuadro reciba el arrastre
-            y no quede tapado por el rect transparente de otra pista. */}
-        {[...activeClipsByTrack]
-          .sort((a, b) => {
-            const aSel = selection?.kind === "video" && selection.id === a.clip.id ? 1 : 0;
-            const bSel = selection?.kind === "video" && selection.id === b.clip.id ? 1 : 0;
-            return aSel - bSel;
-          })
-          .map(({ track, clip }) => (
-            <VideoFrameNode
-              key={track.id}
-              clip={clip}
-              width={width}
-              height={height}
-              onGuides={onGuides}
-              cropMode={cropMode}
-            />
-          ))}
+        {/* Un VideoFrameNode por clip activo de cada pista, en orden natural de
+            pista: la base (índice 0) abajo y las pistas superiores encima. Así, al
+            clicar una capa superior (su recuadro está encima) se selecciona ella, y
+            la base se selecciona/arrastra por sus zonas no tapadas. NO se sube el
+            seleccionado encima: si la base (frame completo) fuese encima, taparía
+            todo el lienzo e impediría seleccionar los clips superiores. */}
+        {activeClipsByTrack.map(({ track, clip }) => (
+          <VideoFrameNode
+            key={track.id}
+            clip={clip}
+            width={width}
+            height={height}
+            onGuides={onGuides}
+            cropMode={cropMode}
+          />
+        ))}
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}

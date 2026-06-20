@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Crop, Scissors, Trash2 } from "lucide-react";
 import type { VideoClip } from "@clipforge/shared";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
@@ -26,6 +26,47 @@ function PlayheadLine({ pxPerSecond }: { pxPerSecond: number }) {
       style={{ left: 80 + playhead * pxPerSecond }}
     >
       <div className="w-2.5 h-2.5 -ml-[5px] rotate-45 bg-accent" />
+    </div>
+  );
+}
+
+// Franja de drop en el hueco por encima/debajo del grupo de carriles de vídeo.
+// Acepta clips de Medios (DnD nativo, tipo application/x-clip-id) y llama onDrop
+// para crear una pista nueva y colocar el clip.
+// IMPORTANTE: este componente es HERMANO de <div ref={videoLanesRef}>, NO hijo,
+// para que videoLanesRef.current.children contenga solo carriles de vídeo y el
+// mapeo Y→carril de handleVideoMoveEnd siga siendo correcto.
+function GapDrop({
+  position,
+  pxPerSecond,
+  onDrop,
+}: {
+  position: "top" | "bottom";
+  pxPerSecond: number;
+  onDrop: (pos: "top" | "bottom", t: number, clipId: string) => void;
+}) {
+  const [active, setActive] = useState(false);
+  return (
+    <div className="flex">
+      <div className="w-20 shrink-0 border-r border-border bg-surface sticky left-0 z-10" />
+      <div
+        className={`flex-1 h-2 ${active ? "bg-accent/30 ring-1 ring-inset ring-accent" : ""}`}
+        onDragOver={(e) => {
+          if (e.dataTransfer.types.includes("application/x-clip-id")) {
+            e.preventDefault();
+            setActive(true);
+          }
+        }}
+        onDragLeave={() => setActive(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setActive(false);
+          const clipId = e.dataTransfer.getData("application/x-clip-id");
+          if (!clipId) return;
+          const rect = e.currentTarget.getBoundingClientRect();
+          onDrop(position, Math.max(0, (e.clientX - rect.left) / pxPerSecond), clipId);
+        }}
+      />
     </div>
   );
 }
@@ -121,19 +162,35 @@ export function Timeline({ height }: { height: number }) {
   const handleVideoMoveEnd = (clipId: string, clientY: number, start: number) => {
     const cont = videoLanesRef.current;
     if (!cont) return;
+    const contRect = cont.getBoundingClientRect();
+
+    // Si el puntero cae por ENCIMA del bloque de carriles: crear pista nueva arriba
+    if (clientY < contRect.top) {
+      const id = useProjectStore.getState().addVideoTrack("top");
+      useProjectStore.getState().moveClipToTrack(clipId, id, start);
+      return;
+    }
+    // Si el puntero cae por DEBAJO del bloque de carriles: crear pista nueva abajo
+    if (clientY >= contRect.bottom) {
+      const id = useProjectStore.getState().addVideoTrack("bottom");
+      useProjectStore.getState().moveClipToTrack(clipId, id, start);
+      return;
+    }
+
     // order[k] = índice de pista del carril visual k (0 = arriba). Los carriles se
     // renderizan en orden inverso (índice alto arriba = capa superior).
     const order = videoTracks.map((_, i) => i).reverse();
     // Carril destino = el hijo (carril) cuyo rect contiene la Y del puntero. Medir el
     // DOM real evita depender de alturas/bordes fijos y funciona con N pistas.
+    // INVARIANTE: cont.children son SOLO carriles TrackRow (las GapDrop son hermanas).
     const lanes = Array.from(cont.children) as HTMLElement[];
     let visualLane = lanes.findIndex((el) => {
       const r = el.getBoundingClientRect();
       return clientY >= r.top && clientY < r.bottom;
     });
     if (visualLane === -1) {
-      // por encima o por debajo del bloque de carriles: clampa al primero/último
-      visualLane = clientY < cont.getBoundingClientRect().top ? 0 : order.length - 1;
+      // dentro del rect del cont pero entre carriles: clampa al primero/último
+      visualLane = clientY < contRect.top ? 0 : order.length - 1;
     }
     const destIndex = order[Math.max(0, Math.min(order.length - 1, visualLane))];
     const destTrack = videoTracks[destIndex];
@@ -194,11 +251,6 @@ export function Timeline({ height }: { height: number }) {
             Recortar
           </button>
         )}
-        <button type="button" onClick={() => useProjectStore.getState().addVideoTrack()}
-          title="Añadir pista de vídeo" aria-label="Añadir pista de vídeo"
-          className="flex items-center gap-1 text-muted hover:text-text text-xs px-1.5">
-          + Pista
-        </button>
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input
           id="tl-zoom"
@@ -217,6 +269,34 @@ export function Timeline({ height }: { height: number }) {
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
           </div>
+          {/* Botón "+" en la columna de etiquetas, encima de los carriles de vídeo */}
+          <div className="flex border-b border-border/60">
+            <div className="w-20 shrink-0 px-2 py-0.5 border-r border-border bg-surface sticky left-0 z-10">
+              <button
+                type="button"
+                onClick={() => useProjectStore.getState().addVideoTrack("top")}
+                title="Añadir pista de vídeo"
+                aria-label="Añadir pista de vídeo"
+                className="text-muted hover:text-text text-sm leading-none"
+              >
+                +
+              </button>
+            </div>
+            <div className="flex-1" />
+          </div>
+          {/* GapDrop superior — hermana de videoLanesRef (no hija) */}
+          <GapDrop
+            position="top"
+            pxPerSecond={pxPerSecond}
+            onDrop={(pos, t, clipId) => {
+              const clip = clips.find((c) => c.id === clipId);
+              if (!clip) return;
+              const id = useProjectStore.getState().addVideoTrack(pos);
+              useProjectStore.getState().addVideoClipToTrack(clip, id, t);
+              useUiStore.getState().select(null);
+            }}
+          />
+          {/* INVARIANTE: videoLanesRef.current.children son SOLO carriles TrackRow */}
           <div ref={videoLanesRef}>
             {videoTracks.map((_, i) => i).reverse().map((i) => {
               const track = videoTracks[i];
@@ -241,6 +321,18 @@ export function Timeline({ height }: { height: number }) {
               );
             })}
           </div>
+          {/* GapDrop inferior — hermana de videoLanesRef (no hija) */}
+          <GapDrop
+            position="bottom"
+            pxPerSecond={pxPerSecond}
+            onDrop={(pos, t, clipId) => {
+              const clip = clips.find((c) => c.id === clipId);
+              if (!clip) return;
+              const id = useProjectStore.getState().addVideoTrack(pos);
+              useProjectStore.getState().addVideoClipToTrack(clip, id, t);
+              useUiStore.getState().select(null);
+            }}
+          />
           <TrackRow
             title="Texto"
             blocks={textBlocks}

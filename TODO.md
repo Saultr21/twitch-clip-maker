@@ -83,8 +83,10 @@
   - Priority: medium
 - [ ] `TASK-012` — Multipista: varias líneas de medios (vídeo/imagen superpuestos, PiP)
   - Picture-in-picture: un vídeo encima de otro, una imagen encima de otra, etc.
-  - Notas: feature MAYOR. Hoy la pista de vídeo es una sola línea secuencial (`hasOverlap` impide solapes), el preview pinta solo un clip activo y el export concatena en secuencia. Toca: modelo (pistas en capas), render del preview (compositar varios `<video>`), timeline multi-carril y grafo FFmpeg (overlay). Brainstorming dedicado pendiente
-  - Priority: high (es la siguiente que el usuario quiere abordar)
+  - Spec: `docs/superpowers/specs/2026-06-20-multipista-video-design.md` (modelo `VideoTrack[]`, DEC-010..013, 5 fases)
+  - **Fase 1 (modelo + migración) — HECHA (2026-06-20)**: `tracks.video` → `VideoTrack[]`, `opacity` por clip, esquema v1→v2 con `migrateProject` (aplicada al cargar en el servidor), todos los lectores y el store sobre la pista base (refactor que preserva comportamiento). 239 tests verdes + typecheck limpio. Plan: `docs/superpowers/plans/2026-06-20-multipista-fase1-modelo.md`. Revisión por subagentes (spec+calidad) por unidad + revisión final holística OK.
+  - **Pendiente**: Fase 2 (export: overlays de vídeo + audio multipista), Fase 3 (preview: N `<video>` + motor multipista), Fase 4 (timeline multipista: carriles, añadir/quitar, arrastre entre pistas — `addVideoTrack`/`removeVideoTrack`/`moveClipToTrack`), Fase 5 (opacidad por capa en UI). Marcadores `TODO(fase2)` en `projectStore.ts` (ripple/split por pista). Cada fase tendrá su propio plan.
+  - Priority: high
 
 ## Discovered / Backlog
 - [x] Comentario en `binaries.ts` (yt-dlp.exe es solo-Windows a propósito) (2026-06-14)

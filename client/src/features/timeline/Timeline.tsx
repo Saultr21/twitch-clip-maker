@@ -118,14 +118,23 @@ export function Timeline({ height }: { height: number }) {
       };
     });
 
-  const LANE_TOTAL = 36; // 4px padding + 32px LANE_HEIGHT (laneCount=1 para pistas de vídeo)
   const handleVideoMoveEnd = (clipId: string, clientY: number, start: number) => {
     const cont = videoLanesRef.current;
     if (!cont) return;
-    const rect = cont.getBoundingClientRect();
-    // Mapeo Y → carril visual (0 = arriba), teniendo en cuenta el render invertido
-    const visualLane = Math.floor((clientY - rect.top) / LANE_TOTAL);
-    const order = videoTracks.map((_, i) => i).reverse(); // [N-1 .. 0]
+    // order[k] = índice de pista del carril visual k (0 = arriba). Los carriles se
+    // renderizan en orden inverso (índice alto arriba = capa superior).
+    const order = videoTracks.map((_, i) => i).reverse();
+    // Carril destino = el hijo (carril) cuyo rect contiene la Y del puntero. Medir el
+    // DOM real evita depender de alturas/bordes fijos y funciona con N pistas.
+    const lanes = Array.from(cont.children) as HTMLElement[];
+    let visualLane = lanes.findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return clientY >= r.top && clientY < r.bottom;
+    });
+    if (visualLane === -1) {
+      // por encima o por debajo del bloque de carriles: clampa al primero/último
+      visualLane = clientY < cont.getBoundingClientRect().top ? 0 : order.length - 1;
+    }
     const destIndex = order[Math.max(0, Math.min(order.length - 1, visualLane))];
     const destTrack = videoTracks[destIndex];
     const srcTrack = videoTracks.find((t) => t.clips.some((c) => c.id === clipId));

@@ -224,11 +224,13 @@ export function buildFilterGraph(
         "format=rgba",
         `colorchannelmixer=aa=${num(clip.opacity)}`,
       ];
+      // Etiqueta de salida [vlay${ovIdx}], NO [ov...]: los overlays de imagen ya
+      // usan [ov${j}] y colisionarían si un proyecto tiene capa de vídeo + imagen
       filters.push(`[${inputIdx}:v]${vchain.join(",")}[ovsrc${ovIdx}]`);
       filters.push(
-        `${videoLabel}[ovsrc${ovIdx}]overlay=x=${rect.left}:y=${rect.top}:enable='between(t,${num(start)},${num(end)})':eof_action=pass[ov${ovIdx}]`,
+        `${videoLabel}[ovsrc${ovIdx}]overlay=x=${rect.left}:y=${rect.top}:enable='between(t,${num(start)},${num(end)})':eof_action=pass[vlay${ovIdx}]`,
       );
-      videoLabel = `[ov${ovIdx}]`;
+      videoLabel = `[vlay${ovIdx}]`;
 
       // audio de la capa: se retrasa a su timelineStart y se acumula para el amix
       const achain = [
@@ -296,6 +298,8 @@ export function buildFilterGraph(
   // ── Audio ──
   // "Voz" = audio base [acat] + audio de las capas de vídeo (volumen completo).
   // La música (si hay) se mezcla encima, con ducking opcional bajo la voz.
+  // audioLabel = salida final; voiceLabel = la voz que la música duckeа. Coinciden
+  // salvo cuando hay música: ahí audioLabel pasa a [amix] y voiceLabel alimenta el duck.
   let audioLabel = "[acat]";
   let voiceLabel = "[acat]";
   if (overlayAudioLabels.length > 0) {

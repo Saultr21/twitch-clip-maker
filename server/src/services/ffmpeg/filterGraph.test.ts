@@ -262,9 +262,23 @@ describe("buildFilterGraph — multipista (vídeo)", () => {
     expect(g.filterComplex).toContain("format=rgba,colorchannelmixer=aa=0.8[ovsrc0]");
     // overlay sobre [vcat] con enable entre 1 y 4 (clipEnd = 1 + 3/1)
     expect(g.filterComplex).toContain("[vcat][ovsrc0]overlay=");
-    expect(g.filterComplex).toContain("enable='between(t,1,4)':eof_action=pass[ov0]");
+    expect(g.filterComplex).toContain("enable='between(t,1,4)':eof_action=pass[vlay0]");
     // el vídeo final ya no es [vcat] sino la capa compositada (luego seguirían imágenes/textos)
-    expect(g.videoLabel).toContain("ov0");
+    expect(g.videoLabel).toBe("[vlay0]");
+  });
+
+  it("capa de vídeo + imagen overlay: etiquetas distintas, sin colisión", () => {
+    const p = projectWithClip();
+    p.tracks.video.push({
+      id: "t2", name: "", clips: [
+        { ...createVideoClip("clip-2", 1, 6), trimIn: 0, trimOut: 3, opacity: 1, zoom: { x: 0.5, y: 0.5, scale: 0.4 } },
+      ],
+    });
+    p.tracks.image.push(createImageOverlay("img-1", "logo.png", 0, 0.2, 0.2));
+    const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));
+    // la capa de vídeo produce [vlay0] y la imagen se composita ENCIMA de ella ([ov0])
+    expect(g.filterComplex).toContain("[vlay0][img0]overlay=");
+    expect(g.videoLabel).toBe("[ov0]"); // la imagen es la capa más externa
   });
 
   it("proyecto de una sola pista: NO añade overlays de vídeo (comportamiento idéntico)", () => {

@@ -93,6 +93,13 @@ export function Timeline({ height }: { height: number }) {
   const dirty = useProjectStore((s) => s.dirty);
   const scrollRef = useRef<HTMLDivElement>(null);
   const videoLanesRef = useRef<HTMLDivElement>(null);
+  const [ghost, setGhost] = useState<{
+    label: string;
+    x: number;
+    y: number;
+    widthPx: number;
+    targetTrackId: string | null;
+  } | null>(null);
   // Clips de la pista base (Fase 1: única pista). Referencia estable vía EMPTY_CLIPS.
   const baseClips = project.tracks.video[0]?.clips ?? EMPTY_CLIPS;
   const videoCount = baseClips.length;
@@ -159,7 +166,29 @@ export function Timeline({ height }: { height: number }) {
       };
     });
 
+  /**
+   * Mapea una coordenada Y de pantalla al id del carril de vídeo que la contiene,
+   * o null si el puntero está fuera del bloque de carriles (hueco arriba/abajo).
+   * Comparte la lógica DOM con handleVideoMoveEnd para evitar duplicación.
+   */
+  const laneAtClientY = (clientY: number): string | null => {
+    const cont = videoLanesRef.current;
+    if (!cont) return null;
+    const contRect = cont.getBoundingClientRect();
+    if (clientY < contRect.top || clientY >= contRect.bottom) return null;
+    const order = videoTracks.map((_, i) => i).reverse();
+    const laneEls = Array.from(cont.children) as HTMLElement[];
+    let visualLane = laneEls.findIndex((el) => {
+      const r = el.getBoundingClientRect();
+      return clientY >= r.top && clientY < r.bottom;
+    });
+    if (visualLane === -1) visualLane = order.length - 1;
+    const trackIndex = order[Math.max(0, Math.min(order.length - 1, visualLane))];
+    return videoTracks[trackIndex]?.id ?? null;
+  };
+
   const handleVideoMoveEnd = (clipId: string, clientY: number, start: number) => {
+    setGhost(null);
     const cont = videoLanesRef.current;
     if (!cont) return;
     const contRect = cont.getBoundingClientRect();
@@ -304,6 +333,17 @@ export function Timeline({ height }: { height: number }) {
                   onRemoveTrack={isBase ? undefined : () => useProjectStore.getState().removeVideoTrack(track.id)}
                   onAddTrack={() => useProjectStore.getState().addVideoTrack("top")}
                   onMoveEnd={handleVideoMoveEnd}
+                  onMoveDrag={(p) =>
+                    setGhost({
+                      label: p.label,
+                      x: p.clientX,
+                      y: p.clientY,
+                      widthPx: p.widthPx,
+                      targetTrackId: laneAtClientY(p.clientY),
+                    })
+                  }
+                  onMoveDragEnd={() => setGhost(null)}
+                  highlight={ghost?.targetTrackId === track.id}
                   trackIndex={i}
                   onReorder={(from, to) => useProjectStore.getState().reorderVideoTrack(from, to)}
                 />
@@ -361,6 +401,20 @@ export function Timeline({ height }: { height: number }) {
           <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>
       </div>
+      {ghost && (
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 bg-accent/70 text-white text-[10px] rounded-md px-1.5 py-1 truncate shadow-lg"
+          style={{
+            left: ghost.x + 12,
+            top: ghost.y - 10,
+            width: ghost.widthPx,
+            maxWidth: 300,
+          }}
+        >
+          {ghost.label}
+        </div>
+      )}
     </footer>
   );
 }

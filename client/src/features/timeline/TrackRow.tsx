@@ -38,6 +38,12 @@ interface TrackRowProps {
   onAddTrack?: () => void;
   /** Al soltar un arrastre de tipo "move", informa de la Y de pantalla y el start final. */
   onMoveEnd?: (id: string, clientY: number, start: number) => void;
+  /** Informa en tiempo real de la posición del cursor mientras se arrastra un clip. */
+  onMoveDrag?: (payload: { id: string; label: string; clientX: number; clientY: number; widthPx: number }) => void;
+  /** Limpia el ghost cuando el arrastre termina o se cancela. */
+  onMoveDragEnd?: () => void;
+  /** Resalta visualmente este carril como destino del arrastre activo. */
+  highlight?: boolean;
   /** Índice de pista para reordenar por arrastre de la cabecera (solo vídeo). */
   trackIndex?: number;
   onReorder?: (fromIndex: number, toIndex: number) => void;
@@ -62,6 +68,9 @@ export function TrackRow({
   onRemoveTrack,
   onAddTrack,
   onMoveEnd,
+  onMoveDrag,
+  onMoveDragEnd,
+  highlight = false,
   trackIndex,
   onReorder,
 }: TrackRowProps) {
@@ -108,7 +117,7 @@ export function TrackRow({
         </span>
       </div>
       <div
-        className={`relative flex-1 ${dropActive ? "bg-accent/10 ring-1 ring-inset ring-accent" : ""}`}
+        className={`relative flex-1 ${dropActive ? "bg-accent/10 ring-1 ring-inset ring-accent" : highlight ? "ring-1 ring-inset ring-accent bg-accent/5" : ""}`}
         style={{ height: 4 + laneCount * LANE_HEIGHT }}
         onDragOver={
           onDropClip
@@ -189,6 +198,13 @@ export function TrackRow({
                   onMove(b.id, snapped, true);
                   drag.lastStart = snapped;
                   drag.lastClientY = e.clientY;
+                  onMoveDrag?.({
+                    id: b.id,
+                    label: b.label,
+                    clientX: e.clientX,
+                    clientY: e.clientY,
+                    widthPx: Math.max(8, (b.end - b.start) * pxPerSecond),
+                  });
                 } else {
                   const snapped = snapTime(Math.max(0, pointerT), points, snapThreshold);
                   onTrim(b.id, drag.mode === "trim-start" ? "start" : "end", snapped, true);
@@ -199,9 +215,11 @@ export function TrackRow({
                 if (drag?.mode === "move" && drag.started && onMoveEnd) {
                   onMoveEnd(drag.id, drag.lastClientY ?? 0, drag.lastStart ?? 0);
                 }
+                onMoveDragEnd?.();
                 dragRef.current = null;
               }}
               onPointerCancel={() => {
+                onMoveDragEnd?.();
                 dragRef.current = null;
               }}
             >

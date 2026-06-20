@@ -307,6 +307,57 @@ describe("subtítulos", () => {
   });
 });
 
+describe("pistas de vídeo (multipista)", () => {
+  it("addVideoTrack añade una pista vacía encima", () => {
+    const s = useProjectStore.getState();
+    expect(s.project.tracks.video).toHaveLength(1);
+    s.addVideoTrack();
+    expect(useProjectStore.getState().project.tracks.video).toHaveLength(2);
+    expect(useProjectStore.getState().project.tracks.video[1].clips).toEqual([]);
+  });
+
+  it("removeVideoTrack elimina la pista y sus clips, pero nunca deja 0 pistas", () => {
+    const s = useProjectStore.getState();
+    s.addVideoTrack();
+    const id = useProjectStore.getState().project.tracks.video[1].id;
+    s.removeVideoTrack(id);
+    expect(useProjectStore.getState().project.tracks.video).toHaveLength(1);
+    // intentar borrar la última no la borra
+    const baseId = useProjectStore.getState().project.tracks.video[0].id;
+    s.removeVideoTrack(baseId);
+    expect(useProjectStore.getState().project.tracks.video.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("moveClipToTrack mueve un clip a otra pista si no solapa", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    s.addVideoTrack();
+    const baseTrack = useProjectStore.getState().project.tracks.video[0];
+    const destId = useProjectStore.getState().project.tracks.video[1].id;
+    const clipId = baseTrack.clips[0].id;
+    s.moveClipToTrack(clipId, destId, 0);
+    const st = useProjectStore.getState().project.tracks.video;
+    expect(st[0].clips).toHaveLength(0);
+    expect(st[1].clips.map((c) => c.id)).toContain(clipId);
+  });
+
+  it("moveClipToTrack rechaza el movimiento si solaparía en destino", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    s.addVideoTrack();
+    // pone un clip ocupando [0,5) en la pista destino
+    const destId = useProjectStore.getState().project.tracks.video[1].id;
+    const movingId = useProjectStore.getState().project.tracks.video[0].clips[0].id;
+    s.moveClipToTrack(movingId, destId, 0); // primero mueve uno
+    s.addVideoClip({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const secondId = useProjectStore.getState().project.tracks.video[0].clips[0].id;
+    // intenta mover el segundo a destino en t=0 → solapa con el primero
+    s.moveClipToTrack(secondId, destId, 0);
+    const st = useProjectStore.getState().project.tracks.video;
+    expect(st[0].clips.map((c) => c.id)).toContain(secondId); // sigue en base
+  });
+});
+
 describe("applyPreset", () => {
   it("sustituye formato, textos e imágenes conservando vídeo, con ids nuevos y undo", () => {
     const s = useProjectStore.getState();

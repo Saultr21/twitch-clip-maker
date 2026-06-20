@@ -95,6 +95,9 @@ interface ProjectState {
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   setAudioDucking: (on: boolean) => void;
   setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
+  addVideoTrack: () => void;
+  removeVideoTrack: (trackId: string) => void;
+  moveClipToTrack: (clipId: string, destTrackId: string, newStart: number, opts?: MutateOptions) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
@@ -178,6 +181,32 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       mutate((d) => {
         Object.assign(d.settings.background, patch);
       }),
+
+    addVideoTrack: () =>
+      mutate((d) => {
+        d.tracks.video.push(createVideoTrack());
+      }),
+
+    removeVideoTrack: (trackId) =>
+      mutate((d) => {
+        if (d.tracks.video.length <= 1) return; // nunca dejar 0 pistas
+        const idx = d.tracks.video.findIndex((t) => t.id === trackId);
+        if (idx !== -1) d.tracks.video.splice(idx, 1);
+      }),
+
+    moveClipToTrack: (clipId, destTrackId, newStart, opts) =>
+      mutate((d) => {
+        const ctx = findClipCtx(d, clipId);
+        const dest = d.tracks.video.find((t) => t.id === destTrackId);
+        if (!ctx || !dest) return;
+        const start = Math.max(0, newStart);
+        // no-solape en la pista destino (excluye el propio clip si ya estuviera ahí)
+        if (hasOverlap(dest.clips, start, clipDuration(ctx.clip), clipId)) return;
+        // saca el clip de su pista actual y lo coloca en destino con el nuevo inicio
+        ctx.track.clips.splice(ctx.index, 1);
+        dest.clips.push({ ...ctx.clip, timelineStart: start });
+        dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);
+      }, opts),
 
     addVideoClip: (clip) =>
       mutate((d) => {

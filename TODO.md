@@ -1,11 +1,11 @@
 # TODO — VideoForge (editor de vídeo local; antes ClipForge)
 
-> Last updated: 2026-06-20
+> Last updated: 2026-06-20 18:30
 > Current phase: development
-> Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master
+> Overall progress: Hitos 1–4 completos + multipista completa + gestión de pistas (4b) en master + migración a modelo de capas (layers) completada
 
 ## In Progress
-- (nada — multipista y su gestión de pistas completas)
+- (nada — migración a `tracks.layers` completada: Tasks 4, 5, 6 commiteadas)
 
 ## Ajustes UX del multipista (2026-06-20) — hecho
 - [x] Botón **+** movido a la cabecera de cada pista de vídeo (no en fila aparte)
@@ -38,7 +38,19 @@
 - [x] Solo contenido público (sin cookies/PO tokens, por decisión de alcance). Spec: `docs/superpowers/specs/2026-06-19-descarga-multiplataforma-design.md`; Plan: `docs/superpowers/plans/2026-06-19-descarga-multiplataforma.md`
 - Verificado: 221 tests verdes (client 71, server 134, shared 16) + typecheck limpio. Pendiente smoke test del usuario con URLs reales de YouTube/TikTok
 
+## Migración a modelo de capas (2026-06-20) — COMPLETA (Tasks 1-6)
+- [x] **Task 1**: Modelo `tracks.layers: Layer[]` en `@clipforge/shared` (v3), selectores `videoLayers/imageLayers/textLayers/allVideoClips/imageItems/textItems`, factories `createVideoLayer/ImageLayer/TextLayer`, `createEmptyProject` devuelve v3
+- [x] **Task 2**: `migrateLayers` v2→v3 (aún no aplicada al servidor; pendiente Task 3)
+- [x] **Task 3**: `migrateLayers` aplicada en `server/src/routes/projects.ts` al cargar proyectos
+- [x] **Task 4 (2026-06-20)**: Store (`projectStore.ts`) reescrito sobre `layers` — helpers internos `baseVideoLayer/findClipCtx/imageLayerFor/textLayerFor/findImage/findText`, ops de multitrack sobre el array `tracks.layers`; comportamiento preservado (commit 585d92f)
+- [x] **Task 5 (2026-06-20)**: Todos los lectores del cliente y servidor migrados a los selectores: `usePlaybackEngine`, `Timeline`, `OverlayLayer`, `PreviewCanvas`, `PropertiesPanel`, `CropOverlay`, `MediaPanel`, `ExportDialog`, `SubtitlesPanel`, `ToolRail`, `shortcuts.ts`, `timeline.ts`, `filterGraph.ts` (commit 6105e18)
+- [x] **Task 6 (2026-06-20)**: Tests actualizados al modelo de capas: `projectStore.test.ts`, `timeline.test.ts`, `shortcuts.test.ts`, `filterGraph.test.ts`, `multitrackExport.e2e.test.ts` — helpers `addText/addImage/addVideoLayer` en filterGraph.test.ts (commit 7269a0f)
+- **Resultado**: 262 tests verdes (25 shared + 92 client + 145 server), typecheck limpio en los 3 paquetes, sin cambio de comportamiento en runtime
+- Plan: `docs/superpowers/plans/2026-06-20-capas-fase1-modelo.md` (Tasks 1-6 de 7)
+- **Pendiente (Task 7)**: limpiar exports de `VideoTrack`/`createVideoTrack` ya sin uso en `@clipforge/shared` y borrar el campo `tracks.video[]` del esquema de migración antiguo (cleanup final de fase 1)
+
 ## Up Next
+- Task 7 de migración de capas: limpiar `VideoTrack`/`createVideoTrack` obsoletos en `shared/src/project.ts`
 - Smoke test del usuario del export por GPU (NVENC) y del waveform en uso real
 - Se trabaja directamente en `master`, sin ramas ni PRs (petición del usuario)
 

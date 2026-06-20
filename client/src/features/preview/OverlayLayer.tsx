@@ -3,12 +3,13 @@ import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import { SubtitlesLayer } from "./SubtitlesLayer";
 import { CropOverlay } from "./CropOverlay";
-import type { ImageOverlay, TextOverlay } from "@clipforge/shared";
+import type { ImageOverlay, TextOverlay, VideoClip, VideoTrack } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
+import { visibleRect } from "./trackVideo";
 
 interface OverlayLayerProps {
   width: number;  // px del lienzo en pantalla
@@ -222,9 +223,12 @@ function TextNode({ overlay, width, height, selected, onGuides }: {
  * del lienzo): clic lo selecciona, arrastrar lo reposiciona (zoom.x/y) y las
  * esquinas del Transformer cambian el zoom. La posición del nodo deriva del
  * modelo en cada render, así que los gestos son updates transitorias.
+ *
+ * Ahora parametrizado por `clip` (cualquier pista) en lugar de leer siempre
+ * la pista base.
  */
-function VideoFrameNode({ width, height, onGuides, cropMode }: {
-  width: number; height: number; onGuides: GuidesCallback; cropMode: boolean;
+function VideoFrameNode({ clip, width, height, onGuides, cropMode }: {
+  clip: VideoClip; width: number; height: number; onGuides: GuidesCallback; cropMode: boolean;
 }) {
   const ref = useRef<Konva.Rect>(null);
   const trRef = useRef<Konva.Transformer>(null);
@@ -234,36 +238,31 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
   const beginTransaction = useProjectStore((s) => s.beginTransaction);
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
   const clips = useClipsStore((s) => s.clips);
-  // clip activo: depende del playhead y de la pista (referencias estables)
-  const videoTrack = useProjectStore((s) => s.project.tracks.video[0]?.clips ?? []);
-  const activeClip = useUiStore((s) => videoClipAt(videoTrack, s.playhead));
-  const selected =
-    !!activeClip && selection?.kind === "video" && selection.id === activeClip.id;
+  const selected = selection?.kind === "video" && selection.id === clip.id;
 
   useEffect(() => {
     if (selected && ref.current && trRef.current) {
       trRef.current.nodes([ref.current]);
     }
-  }, [selected, activeClip?.id]);
+  }, [selected, clip.id]);
 
-  const info = activeClip ? clips.find((c) => c.id === activeClip.clipId) : undefined;
-  if (!activeClip || !info) return null;
+  const info = clips.find((c) => c.id === clip.clipId);
+  if (!info) return null;
 
-  // Geometría: escala del FRAME completo; el recorte solo reduce el tamaño
-  // VISIBLE. La posición usa zoom·(lienzo − tamaño visible), así el vídeo
-  // recortado se puede mover por todo el lienzo (coincide con renderRect del
-  // export). El recuadro/asas abrazan el rect visible.
-  const baseScale = Math.min(width / info.width, height / info.height);
-  const w = info.width * baseScale * activeClip.zoom.scale;
-  const h = info.height * baseScale * activeClip.zoom.scale;
-  const crop = activeClip.crop ?? FULL_CROP;
-  const vW = w * crop.w;
-  const vH = h * crop.h;
-  const vLeft = activeClip.zoom.x * (width - vW);
-  const vTop = activeClip.zoom.y * (height - vH);
+  // Geometría: usa visibleRect (misma fórmula que PreviewCanvas y el export).
+  // El recuadro abraza el rect visible (frame con su recorte).
+  const r = visibleRect(width, height, info, clip.zoom, clip.crop ?? FULL_CROP);
+  const { w: vW, h: vH, left: vLeft, top: vTop } = r;
 
-  const clipNow = () =>
-    useProjectStore.getState().project.tracks.video[0]?.clips.find((c) => c.id === activeClip.id);
+  // Lee el clip fresco del store (evita stale closure en gestos)
+  const clipNow = (): VideoClip | undefined => {
+    const project = useProjectStore.getState().project;
+    for (const track of project.tracks.video) {
+      const found = track.clips.find((c) => c.id === clip.id);
+      if (found) return found;
+    }
+    return undefined;
+  };
 
   return (
     <>
@@ -274,16 +273,16 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
         width={vW}
         height={vH}
         fill="transparent"
-        onMouseDown={() => select({ kind: "video", id: activeClip.id })}
-        onTap={() => select({ kind: "video", id: activeClip.id })}
+        onMouseDown={() => select({ kind: "video", id: clip.id })}
+        onTap={() => select({ kind: "video", id: clip.id })}
         draggable={selected && !cropMode}
         onDragStart={() => beginTransaction()}
         onDragMove={(e) => {
           const node = e.target;
-          const clip = clipNow();
-          if (!clip) return;
+          const current = clipNow();
+          if (!current) return;
           // node.x() es la esquina del rect visible: zoom.x = x / (lienzo − vW)
-          const zoom = { ...clip.zoom };
+          const zoom = { ...current.zoom };
           let vGuide = false;
           let hGuide = false;
           if (Math.abs(width - vW) > 1) {
@@ -302,7 +301,7 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
             }
           }
           onGuides(vGuide, hGuide);
-          updateVideoClip(clip.id, { zoom }, { transient: true });
+          updateVideoClip(current.id, { zoom }, { transient: true });
           // Re-clava el nodo a la posición visible derivada del modelo
           node.position({ x: zoom.x * (width - vW), y: zoom.y * (height - vH) });
         }}
@@ -313,16 +312,18 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
         // recuadro crecen a la vez mientras arrastras la esquina
         onTransform={(e) => {
           const node = e.target;
-          const clip = clipNow();
-          if (!clip) return;
+          const current = clipNow();
+          if (!current || !info) return;
+          const baseScale = Math.min(width / info.width, height / info.height);
+          const crop = current.crop ?? FULL_CROP;
           const factor = Math.max(node.scaleX(), node.scaleY());
-          const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * factor));
+          const scale = Math.min(10, Math.max(0.1, current.zoom.scale * factor));
           const vW2 = info.width * baseScale * scale * crop.w;
           const vH2 = info.height * baseScale * scale * crop.h;
-          const zoom = { ...clip.zoom, scale };
+          const zoom = { ...current.zoom, scale };
           if (Math.abs(width - vW2) > 1) zoom.x = clamp01(node.x() / (width - vW2));
           if (Math.abs(height - vH2) > 1) zoom.y = clamp01(node.y() / (height - vH2));
-          updateVideoClip(clip.id, { zoom }, { transient: true });
+          updateVideoClip(current.id, { zoom }, { transient: true });
           node.scale({ x: 1, y: 1 });
           node.position({ x: zoom.x * (width - vW2), y: zoom.y * (height - vH2) });
         }}
@@ -334,13 +335,13 @@ function VideoFrameNode({ width, height, onGuides, cropMode }: {
         onWheel={(e) => {
           if (!selected) return;
           e.evt.preventDefault();
-          const clip = clipNow();
-          if (!clip) return;
+          const current = clipNow();
+          if (!current) return;
           if (Date.now() - lastWheelRef.current > 500) beginTransaction();
           lastWheelRef.current = Date.now();
           const dir = e.evt.deltaY > 0 ? 1 / 1.08 : 1.08;
-          const scale = Math.min(10, Math.max(0.1, clip.zoom.scale * dir));
-          updateVideoClip(clip.id, { zoom: { ...clip.zoom, scale } }, { transient: true });
+          const scale = Math.min(10, Math.max(0.1, current.zoom.scale * dir));
+          updateVideoClip(current.id, { zoom: { ...current.zoom, scale } }, { transient: true });
         }}
       />
       {selected && !cropMode && (
@@ -363,6 +364,7 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const cropMode = useUiStore((s) => s.cropMode);
   const texts = useProjectStore((s) => s.project.tracks.text);
   const images = useProjectStore((s) => s.project.tracks.image);
+  const videoTracks = useProjectStore((s) => s.project.tracks.video);
   // Guías de centrado: visibles solo mientras un arrastre engancha al centro
   const [guides, setGuides] = useState({ vertical: false, horizontal: false });
   const onGuides: GuidesCallback = (vertical, horizontal) =>
@@ -372,6 +374,14 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
 
   const visibleTexts = texts.filter((t) => playhead >= t.start && playhead < t.end);
   const visibleImages = images.filter((i) => playhead >= i.start && playhead < i.end);
+
+  // Clips activos por pista (una entrada por pista que tiene clip en el playhead)
+  const activeClipsByTrack: Array<{ track: VideoTrack; clip: VideoClip }> = videoTracks
+    .map((track) => {
+      const active = videoClipAt(track.clips, playhead);
+      return active ? { track, clip: active } : null;
+    })
+    .filter((x): x is { track: VideoTrack; clip: VideoClip } => x !== null);
 
   return (
     <Stage
@@ -387,7 +397,17 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       }}
     >
       <Layer>
-        <VideoFrameNode width={width} height={height} onGuides={onGuides} cropMode={cropMode} />
+        {/* Un VideoFrameNode por clip activo de cada pista, en z-order */}
+        {activeClipsByTrack.map(({ track, clip }) => (
+          <VideoFrameNode
+            key={track.id}
+            clip={clip}
+            width={width}
+            height={height}
+            onGuides={onGuides}
+            cropMode={cropMode}
+          />
+        ))}
         {visibleImages.map((o) => (
           <ImageNode
             key={o.id}

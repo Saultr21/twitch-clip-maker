@@ -38,7 +38,7 @@ beforeEach(() => {
 
 function selectFirstVideo(): void {
   useProjectStore.getState().addVideoClip(clipInfo);
-  const id = useProjectStore.getState().project.tracks.video[0].id;
+  const id = useProjectStore.getState().project.tracks.video[0].clips[0].id;
   useUiStore.getState().select({ kind: "video", id });
 }
 
@@ -46,14 +46,14 @@ describe("handleShortcut · borrado", () => {
   it("Supr borra el elemento seleccionado aunque el foco esté en un botón (bloque del timeline)", () => {
     selectFirstVideo();
     handleShortcut(key("Delete", "BUTTON"), deps);
-    expect(useProjectStore.getState().project.tracks.video).toHaveLength(0);
+    expect(useProjectStore.getState().project.tracks.video[0].clips).toHaveLength(0);
     expect(useUiStore.getState().selection).toBeNull();
   });
 
   it("no borra mientras se escribe en un input", () => {
     selectFirstVideo();
     handleShortcut(key("Delete", "INPUT"), deps);
-    expect(useProjectStore.getState().project.tracks.video).toHaveLength(1);
+    expect(useProjectStore.getState().project.tracks.video[0].clips).toHaveLength(1);
   });
 });
 

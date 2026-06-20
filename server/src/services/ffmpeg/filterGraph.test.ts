@@ -21,7 +21,7 @@ const info: ClipInfo = {
 
 function projectWithClip() {
   const p = createEmptyProject("demo");
-  p.tracks.video.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7 });
+  p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7 });
   return p;
 }
 
@@ -43,7 +43,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("hueco inicial entre t=0 y el primer clip: segmento negro con silencio", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4 });
+    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("color=black:s=1080x1920:d=3:r=30[seg0]");
     expect(g.filterComplex).toContain("anullsrc=r=44100:cl=stereo,atrim=duration=3[sega0]");
@@ -62,7 +62,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("dos clips contiguos: dos segmentos y n=2", () => {
     const p = projectWithClip(); // ocupa [0,5)
-    p.tracks.video.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2 });
+    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.inputs).toHaveLength(2);
     expect(g.filterComplex).toContain("[1:v]trim=start=0:end=2");
@@ -120,7 +120,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("la velocidad ajusta setpts, atempo y la duración del segmento", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
+    p.tracks.video[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("setpts=(PTS-STARTPTS)/2");
     expect(g.filterComplex).toContain("atempo=2");
@@ -130,7 +130,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("los filtros de color generan eq y hue tras el scale", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video.push({
+    p.tracks.video[0].clips.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0.2, contrast: 1.3, saturation: 1.5, hue: 30, grayscale: 0 },
@@ -142,7 +142,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("el blanco y negro reduce la saturación efectiva", () => {
     const p = createEmptyProject("demo");
-    p.tracks.video.push({
+    p.tracks.video[0].clips.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0, contrast: 1, saturation: 2, hue: 0, grayscale: 0.5 },
@@ -283,7 +283,7 @@ describe("buildFilterGraph — música", () => {
   it("transición entre clips: fade a negro en los límites (out del 1.º, in del 2.º)", () => {
     const p = createEmptyProject("demo");
     p.settings.clipTransition = 0.5;
-    p.tracks.video.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
+    p.tracks.video[0].clips.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // clip 0 (dur 4): solo fade-out al final
     expect(g.filterComplex).toContain("[seg0]fade=t=out:st=3.5:d=0.5[segt0]");

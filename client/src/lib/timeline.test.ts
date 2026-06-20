@@ -27,7 +27,7 @@ describe("duraciones", () => {
 
   it("projectDuration es el final más tardío de cualquier pista", () => {
     const p = createEmptyProject("x");
-    p.tracks.video.push(clip(0, 0, 10));
+    p.tracks.video[0].clips.push(clip(0, 0, 10));
     p.tracks.text.push({ ...createTextOverlay(8), end: 15 });
     expect(projectDuration(p)).toBe(15);
   });
@@ -69,7 +69,7 @@ describe("snapping", () => {
   it("findSnapPoints incluye 0 y los bordes de todos los bloques", () => {
     const p = createEmptyProject("x");
     const a = clip(2, 0, 5);
-    p.tracks.video.push(a);
+    p.tracks.video[0].clips.push(a);
     const points = findSnapPoints(p, a.id);
     expect(points).toContain(0);
     expect(points).not.toContain(2); // los bordes del propio bloque excluido no cuentan

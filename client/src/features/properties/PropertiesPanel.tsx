@@ -199,7 +199,9 @@ function VideoProperties({ clipId }: { clipId: string }) {
   const applyReframe = useProjectStore((s) => s.applyReframe);
   const settings = useProjectStore((s) => s.project.settings);
   const clipInfos = useClipsStore((s) => s.clips);
-  const clip = useProjectStore((s) => s.project.tracks.video[0]?.clips.find((c) => c.id === clipId));
+  // busca el clip en CUALQUIER pista (no solo la base): los clips de capas
+  // superiores también deben mostrar sus propiedades
+  const clip = useProjectStore((s) => s.project.tracks.video.flatMap((t) => t.clips).find((c) => c.id === clipId));
   const [silence, setSilence] = useState<SilenceState>("idle");
   const [reframe, setReframe] = useState<ReframeState>({ phase: "idle" });
   if (!clip) return null;
@@ -266,6 +268,9 @@ function VideoProperties({ clipId }: { clipId: string }) {
         <Slider id="prop-zoom-y" min={0} max={1} step={0.01} value={clip.zoom.y} onChange={(v) => zoom({ y: v })} />
       </Field>
       <CenterButton onCenter={() => zoom({ x: 0.5, y: 0.5 })} />
+      <Field label={`Opacidad · ${Math.round(clip.opacity * 100)}%`} htmlFor="prop-vopacity">
+        <Slider id="prop-vopacity" min={0} max={1} step={0.01} value={clip.opacity} onChange={(v) => updateVideoClip(clip.id, { opacity: v })} />
+      </Field>
       <Field label={`Velocidad · ${clip.speed.toFixed(2)}x`} htmlFor="prop-speed">
         <Slider id="prop-speed" min={0.25} max={4} step={0.05} value={clip.speed} onChange={(v) => updateVideoClip(clip.id, { speed: v })} />
       </Field>

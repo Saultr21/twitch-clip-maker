@@ -6,10 +6,14 @@ import {
   createEmptyProject,
   createImageLayer,
   createImageOverlay,
+  createMediaLayer,
   createTextLayer,
   createTextOverlay,
   createVideoLayer,
   imageItems,
+  layerItems,
+  mediaLayers,
+  migrateMedia,
   migrateLayers,
   migrateProject,
   projectSchema,
@@ -19,16 +23,17 @@ import {
 import { DEFAULT_SUBTITLE_STYLE } from "./subtitles.js";
 
 describe("createEmptyProject", () => {
-  it("crea un proyecto 9:16 válido según el esquema", () => {
+  it("crea un proyecto 9:16 válido según el esquema v4", () => {
     const p = createEmptyProject("mi proyecto");
     expect(p.name).toBe("mi proyecto");
+    expect(p.version).toBe(4);
     expect(p.settings.aspect).toBe("9:16");
     expect(p.settings.width).toBe(1080);
     expect(p.settings.height).toBe(1920);
     expect(p.settings.fps).toBe(30);
     expect(p.settings.background.type).toBe("black");
     expect(p.tracks.layers).toHaveLength(1);
-    expect(p.tracks.layers[0]).toMatchObject({ kind: "video", clips: [] });
+    expect(p.tracks.layers[0]).toMatchObject({ items: [] });
     expect(p.tracks.audio).toEqual([]);
     expect(projectSchema.safeParse(p).success).toBe(true);
   });
@@ -42,7 +47,7 @@ describe("createEmptyProject", () => {
   });
 });
 
-describe("projectSchema", () => {
+describe("projectSchema v4", () => {
   it("rechaza un aspect desconocido", () => {
     const p = { ...createEmptyProject("x"), settings: { aspect: "21:9", width: 100, height: 100, fps: 30 } };
     expect(projectSchema.safeParse(p).success).toBe(false);
@@ -50,17 +55,14 @@ describe("projectSchema", () => {
 
   it("rechaza coordenadas normalizadas fuera de 0–1 en un item de texto", () => {
     const p = createEmptyProject("x");
-    const textLayer = createTextLayer();
-    textLayer.items.push({ ...createTextOverlay(0), x: 1.5 });
-    p.tracks.layers.push(textLayer);
+    p.tracks.layers[0].items.push({ ...createTextOverlay(0), kind: "text", x: 1.5 });
     expect(projectSchema.safeParse(p).success).toBe(false);
   });
 
-  it("rechaza trimOut anterior a trimIn en un clip de vídeo", () => {
+  it("rechaza trimOut anterior a trimIn en un elemento de vídeo", () => {
     const p = createEmptyProject("x");
-    const videoLayer = p.tracks.layers[0];
-    if (videoLayer.kind !== "video") throw new Error("expected video layer");
-    videoLayer.clips.push({
+    p.tracks.layers[0].items.push({
+      kind: "video",
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 5, trimOut: 2, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
@@ -89,22 +91,24 @@ describe("ASPECT_PRESETS", () => {
 });
 
 describe("allVideoClips", () => {
-  it("aplana los clips de todas las capas de vídeo en orden", () => {
+  it("aplana los items de vídeo de todas las capas en orden", () => {
     const p = createEmptyProject("x");
-    const firstLayer = p.tracks.layers[0];
-    if (firstLayer.kind !== "video") throw new Error("expected video layer");
-    firstLayer.clips.push({
+    p.tracks.layers[0].items.push({
+      kind: "video",
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
       crop: null, opacity: 1,
     });
-    p.tracks.layers.push({ id: "t2", kind: "video", name: "", clips: [{
-      id: "v2", clipId: "c2", timelineStart: 1, trimIn: 0, trimOut: 4, speed: 1,
-      zoom: { x: 0.5, y: 0.5, scale: 1 },
-      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-      crop: null, opacity: 1,
-    }] });
+    p.tracks.layers.push({
+      id: "layer2", name: "", items: [{
+        kind: "video",
+        id: "v2", clipId: "c2", timelineStart: 1, trimIn: 0, trimOut: 4, speed: 1,
+        zoom: { x: 0.5, y: 0.5, scale: 1 },
+        filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+        crop: null, opacity: 1,
+      }],
+    });
     expect(allVideoClips(p).map((c) => c.id)).toEqual(["v1", "v2"]);
   });
 });
@@ -127,10 +131,8 @@ const RAW_SUBTITLES = {
   maxWordsPerCue: 8,
 } as const;
 
-// Construye un proyecto v2 válido (con la nueva estructura v3 como base pero degradado a v2)
-// para probar migrateProject (v1→v2). migrateProject ahora lleva a v2, migrateLayers lleva a v3.
+// Construye un proyecto v1 válido para probar migrateProject (v1→v2).
 function makeV1WithClip() {
-  // Usamos un objeto raw directamente (no createEmptyProject que da v3)
   const clip = {
     id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
     zoom: { x: 0.5, y: 0.5, scale: 1 },
@@ -150,14 +152,13 @@ function makeV1WithClip() {
 
 describe("migrateProject", () => {
   it("envuelve el tracks.video plano de v1 en una sola pista (v2)", () => {
-    // migrateProject solo lleva a v2 — la validación con projectSchema v3 requiere también migrateLayers
     const migratedV2 = migrateProject(makeV1WithClip()) as Record<string, any>;
     expect(migratedV2.version).toBe(2);
     expect(migratedV2.tracks.video).toHaveLength(1);
     expect(migratedV2.tracks.video[0].clips[0].id).toBe("v1");
-    // Encadenado con migrateLayers lleva a v3 válido
-    const migrated = projectSchema.parse(migrateLayers(migratedV2));
-    expect(migrated.version).toBe(3);
+    // Encadenado con migrateLayers+migrateMedia lleva a v4 válido
+    const migrated = projectSchema.parse(migrateMedia(migrateLayers(migratedV2)));
+    expect(migrated.version).toBe(4);
   });
 
   it("deja intacto un proyecto que ya es v2", () => {
@@ -172,8 +173,8 @@ describe("migrateProject", () => {
   });
 
   it("devuelve sin tocar entradas de versión desconocida o malformadas", () => {
-    const v4 = { version: 4, tracks: {} };
-    expect(migrateProject(v4)).toBe(v4);
+    const v5 = { version: 5, tracks: {} };
+    expect(migrateProject(v5)).toBe(v5);
     expect(migrateProject(null)).toBe(null);
     expect(migrateProject("corrupto")).toBe("corrupto");
   });
@@ -186,24 +187,48 @@ describe("migrateProject", () => {
   });
 });
 
-describe("capas — selectores", () => {
-  it("createEmptyProject arranca con una capa de vídeo vacía", () => {
+describe("capas media — selectores v4", () => {
+  it("createEmptyProject arranca con una MediaLayer vacía (v4)", () => {
     const p = createEmptyProject("x");
+    expect(p.version).toBe(4);
     expect(p.tracks.layers).toHaveLength(1);
-    expect(p.tracks.layers[0]).toMatchObject({ kind: "video", clips: [] });
+    expect(p.tracks.layers[0]).toMatchObject({ items: [] });
     expect(p.tracks.audio).toEqual([]);
     expect(projectSchema.safeParse(p).success).toBe(true);
   });
-  it("selectores reconstruyen vistas por tipo en orden", () => {
+
+  it("mediaLayers devuelve todas las capas del proyecto", () => {
     const p = createEmptyProject("x");
-    p.tracks.layers.push({ id: "i1", kind: "image", name: "", items: [
-      createImageOverlay("a", "a.png", 0, 0.2, 0.2),
-    ] });
-    p.tracks.layers.push({ id: "t1", kind: "text", name: "", items: [createTextOverlay(0)] });
-    expect(videoLayers(p)).toHaveLength(1);
+    const layer2 = createMediaLayer("capa2");
+    p.tracks.layers.push(layer2);
+    expect(mediaLayers(p)).toHaveLength(2);
+  });
+
+  it("layerItems devuelve los items de una capa", () => {
+    const layer = createMediaLayer("test");
+    const text = { ...createTextOverlay(0), kind: "text" as const };
+    layer.items.push(text);
+    expect(layerItems(layer)).toHaveLength(1);
+  });
+
+  it("allVideoClips, imageItems, textItems filtran por kind entre todas las capas", () => {
+    const p = createEmptyProject("x");
+    p.tracks.layers[0].items.push(
+      { kind: "video", id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4,
+        speed: 1, zoom: { x: 0.5, y: 0.5, scale: 1 },
+        filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+        crop: null, opacity: 1 },
+      { ...createImageOverlay("a", "a.png", 0, 0.2, 0.2), kind: "image" as const },
+      { ...createTextOverlay(0), kind: "text" as const },
+    );
+    expect(allVideoClips(p)).toHaveLength(1);
     expect(imageItems(p)).toHaveLength(1);
     expect(textItems(p)).toHaveLength(1);
-    expect(allVideoClips(p)).toEqual([]);
+  });
+
+  it("videoLayers/imageLayers/textLayers devuelven [] (deprecadas en v4)", () => {
+    const p = createEmptyProject("x");
+    expect(videoLayers(p)).toEqual([]);
   });
 });
 
@@ -221,13 +246,133 @@ describe("migrateLayers", () => {
       originalAudioVolume: 1,
       subtitles: { ...RAW_SUBTITLES },
     };
-    const migrated = projectSchema.parse(migrateLayers(v2));
-    expect(migrated.version).toBe(3);
-    const kinds = migrated.tracks.layers.map((l) => l.kind);
-    expect(kinds).toEqual(["video", "image", "text"]); // vídeo atrás, texto al frente
+    const v3 = migrateLayers(v2) as Record<string, any>;
+    expect(v3.version).toBe(3);
+    const kinds = v3.tracks.layers.map((l: any) => l.kind);
+    expect(kinds).toEqual(["video", "image", "text"]);
   });
+
   it("idempotente: un proyecto v3 se devuelve igual", () => {
+    // Construimos un v3 raw directamente
+    const v3raw = {
+      id: "p1", name: "x", version: 3,
+      settings: { ...RAW_SETTINGS },
+      tracks: {
+        layers: [{ id: "l1", kind: "video", name: "", clips: [] }],
+        audio: [],
+      },
+      originalAudioVolume: 1,
+      subtitles: { ...RAW_SUBTITLES },
+    };
+    expect(migrateLayers(v3raw)).toBe(v3raw);
+  });
+
+  it("idempotente: un proyecto v4 se devuelve igual (migrateLayers no toca v4)", () => {
     const p = createEmptyProject("x");
     expect(migrateLayers(p)).toBe(p);
+  });
+});
+
+describe("migrateMedia", () => {
+  const baseV3 = {
+    id: "p1", name: "x", version: 3,
+    settings: { ...RAW_SETTINGS },
+    originalAudioVolume: 1,
+    subtitles: { ...RAW_SUBTITLES },
+  };
+
+  it("convierte v3 (capas tipadas) en v4 con MediaLayers e items etiquetados por kind", () => {
+    const clip = {
+      id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
+      zoom: { x: 0.5, y: 0.5, scale: 1 },
+      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+      crop: null, opacity: 1,
+    };
+    const img = createImageOverlay("a", "a.png", 0, 0.2, 0.2);
+    const txt = createTextOverlay(0);
+    const v3 = {
+      ...baseV3,
+      tracks: {
+        layers: [
+          { id: "lv", kind: "video", name: "video-capa", clips: [clip] },
+          { id: "li", kind: "image", name: "img-capa", items: [img] },
+          { id: "lt", kind: "text", name: "txt-capa", items: [txt] },
+        ],
+        audio: [],
+      },
+    };
+    const result = migrateMedia(v3) as Record<string, any>;
+    expect(result.version).toBe(4);
+    expect(result.tracks.layers).toHaveLength(3);
+    // Capa vídeo
+    expect(result.tracks.layers[0]).toMatchObject({ id: "lv", name: "video-capa" });
+    expect(result.tracks.layers[0].items[0]).toMatchObject({ id: "v1", kind: "video" });
+    // Capa imagen
+    expect(result.tracks.layers[1]).toMatchObject({ id: "li", name: "img-capa" });
+    expect(result.tracks.layers[1].items[0]).toMatchObject({ id: img.id, kind: "image" });
+    // Capa texto
+    expect(result.tracks.layers[2]).toMatchObject({ id: "lt", name: "txt-capa" });
+    expect(result.tracks.layers[2].items[0]).toMatchObject({ id: txt.id, kind: "text" });
+  });
+
+  it("conserva el orden de las capas (z)", () => {
+    const v3 = {
+      ...baseV3,
+      tracks: {
+        layers: [
+          { id: "l1", kind: "text", name: "primero", items: [] },
+          { id: "l2", kind: "video", name: "segundo", clips: [] },
+          { id: "l3", kind: "image", name: "tercero", items: [] },
+        ],
+        audio: [],
+      },
+    };
+    const result = migrateMedia(v3) as Record<string, any>;
+    expect(result.tracks.layers.map((l: any) => l.id)).toEqual(["l1", "l2", "l3"]);
+  });
+
+  it("idempotente: un proyecto v4 se devuelve igual", () => {
+    const p = createEmptyProject("x");
+    expect(migrateMedia(p)).toBe(p);
+  });
+
+  it("no toca proyectos v1/v2 (los ignora)", () => {
+    const v1 = { version: 1, tracks: {} };
+    expect(migrateMedia(v1)).toBe(v1);
+    const v2 = { version: 2, tracks: {} };
+    expect(migrateMedia(v2)).toBe(v2);
+  });
+
+  it("el resultado v4 pasa el projectSchema tras la cadena completa v1→v4", () => {
+    const clip = {
+      id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
+      zoom: { x: 0.5, y: 0.5, scale: 1 },
+      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+      crop: null,
+    };
+    const v1 = {
+      id: "proj1", name: "test-v1", version: 1,
+      settings: { ...RAW_SETTINGS },
+      tracks: { video: [clip], text: [], image: [], audio: [] },
+      originalAudioVolume: 1,
+      subtitles: { ...RAW_SUBTITLES },
+    };
+    const migrated = migrateMedia(migrateLayers(migrateProject(v1)));
+    const parsed = projectSchema.safeParse(migrated);
+    expect(parsed.success).toBe(true);
+    if (parsed.success) {
+      expect(parsed.data.version).toBe(4);
+      expect(parsed.data.tracks.layers[0].items[0]).toMatchObject({ id: "v1", kind: "video" });
+    }
+  });
+
+  // Factories legacy siguen funcionando (se usan en tests de migración v3)
+  it("createVideoLayer/createImageLayer/createTextLayer siguen disponibles", () => {
+    const vl = createVideoLayer("test");
+    expect(vl.kind).toBe("video");
+    const il = createImageLayer();
+    expect(il.kind).toBe("image");
+    const tl = createTextLayer();
+    expect(tl.kind).toBe("text");
   });
 });

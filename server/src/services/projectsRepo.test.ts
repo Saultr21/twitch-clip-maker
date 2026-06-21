@@ -38,8 +38,14 @@ describe("sanitizeProjectName", () => {
   });
 });
 
+const RAW_SETTINGS = {
+  aspect: "9:16", width: 1080, height: 1920, fps: 30,
+  background: { type: "black", color: "#000000", blur: 0.5 },
+  audioDucking: false, fadeIn: 0, fadeOut: 0, clipTransition: 0,
+};
+
 describe("projectsRepo", () => {
-  it("guarda y recarga un proyecto", () => {
+  it("guarda y recarga un proyecto v4", () => {
     const p = createEmptyProject("demo");
     saveProject("demo", p, dir);
     expect(loadProject("demo", dir)).toEqual(p);
@@ -72,47 +78,39 @@ describe("projectsRepo", () => {
     expect(loadProject("nada", dir)).toBeNull();
   });
 
-  it("migra un proyecto v1 en disco al cargarlo (v1→v2→v3 con una capa de vídeo)", () => {
-    // v1 = tracks.video plano (array de clips, no de pistas)
-    const rawSettings = {
-      aspect: "9:16", width: 1080, height: 1920, fps: 30,
-      background: { type: "black", color: "#000000", blur: 0.5 },
-      audioDucking: false, fadeIn: 0, fadeOut: 0, clipTransition: 0,
-    };
-    const clip = { id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
+  it("migra un proyecto v1 en disco al cargarlo (v1→v2→v3→v4)", () => {
+    const clip = {
+      id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
-      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 }, crop: null };
+      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+      crop: null,
+    };
     const v1 = {
       id: "demo-id", name: "demo", version: 1,
-      settings: rawSettings,
+      settings: RAW_SETTINGS,
       tracks: { video: [clip], text: [], image: [], audio: [] },
       originalAudioVolume: 1,
       subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 },
     };
     fs.writeFileSync(path.join(dir, "demo.json"), JSON.stringify(v1));
     const loaded = loadProject("demo", dir);
-    expect(loaded?.version).toBe(3);
+    expect(loaded?.version).toBe(4);
     const layers = loaded?.tracks.layers;
-    expect(layers?.[0]?.kind).toBe("video");
-    const videoLayer = layers?.[0];
-    if (videoLayer?.kind === "video") {
-      expect(videoLayer.clips[0].id).toBe("v1");
-    }
+    expect(layers).toHaveLength(1);
+    // La única capa tiene el clip con kind=video
+    expect(layers?.[0]?.items[0]).toMatchObject({ id: "v1", kind: "video" });
   });
 
-  it("migra un proyecto v2 en disco al cargarlo (v2→v3 con tracks.layers)", () => {
-    const rawSettings = {
-      aspect: "9:16", width: 1080, height: 1920, fps: 30,
-      background: { type: "black", color: "#000000", blur: 0.5 },
-      audioDucking: false, fadeIn: 0, fadeOut: 0, clipTransition: 0,
-    };
+  it("migra un proyecto v2 en disco al cargarlo (v2→v3→v4 con tracks.layers media)", () => {
+    const img = createImageOverlay("a", "a.png", 0, 0.2, 0.2);
+    const txt = createTextOverlay(0);
     const v2 = {
       id: "demo-id", name: "demo", version: 2,
-      settings: rawSettings,
+      settings: RAW_SETTINGS,
       tracks: {
         video: [{ id: "tk", name: "", clips: [] }],
-        image: [createImageOverlay("a", "a.png", 0, 0.2, 0.2)],
-        text: [createTextOverlay(0)],
+        image: [img],
+        text: [txt],
         audio: [],
       },
       originalAudioVolume: 1,
@@ -120,9 +118,48 @@ describe("projectsRepo", () => {
     };
     fs.writeFileSync(path.join(dir, "demo.json"), JSON.stringify(v2));
     const loaded = loadProject("demo", dir);
-    expect(loaded?.version).toBe(3);
-    expect(loaded?.tracks.layers).toBeDefined();
-    const kinds = loaded?.tracks.layers.map((l) => l.kind);
-    expect(kinds).toEqual(["video", "image", "text"]);
+    expect(loaded?.version).toBe(4);
+    expect(loaded?.tracks.layers).toHaveLength(3); // video + image + text
+    // Orden preservado: vídeo, imagen, texto
+    const items0 = loaded?.tracks.layers[0]?.items;
+    const items1 = loaded?.tracks.layers[1]?.items;
+    const items2 = loaded?.tracks.layers[2]?.items;
+    expect(items0).toEqual([]); // capa vídeo vacía
+    expect(items1?.[0]).toMatchObject({ id: img.id, kind: "image" });
+    expect(items2?.[0]).toMatchObject({ id: txt.id, kind: "text" });
+  });
+
+  it("migra un proyecto v3 en disco al cargarlo (v3→v4 con items etiquetados por kind)", () => {
+    const clip = {
+      id: "vc1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 5, speed: 1,
+      zoom: { x: 0.5, y: 0.5, scale: 1 },
+      filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
+      crop: null, opacity: 1,
+    };
+    const img = createImageOverlay("b", "b.png", 0, 0.3, 0.3);
+    const txt = createTextOverlay(1);
+    const v3 = {
+      id: "demo-id", name: "demo", version: 3,
+      settings: RAW_SETTINGS,
+      tracks: {
+        layers: [
+          { id: "lv", kind: "video", name: "vídeo", clips: [clip] },
+          { id: "li", kind: "image", name: "imágenes", items: [img] },
+          { id: "lt", kind: "text", name: "textos", items: [txt] },
+        ],
+        audio: [],
+      },
+      originalAudioVolume: 1,
+      subtitles: { cues: [], style: { ...DEFAULT_SUBTITLE_STYLE }, maxWordsPerCue: 8 },
+    };
+    fs.writeFileSync(path.join(dir, "demo.json"), JSON.stringify(v3));
+    const loaded = loadProject("demo", dir);
+    expect(loaded?.version).toBe(4);
+    const layers = loaded?.tracks.layers;
+    expect(layers).toHaveLength(3);
+    // Orden conservado, items etiquetados
+    expect(layers?.[0]?.items[0]).toMatchObject({ id: "vc1", kind: "video" });
+    expect(layers?.[1]?.items[0]).toMatchObject({ id: img.id, kind: "image" });
+    expect(layers?.[2]?.items[0]).toMatchObject({ id: txt.id, kind: "text" });
   });
 });

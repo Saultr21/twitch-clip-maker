@@ -8,6 +8,7 @@ import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { usePlayback } from "../preview/PreviewArea";
+import { useElementSize } from "../preview/useElementSize";
 import { TimeRuler } from "./TimeRuler";
 import { TrackRow, type BlockDescriptor } from "./TrackRow";
 
@@ -18,7 +19,7 @@ function PlayheadLine({ pxPerSecond }: { pxPerSecond: number }) {
   return (
     <div
       aria-hidden="true"
-      className="absolute top-0 bottom-0 w-px bg-accent pointer-events-none"
+      className="absolute top-0 bottom-0 w-px bg-accent pointer-events-none z-30"
       style={{ left: 80 + playhead * pxPerSecond }}
     >
       <div className="w-2.5 h-2.5 -ml-[5px] rotate-45 bg-accent" />
@@ -127,7 +128,13 @@ export function Timeline({ height }: { height: number }) {
   const canSplit = videoCount > 0;
 
   const duration = projectDuration(project);
-  const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
+  // El contenido llena al menos el ancho visible del panel (aunque el proyecto sea
+  // corto), para que la regla y los carriles no terminen a media pantalla.
+  const viewport = useElementSize(scrollRef);
+  const HEADER_W = 80; // ancho de la columna de cabeceras (w-20)
+  const contentWidth = Math.max(600, (duration + 5) * pxPerSecond, viewport.width);
+  // La regla dibuja marcas hasta cubrir todo el ancho del contenido.
+  const rulerDuration = Math.max(duration, (contentWidth - HEADER_W) / pxPerSecond);
 
   const audioBlocks: BlockDescriptor[] = project.tracks.audio.map((a) => ({
     id: a.id,
@@ -336,8 +343,13 @@ export function Timeline({ height }: { height: number }) {
 
       <div ref={scrollRef} className="flex-1 overflow-x-auto overflow-y-auto">
         <div className="relative" style={{ width: contentWidth }}>
-          <div className="ml-20">
-            <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
+          {/* Regla sticky: se queda pegada arriba al hacer scroll vertical, para
+              ver siempre el playhead. La envoltura ocupa todo el ancho (con fondo)
+              y la regla se desplaza 80px tras la columna de cabeceras. */}
+          <div className="sticky top-0 z-20 bg-surface border-b border-border">
+            <div className="ml-20">
+              <TimeRuler duration={rulerDuration} pxPerSecond={pxPerSecond} onSeek={seek} />
+            </div>
           </div>
           {/* GapDrop superior — hermana de layersContainerRef (no hija).
               Soltar un clip de Medios aquí crea una capa nueva al frente. */}

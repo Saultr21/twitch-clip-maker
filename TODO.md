@@ -110,10 +110,7 @@
 - [ ] Transiciones v2: crossfade real (xfade) entre clips — reescribe el concat (lo más central/testeado); riesgo alto
 
 ## Pendiente — features grandes (pedidas por el usuario 2026-06-19, requieren diseño propio)
-- [ ] `TASK-010` — Zoom de la zona de trabajo (preview/lienzo)
-  - Poder acercar/alejar el lienzo del editor para trabajar con precisión (no confundir con el `zoom.scale` del clip, que reencuadra el vídeo)
-  - Notas: afecta al cálculo de tamaño del lienzo en `PreviewCanvas` y a las coordenadas del Stage de Konva (`OverlayLayer`); pan + reset; atajos rueda/Ctrl
-  - Priority: medium
+- [~] `TASK-010` — Zoom de la zona de trabajo — DESCARTADA (2026-06-21, el usuario decide que no la quiere)
 - [ ] `TASK-011` — Botón de Transiciones + apartado de animaciones/transiciones
   - Un **botón de Transiciones** en la UI que permita añadir transiciones (desvanecer, fundido, crossfade, etc.) ENTRE clips, al inicio y al final (petición usuario 2026-06-20)
   - Notas: se solapa con lo ya deferido (fade in/out al export ya existe; "Transiciones v2: crossfade real (xfade)" reescribe el concat → riesgo alto). Requiere modelo de transiciones en el proyecto + UI de selección/colocación + preview + export FFmpeg (xfade/acrossfade)

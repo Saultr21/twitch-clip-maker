@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Trash2, Upload } from "lucide-react";
 import type { ClipInfo } from "@clipforge/shared";
-import { allVideoClips, videoLayers } from "@clipforge/shared";
+import { allVideoClips, videoTracks } from "@clipforge/shared";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
@@ -41,7 +41,7 @@ export function MediaPanel() {
 
   const addToTimeline = (clip: ClipInfo) => {
     useProjectStore.getState().addVideoClip(clip);
-    const tracks = videoLayers(useProjectStore.getState().project)[0]?.clips ?? [];
+    const tracks = videoTracks(useProjectStore.getState().project)[0]?.clips ?? [];
     const newClip = tracks[tracks.length - 1];
     if (newClip) {
       useUiStore.getState().select({ kind: "video", id: newClip.id });

@@ -1,5 +1,5 @@
 import { Film, Type, Image, Music, Captions, SlidersHorizontal, type LucideIcon } from "lucide-react";
-import { videoLayers } from "@clipforge/shared";
+import { videoTracks } from "@clipforge/shared";
 import { useProjectStore } from "../stores/projectStore";
 import { useUiStore, type Tool } from "../stores/uiStore";
 import { videoClipAt } from "../lib/timeline";
@@ -33,7 +33,7 @@ export function ToolRail() {
       // color y velocidad están en el panel de propiedades)
       const { project } = useProjectStore.getState();
       const playhead = useUiStore.getState().playhead;
-      const baseClips = videoLayers(project)[0]?.clips ?? [];
+      const baseClips = videoTracks(project)[0]?.clips ?? [];
       const clip = videoClipAt(baseClips, playhead) ?? baseClips[0];
       if (clip) useUiStore.getState().select({ kind: "video", id: clip.id });
       return;

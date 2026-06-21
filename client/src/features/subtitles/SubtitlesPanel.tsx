@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type { SubtitleCue } from "@clipforge/shared";
-import { videoLayers } from "@clipforge/shared";
+import { videoTracks } from "@clipforge/shared";
 import { censorCues } from "../../lib/profanity";
 import { splitCuesToMaxWords } from "../../lib/subtitles";
 import { videoClipAt } from "../../lib/timeline";
@@ -43,13 +43,13 @@ export function SubtitlesPanel() {
     const project = useProjectStore.getState().project;
     const playhead = useUiStore.getState().playhead;
     // clip bajo el playhead, o el primero si el playhead está en un hueco
-    const baseClips = videoLayers(project)[0]?.clips ?? [];
+    const baseClips = videoTracks(project)[0]?.clips ?? [];
     const clip = videoClipAt(baseClips, playhead) ?? baseClips[0];
     if (!clip) return;
     void start(clip, language, model);
   };
 
-  const hasClips = useProjectStore((s) => (videoLayers(s.project)[0]?.clips.length ?? 0) > 0);
+  const hasClips = useProjectStore((s) => (videoTracks(s.project)[0]?.clips.length ?? 0) > 0);
 
   const clearAll = async () => {
     const n = useProjectStore.getState().project.subtitles.cues.length;

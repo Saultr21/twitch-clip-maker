@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, FolderOpen } from "lucide-react";
 import { createPortal } from "react-dom";
 import type { QualityPresetId } from "@clipforge/shared";
-import { videoLayers } from "@clipforge/shared";
+import { videoTracks } from "@clipforge/shared";
 import { useProjectStore } from "../../stores/projectStore";
 import { useUiStore } from "../../stores/uiStore";
 import { useExport } from "./useExport";
@@ -20,7 +20,7 @@ interface ExportDialogProps {
 
 export function ExportDialog({ open, onClose }: ExportDialogProps) {
   const projectName = useProjectStore((s) => s.project.name);
-  const hasClips = useProjectStore((s) => (videoLayers(s.project)[0]?.clips.length ?? 0) > 0);
+  const hasClips = useProjectStore((s) => (videoTracks(s.project)[0]?.clips.length ?? 0) > 0);
   const { state, start, cancel, reset, openFolder } = useExport();
   const [preset, setPreset] = useState<QualityPresetId>("tiktok");
   const [fileName, setFileName] = useState("");

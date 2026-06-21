@@ -9,6 +9,7 @@ import {
   createMediaLayer,
   createTextLayer,
   createTextOverlay,
+  createVideoClip,
   createVideoLayer,
   imageItems,
   layerItems,
@@ -18,7 +19,7 @@ import {
   migrateProject,
   projectSchema,
   textItems,
-  videoLayers,
+  videoTracks,
 } from "./project.js";
 import { DEFAULT_SUBTITLE_STYLE } from "./subtitles.js";
 
@@ -226,9 +227,18 @@ describe("capas media — selectores v4", () => {
     expect(textItems(p)).toHaveLength(1);
   });
 
-  it("videoLayers/imageLayers/textLayers devuelven [] (deprecadas en v4)", () => {
+  it("videoTracks devuelve las capas con vídeo como {id,name,clips} en orden", () => {
     const p = createEmptyProject("x");
-    expect(videoLayers(p)).toEqual([]);
+    // Proyecto vacío: ninguna capa tiene vídeo → []
+    expect(videoTracks(p)).toEqual([]);
+    // Añadir un clip de vídeo a la primera capa
+    const clip = createVideoClip("clip-1", 0, 5);
+    p.tracks.layers[0].items.push({ ...clip, kind: "video" });
+    const tracks = videoTracks(p);
+    expect(tracks).toHaveLength(1);
+    expect(tracks[0].id).toBe(p.tracks.layers[0].id);
+    expect(tracks[0].clips).toHaveLength(1);
+    expect(tracks[0].clips[0].id).toBe(clip.id);
   });
 });
 

@@ -242,19 +242,24 @@ export function textItems(p: Project): TextOverlay[] {
     .filter((it): it is MediaElement & { kind: "text" } => it.kind === "text") as unknown as TextOverlay[];
 }
 
-// v3 selector aliases — mantenidos para compatibilidad de lectores hasta Task 3.
-/** @deprecated Usa mediaLayers() en código nuevo. */
-export function videoLayers(_p: Project): VideoLayer[] {
-  // En v4 no hay VideoLayer; devolvemos vacío para no romper lectores que lo esperan.
-  return [];
+/** Vista de las capas que contienen vídeo como "pistas" {id,name,clips}, en
+ *  orden de array (índice = z). La primera (`[0]`) es la pista base (la que el
+ *  preview/motor sincroniza con `videoRef`); el resto son superpuestas. */
+export interface VideoTrackView {
+  id: string;
+  name: string;
+  clips: VideoClip[];
 }
-/** @deprecated Usa mediaLayers() en código nuevo. */
-export function imageLayers(_p: Project): ImageLayer[] {
-  return [];
-}
-/** @deprecated Usa mediaLayers() en código nuevo. */
-export function textLayers(_p: Project): TextLayer[] {
-  return [];
+export function videoTracks(p: Project): VideoTrackView[] {
+  return p.tracks.layers
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      clips: l.items.filter(
+        (it): it is MediaElement & { kind: "video" } => it.kind === "video",
+      ) as unknown as VideoClip[],
+    }))
+    .filter((t) => t.clips.length > 0);
 }
 
 export type Background = z.infer<typeof backgroundSchema>;

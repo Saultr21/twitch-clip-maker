@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Crop, Scissors, Trash2 } from "lucide-react";
 import type { ImageOverlay, MediaLayer, TextOverlay, VideoClip } from "@clipforge/shared";
+import { allVideoClips } from "@clipforge/shared";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -9,10 +10,6 @@ import { useUiStore } from "../../stores/uiStore";
 import { usePlayback } from "../preview/PreviewArea";
 import { TimeRuler } from "./TimeRuler";
 import { TrackRow, type BlockDescriptor } from "./TrackRow";
-
-// Referencia estable para el fallback de "sin clips": evita crear un array nuevo
-// por render, que rompería la memoización de los hooks que dependen de los clips.
-const EMPTY_CLIPS: never[] = [];
 
 // Componente propio: el playhead cambia a 60fps durante la reproducción y
 // suscribirlo aquí evita re-renderizar el Timeline completo en cada frame
@@ -87,8 +84,7 @@ export function Timeline({ height }: { height: number }) {
   const moveCue = useProjectStore((s) => s.moveCue);
   const trimCue = useProjectStore((s) => s.trimCue);
   const subtitleCues = useProjectStore((s) => s.project.subtitles.cues);
-  const addImageLayer = useProjectStore((s) => s.addImageLayer);
-  const addTextLayer = useProjectStore((s) => s.addTextLayer);
+  const addMediaLayer = useProjectStore((s) => s.addMediaLayer);
   const reorderLayer = useProjectStore((s) => s.reorderLayer);
   const removeLayer = useProjectStore((s) => s.removeLayer);
   const pxPerSecond = useUiStore((s) => s.pxPerSecond);
@@ -107,35 +103,28 @@ export function Timeline({ height }: { height: number }) {
     x: number;
     y: number;
     widthPx: number;
+    // Carril (capa media) resaltado como destino al soltar DENTRO de él.
     targetLayerId: string | null;
-    // Si el cursor está en la zona de inserción (por encima/por debajo del bloque
-    // de capas), se creará una capa nueva ahí al soltar (estilo Adobe).
-    insertEdge: "top" | "bottom" | null;
+    // Línea de inserción: si está definida, al soltar se crea una capa nueva en
+    // `index` del array de capas, y la línea se pinta en pantalla en `lineY`
+    // (estilo Adobe: arrastrar entre dos carriles crea una capa entre medias).
+    insert: { index: number; lineY: number; lineLeft: number; lineWidth: number } | null;
   } | null>(null);
 
-  // Capas de vídeo derivadas del modelo v4 (MediaLayer[])
-  const videoTracks = project.tracks.layers
-    .map((l) => ({
-      id: l.id,
-      name: l.name,
-      clips: l.items.filter((it) => it.kind === "video") as unknown as VideoClip[],
-    }))
-    .filter((t) => t.clips.length > 0);
-
-  // Clips de la capa base (pista de vídeo 0). Referencia estable vía EMPTY_CLIPS.
-  const baseClips = videoTracks[0]?.clips ?? EMPTY_CLIPS;
-  const videoCount = baseClips.length;
+  // Clips de vídeo (de todas las capas) para el auto-scroll al añadir y "Dividir".
+  const videoClips = allVideoClips(project);
+  const videoCount = videoClips.length;
   const prevVideoCount = useRef(videoCount);
   // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
   useEffect(() => {
-    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && baseClips.length > 0) {
-      const last = baseClips[baseClips.length - 1];
+    if (videoCount > prevVideoCount.current && dirty && scrollRef.current && videoClips.length > 0) {
+      const last = videoClips[videoClips.length - 1];
       const left = 80 + last.timelineStart * pxPerSecond - 60;
       scrollRef.current.scrollLeft = Math.max(0, left);
     }
     prevVideoCount.current = videoCount;
-  }, [videoCount, baseClips, pxPerSecond, dirty]);
-  const canSplit = baseClips.length > 0;
+  }, [videoCount, videoClips, pxPerSecond, dirty]);
+  const canSplit = videoCount > 0;
 
   const duration = projectDuration(project);
   const contentWidth = Math.max(600, (duration + 5) * pxPerSecond);
@@ -195,105 +184,84 @@ export function Timeline({ height }: { height: number }) {
     return blocks;
   }
 
-  function layerTitle(layer: MediaLayer): string {
-    const hasVideo = layer.items.some((it) => it.kind === "video");
-    const hasImage = layer.items.some((it) => it.kind === "image");
-    const hasText = layer.items.some((it) => it.kind === "text");
-
-    const videoLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "video"));
-    const imageLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "image"));
-    const textLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "text"));
-
-    if (hasVideo) {
-      const vidIdx = videoLayersArr.findIndex((l) => l.id === layer.id);
-      return vidIdx === 0 ? "Vídeo" : `Vídeo ${vidIdx + 1}`;
-    }
-    if (hasImage) {
-      const imgIdx = imageLayersArr.findIndex((l) => l.id === layer.id);
-      return imageLayersArr.length === 1 ? "Imagen" : `Imagen ${imgIdx + 1}`;
-    }
-    if (hasText) {
-      const txtIdx = textLayersArr.findIndex((l) => l.id === layer.id);
-      return textLayersArr.length === 1 ? "Texto" : `Texto ${txtIdx + 1}`;
-    }
-    return "Capa";
+  // Carriles "media" genéricos: el orden visual va de arriba (frente) a abajo
+  // (fondo). Se numeran por posición visual para dar un asa estable de agarre.
+  function layerTitle(_layer: MediaLayer, visualIndex: number): string {
+    return `Capa ${visualIndex + 1}`;
   }
 
+  // Bandas verticales dentro de un carril: el tercio superior inserta una capa
+  // por ENCIMA, el inferior por DEBAJO y la franja central mueve DENTRO del carril.
+  const BAND = 0.28;
+
   /**
-   * Mapea una coordenada Y de pantalla al layer que la contiene dentro del
-   * bloque unificado, o null si el puntero está fuera.
+   * Resuelve, a partir de una Y de pantalla, qué hará el arrastre vertical:
+   *  - `into`:   mover el elemento al carril `layerId` existente.
+   *  - `insert`: crear una capa nueva en `index` del array (con geometría de la
+   *              línea de inserción para pintarla).
+   * Estilo Adobe: cerca del borde de un carril → inserción entre capas; en el
+   * centro → mover a ese carril.
    */
-  const laneAtClientYUnified = (clientY: number): { layerId: string; kind: string } | null => {
+  type DropTarget =
+    | { type: "into"; layerId: string }
+    | { type: "insert"; index: number; lineY: number; lineLeft: number; lineWidth: number };
+
+  const resolveDropTarget = (clientY: number): DropTarget | null => {
     const cont = layersContainerRef.current;
     if (!cont) return null;
     const contRect = cont.getBoundingClientRect();
-    if (clientY < contRect.top || clientY >= contRect.bottom) return null;
-
     const laneEls = Array.from(cont.children) as HTMLElement[];
+    if (laneEls.length === 0) return null;
+    const lineLeft = contRect.left + 80; // tras la columna de cabeceras (w-20)
+    const lineWidth = contRect.width - 80;
+
+    // Por encima de todo el bloque: insertar en el frente (final del array).
+    if (clientY < contRect.top) {
+      return { type: "insert", index: layers.length, lineY: contRect.top, lineLeft, lineWidth };
+    }
+    // Por debajo de todo el bloque: insertar en el fondo (índice 0).
+    if (clientY >= contRect.bottom) {
+      return { type: "insert", index: 0, lineY: contRect.bottom, lineLeft, lineWidth };
+    }
+
     let visualLane = laneEls.findIndex((el) => {
       const r = el.getBoundingClientRect();
       return clientY >= r.top && clientY < r.bottom;
     });
     if (visualLane === -1) visualLane = laneEls.length - 1;
 
-    // Los carriles se renderizan en reversedIndices order: visual 0 = capa superior
-    const layerIndex = reversedIndices[Math.max(0, Math.min(reversedIndices.length - 1, visualLane))];
-    const layer = layers[layerIndex];
-    const layerKind = layer.items.some((it) => it.kind === "video") ? "video"
-      : layer.items.some((it) => it.kind === "image") ? "image"
-      : layer.items.some((it) => it.kind === "text") ? "text"
-      : "unknown";
-    return layer ? { layerId: layer.id, kind: layerKind } : null;
+    const rect = laneEls[visualLane].getBoundingClientRect();
+    const rel = (clientY - rect.top) / rect.height;
+    // visual → índice del array (reversedIndices: visual 0 = última posición)
+    const arr = reversedIndices[visualLane];
+
+    if (rel < BAND) {
+      // Insertar ENCIMA de este carril (más al frente) → array index arr+1
+      return { type: "insert", index: arr + 1, lineY: rect.top, lineLeft, lineWidth };
+    }
+    if (rel > 1 - BAND) {
+      // Insertar DEBAJO de este carril (más al fondo) → array index arr
+      return { type: "insert", index: arr, lineY: rect.bottom, lineLeft, lineWidth };
+    }
+    return { type: "into", layerId: layers[arr].id };
   };
 
   const handleUnifiedMoveEnd = (elementId: string, clientY: number, start: number) => {
     setGhost(null);
-    const cont = layersContainerRef.current;
-    if (!cont) return;
-    const contRect = cont.getBoundingClientRect();
-
-    // Detectar la capa origen del elemento
-    const sourceLayer = layers.find((layer) =>
-      layer.items.some((it) => it.id === elementId)
-    );
+    const sourceLayer = layers.find((layer) => layer.items.some((it) => it.id === elementId));
     if (!sourceLayer) return;
-    const sourceItem = sourceLayer.items.find((it) => it.id === elementId);
-    const elementKind = sourceItem?.kind ?? "video";
 
-    // Si el puntero cae por ENCIMA del bloque: crear capa nueva arriba
-    if (clientY < contRect.top) {
-      if (elementKind === "video") {
-        const id = useProjectStore.getState().addVideoTrack("top");
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      } else if (elementKind === "image") {
-        const id = useProjectStore.getState().addImageLayer();
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      } else if (elementKind === "text") {
-        const id = useProjectStore.getState().addTextLayer();
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      }
-      return;
-    }
-
-    // Si el puntero cae por DEBAJO del bloque: crear capa nueva abajo
-    if (clientY >= contRect.bottom) {
-      if (elementKind === "video") {
-        const id = useProjectStore.getState().addVideoTrack("bottom");
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      } else if (elementKind === "image") {
-        const id = useProjectStore.getState().addImageLayer();
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      } else if (elementKind === "text") {
-        const id = useProjectStore.getState().addTextLayer();
-        useProjectStore.getState().moveElementToLayer(elementId, id, start);
-      }
-      return;
-    }
-
-    // Dentro del bloque: encontrar el carril destino
-    const target = laneAtClientYUnified(clientY);
+    const target = resolveDropTarget(clientY);
     if (!target) return;
-    if (target.kind !== elementKind) return; // kind distinto: no-op
+
+    if (target.type === "insert") {
+      // Crear capa nueva en el hueco indicado y mover el elemento allí.
+      const newId = useProjectStore.getState().addMediaLayer(target.index);
+      useProjectStore.getState().moveElementToLayer(elementId, newId, start);
+      return;
+    }
+
+    // Mover DENTRO de un carril existente (cualquier tipo a cualquier capa).
     if (target.layerId === sourceLayer.id) return; // misma capa: no-op
     useProjectStore.getState().moveElementToLayer(elementId, target.layerId, start);
   };
@@ -346,30 +314,12 @@ export function Timeline({ height }: { height: number }) {
         )}
         <button
           type="button"
-          onClick={() => useProjectStore.getState().addVideoTrack("top")}
-          title="Añadir pista de vídeo"
-          aria-label="Añadir pista de vídeo"
+          onClick={() => addMediaLayer()}
+          title="Añadir capa al frente"
+          aria-label="Añadir capa"
           className="flex items-center gap-1 text-muted hover:text-text text-xs px-1.5"
         >
-          + Vídeo
-        </button>
-        <button
-          type="button"
-          onClick={() => addImageLayer()}
-          title="Añadir capa de imagen"
-          aria-label="Añadir capa de imagen"
-          className="flex items-center gap-1 text-muted hover:text-text text-xs px-1.5"
-        >
-          + Imagen
-        </button>
-        <button
-          type="button"
-          onClick={() => addTextLayer()}
-          title="Añadir capa de texto"
-          aria-label="Añadir capa de texto"
-          className="flex items-center gap-1 text-muted hover:text-text text-xs px-1.5"
-        >
-          + Texto
+          + Capa
         </button>
         <label htmlFor="tl-zoom" className="ml-auto text-[10px] text-muted">Zoom</label>
         <input
@@ -389,31 +339,27 @@ export function Timeline({ height }: { height: number }) {
           <div className="ml-20">
             <TimeRuler duration={duration} pxPerSecond={pxPerSecond} onSeek={seek} />
           </div>
-          {/* GapDrop superior — hermana de layersContainerRef (no hija) */}
+          {/* GapDrop superior — hermana de layersContainerRef (no hija).
+              Soltar un clip de Medios aquí crea una capa nueva al frente. */}
           <GapDrop
             position="top"
             pxPerSecond={pxPerSecond}
-            highlight={ghost?.insertEdge === "top"}
-            onDrop={(pos, t, clipId) => {
+            onDrop={(_pos, t, clipId) => {
               const clip = clips.find((c) => c.id === clipId);
               if (!clip) return;
-              const id = useProjectStore.getState().addVideoTrack(pos);
+              const id = useProjectStore.getState().addMediaLayer(layers.length);
               useProjectStore.getState().addVideoClipToTrack(clip, id, t);
               useUiStore.getState().select(null);
             }}
           />
           {/* INVARIANTE: layersContainerRef.current.children son SOLO carriles TrackRow */}
           <div ref={layersContainerRef}>
-            {reversedIndices.map((i) => {
+            {reversedIndices.map((i, visualIndex) => {
               const layer = layers[i];
-              const isBaseVideoLayer =
-                layer.items.some((it) => it.kind === "video") &&
-                videoTracks.findIndex((t) => t.id === layer.id) === 0;
-
               return (
                 <TrackRow
                   key={layer.id}
-                  title={layerTitle(layer)}
+                  title={layerTitle(layer, visualIndex)}
                   blocks={blocksForLayer(layer)}
                   pxPerSecond={pxPerSecond}
                   onMove={(id, t, transient) => {
@@ -430,44 +376,30 @@ export function Timeline({ height }: { height: number }) {
                     else if (item.kind === "image") trimOverlay("image", id, edge, t, { transient });
                     else if (item.kind === "text") trimOverlay("text", id, edge, t, { transient });
                   }}
-                  onDropClip={
-                    layer.items.some((it) => it.kind === "video")
-                      ? (clipId, t) => {
-                          const clip = clips.find((c) => c.id === clipId);
-                          if (!clip) return;
-                          useProjectStore.getState().addVideoClipToTrack(clip, layer.id, t);
-                          useUiStore.getState().select(null);
-                        }
-                      : undefined
-                  }
-                  onRemoveTrack={
-                    isBaseVideoLayer
-                      ? undefined
-                      : () => removeLayer(layer.id)
-                  }
-                  onAddTrack={
-                    layer.items.some((it) => it.kind === "video")
-                      ? () => useProjectStore.getState().addVideoTrack("top")
-                      : undefined
-                  }
+                  // Cualquier carril acepta soltar un clip de Medios (siempre vídeo).
+                  onDropClip={(clipId, t) => {
+                    const clip = clips.find((c) => c.id === clipId);
+                    if (!clip) return;
+                    useProjectStore.getState().addVideoClipToTrack(clip, layer.id, t);
+                    useUiStore.getState().select(null);
+                  }}
+                  // Quitar cualquier capa (removeLayer garantiza ≥1).
+                  onRemoveTrack={() => removeLayer(layer.id)}
+                  // Insertar una capa nueva ENCIMA de esta (índice array i+1).
+                  onAddTrack={() => addMediaLayer(i + 1)}
                   onMoveEnd={handleUnifiedMoveEnd}
                   onMoveDrag={(p) => {
-                    const cont = layersContainerRef.current;
-                    const rect = cont?.getBoundingClientRect();
-                    const insertEdge: "top" | "bottom" | null = !rect
-                      ? null
-                      : p.clientY < rect.top
-                        ? "top"
-                        : p.clientY >= rect.bottom
-                          ? "bottom"
-                          : null;
+                    const target = resolveDropTarget(p.clientY);
                     setGhost({
                       label: p.label,
                       x: p.clientX,
                       y: p.clientY,
                       widthPx: p.widthPx,
-                      targetLayerId: insertEdge ? null : laneAtClientYUnified(p.clientY)?.layerId ?? null,
-                      insertEdge,
+                      targetLayerId: target?.type === "into" ? target.layerId : null,
+                      insert:
+                        target?.type === "insert"
+                          ? { index: target.index, lineY: target.lineY, lineLeft: target.lineLeft, lineWidth: target.lineWidth }
+                          : null,
                     });
                   }}
                   onMoveDragEnd={() => setGhost(null)}
@@ -478,15 +410,15 @@ export function Timeline({ height }: { height: number }) {
               );
             })}
           </div>
-          {/* GapDrop inferior — hermana de layersContainerRef (no hija) */}
+          {/* GapDrop inferior — hermana de layersContainerRef (no hija).
+              Soltar un clip de Medios aquí crea una capa nueva al fondo. */}
           <GapDrop
             position="bottom"
             pxPerSecond={pxPerSecond}
-            highlight={ghost?.insertEdge === "bottom"}
-            onDrop={(pos, t, clipId) => {
+            onDrop={(_pos, t, clipId) => {
               const clip = clips.find((c) => c.id === clipId);
               if (!clip) return;
-              const id = useProjectStore.getState().addVideoTrack(pos);
+              const id = useProjectStore.getState().addMediaLayer(0);
               useProjectStore.getState().addVideoClipToTrack(clip, id, t);
               useUiStore.getState().select(null);
             }}
@@ -512,6 +444,18 @@ export function Timeline({ height }: { height: number }) {
           <PlayheadLine pxPerSecond={pxPerSecond} />
         </div>
       </div>
+      {ghost?.insert && (
+        // Línea de inserción "+ nueva capa": se pinta en el hueco entre dos
+        // carriles (o en los extremos), no solo en los bordes del bloque.
+        <div
+          aria-hidden="true"
+          className="pointer-events-none fixed z-50 flex items-center"
+          style={{ left: ghost.insert.lineLeft, top: ghost.insert.lineY - 1, width: ghost.insert.lineWidth }}
+        >
+          <div className="h-0.5 flex-1 bg-accent" />
+          <span className="ml-1 rounded bg-accent px-1 py-0.5 text-[9px] leading-none text-white">+ nueva capa</span>
+        </div>
+      )}
       {ghost && (
         <div
           aria-hidden="true"

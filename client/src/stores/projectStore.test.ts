@@ -336,6 +336,22 @@ describe("capas media (addMediaLayer / addVideoTrack / reorderLayer / removeLaye
     expect(newLayer.items).toEqual([]);
   });
 
+  it("addMediaLayer(atIndex) inserta la capa en esa posición del array", () => {
+    const s = useProjectStore.getState();
+    const a = s.addMediaLayer(); // [base, a]
+    const mid = s.addMediaLayer(1); // [base, mid, a]
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers).toHaveLength(3);
+    expect(layers[1].id).toBe(mid);
+    expect(layers[2].id).toBe(a);
+  });
+
+  it("addMediaLayer(0) inserta la capa en el fondo", () => {
+    const s = useProjectStore.getState();
+    const bottom = s.addMediaLayer(0);
+    expect(mediaLayers(useProjectStore.getState().project)[0].id).toBe(bottom);
+  });
+
   it("addVideoTrack('top') añade una capa al final y devuelve su id", () => {
     const s = useProjectStore.getState();
     const id = s.addVideoTrack("top");

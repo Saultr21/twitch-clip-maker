@@ -107,8 +107,8 @@ export function TrackRow({
         <span className="truncate">{title}</span>
         <span className="flex items-center gap-1 shrink-0">
           {onAddTrack && (
-            <button type="button" onClick={onAddTrack} title="Añadir pista de vídeo"
-              aria-label="Añadir pista de vídeo" className="text-muted hover:text-text text-sm leading-none">+</button>
+            <button type="button" onClick={onAddTrack} title="Añadir capa encima"
+              aria-label="Añadir capa encima" className="text-muted hover:text-text text-sm leading-none">+</button>
           )}
           {onRemoveTrack && (
             <button type="button" onClick={onRemoveTrack} title="Quitar pista"

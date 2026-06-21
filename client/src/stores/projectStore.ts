@@ -137,7 +137,9 @@ interface ProjectState {
   addImageLayer: () => string;
   /** @deprecated Usa addMediaLayer(). Añade una capa media vacía. */
   addTextLayer: () => string;
-  addMediaLayer: () => string;
+  /** Crea una capa media vacía. Con `atIndex` la inserta en esa posición del
+   *  array (0 = fondo); sin él, la añade al final (frente). Devuelve su id. */
+  addMediaLayer: (atIndex?: number) => string;
   reorderVideoTrack: (fromIndex: number, toIndex: number) => void;
   reorderLayer: (fromIndex: number, toIndex: number) => void;
   removeVideoTrack: (trackId: string) => void;
@@ -232,9 +234,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     // ── Ops de capas ──────────────────────────────────────────────────────────
 
-    addMediaLayer: () => {
+    addMediaLayer: (atIndex?: number) => {
       const layer = createMediaLayer();
-      mutate((d) => void d.tracks.layers.push(layer));
+      mutate((d) => {
+        if (atIndex === undefined) {
+          d.tracks.layers.push(layer);
+        } else {
+          const i = Math.max(0, Math.min(d.tracks.layers.length, atIndex));
+          d.tracks.layers.splice(i, 0, layer);
+        }
+      });
       return layer.id;
     },
 

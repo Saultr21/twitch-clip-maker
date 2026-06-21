@@ -114,10 +114,9 @@ function TrackVideo({
   const r = visibleRect(canvas.width, canvas.height, info, active!.zoom, crop);
   const cssFilter = clipCssFilter(active!.filters);
   const opacity = active!.opacity;
-  // Esta pista tiene clip activo (si no, ya retornó arriba): se ve siempre, con
-  // independencia de si la BASE está en un hueco. (Antes colgaba de inGap global y
-  // al vaciarse la base se ocultaban todas las pistas.)
-  const visible = "visible";
+  // NO forzar visibility aquí: se hereda del wrapper de la capa, que la pone en
+  // "hidden" cuando la capa está oculta (ojito). Si forzáramos "visible", un hijo
+  // visible anula el hidden del padre y el vídeo seguiría viéndose.
 
   const wrapperStyle: CSSProperties = {
     position: "absolute",
@@ -126,7 +125,6 @@ function TrackVideo({
     width: r.w,
     height: r.h,
     overflow: "hidden",
-    visibility: visible,
     opacity,
     zIndex,
     // Solo visual: la interacción (seleccionar/mover) es vía la capa Konva que va

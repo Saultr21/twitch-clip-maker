@@ -193,8 +193,6 @@ type SilenceState = "idle" | "analyzing" | "none" | "done" | "error";
 type ReframeState = { phase: "idle" | "none" | "error" } | { phase: "running"; progress: number };
 
 function VideoProperties({ clipId }: { clipId: string }) {
-  const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
-  const setOriginalAudioVolume = useProjectStore((s) => s.setOriginalAudioVolume);
   const updateVideoClip = useProjectStore((s) => s.updateVideoClip);
   const removeSilencesFromClip = useProjectStore((s) => s.removeSilencesFromClip);
   const applyReframe = useProjectStore((s) => s.applyReframe);
@@ -302,8 +300,8 @@ function VideoProperties({ clipId }: { clipId: string }) {
       >
         Restablecer velocidad y filtros
       </button>
-      <Field label={`Volumen del clip · ${Math.round(originalAudioVolume * 100)}%`} htmlFor="prop-vol">
-        <Slider id="prop-vol" min={0} max={1} step={0.01} value={originalAudioVolume} onChange={setOriginalAudioVolume} />
+      <Field label={`Volumen del clip · ${Math.round(clip.volume * 100)}%`} htmlFor="prop-vol">
+        <Slider id="prop-vol" min={0} max={1} step={0.01} value={clip.volume} onChange={(v) => updateVideoClip(clip.id, { volume: v })} />
       </Field>
 
       <div className="border-t border-border pt-3 flex flex-col gap-1">

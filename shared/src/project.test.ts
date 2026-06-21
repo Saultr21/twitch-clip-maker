@@ -67,7 +67,7 @@ describe("projectSchema v4", () => {
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 5, trimOut: 2, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-      crop: null, opacity: 1,
+      crop: null, opacity: 1, volume: 1,
     });
     expect(projectSchema.safeParse(p).success).toBe(false);
   });
@@ -99,7 +99,7 @@ describe("allVideoClips", () => {
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-      crop: null, opacity: 1,
+      crop: null, opacity: 1, volume: 1,
     });
     p.tracks.layers.push({
       id: "layer2", name: "", items: [{
@@ -107,7 +107,7 @@ describe("allVideoClips", () => {
         id: "v2", clipId: "c2", timelineStart: 1, trimIn: 0, trimOut: 4, speed: 1,
         zoom: { x: 0.5, y: 0.5, scale: 1 },
         filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-        crop: null, opacity: 1,
+        crop: null, opacity: 1, volume: 1,
       }],
       hidden: false, muted: false,
     });
@@ -219,7 +219,7 @@ describe("capas media — selectores v4", () => {
       { kind: "video", id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4,
         speed: 1, zoom: { x: 0.5, y: 0.5, scale: 1 },
         filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-        crop: null, opacity: 1 },
+        crop: null, opacity: 1, volume: 1 },
       { ...createImageOverlay("a", "a.png", 0, 0.2, 0.2), kind: "image" as const },
       { ...createTextOverlay(0), kind: "text" as const },
     );
@@ -297,7 +297,7 @@ describe("migrateMedia", () => {
       id: "v1", clipId: "c1", timelineStart: 0, trimIn: 0, trimOut: 4, speed: 1,
       zoom: { x: 0.5, y: 0.5, scale: 1 },
       filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
-      crop: null, opacity: 1,
+      crop: null, opacity: 1, volume: 1,
     };
     const img = createImageOverlay("a", "a.png", 0, 0.2, 0.2);
     const txt = createTextOverlay(0);

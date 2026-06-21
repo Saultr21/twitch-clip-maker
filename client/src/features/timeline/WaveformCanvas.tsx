@@ -39,8 +39,10 @@ export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height,
     const span = i1 - i0;
     if (span <= 0) return;
 
-    const mid = height / 2;
-    const scale = Math.max(0, Math.min(1, volumeScale));
+    // El volumen NO cambia el TAMAÑO de la onda, sino su POSICIÓN vertical:
+    // más volumen → más arriba, menos → más abajo. La amplitud se mantiene.
+    const vol = Math.max(0, Math.min(1, volumeScale));
+    const mid = height * (0.72 - 0.44 * vol); // vol 0 → abajo, vol 1 → arriba
     // un pico por columna de píxel: el máximo de los picos que caen en ella
     for (let x = 0; x < width; x++) {
       const s = i0 + Math.floor((x / width) * span);
@@ -49,8 +51,8 @@ export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height,
       for (let i = s; i < Math.max(s + 1, e); i++) {
         if (peaks[i] > max) max = peaks[i];
       }
-      // La amplitud sube/baja con el volumen; mínimo 1px para que se lea la línea.
-      const barH = Math.max(1, max * height * scale);
+      // Amplitud fija (un poco reducida para dejar margen al desplazamiento).
+      const barH = Math.max(1, max * height * 0.7);
       ctx.fillRect(x, mid - barH / 2, 1, barH);
     }
   }, [data, trimIn, trimOut, width, height, color, volumeScale]);

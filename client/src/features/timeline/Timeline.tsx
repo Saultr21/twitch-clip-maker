@@ -79,7 +79,6 @@ export function Timeline({ height }: { height: number }) {
   const project = useProjectStore((s) => s.project);
   const moveVideoClip = useProjectStore((s) => s.moveVideoClip);
   const moveOverlay = useProjectStore((s) => s.moveOverlay);
-  const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
   const trimVideoClip = useProjectStore((s) => s.trimVideoClip);
   const trimOverlay = useProjectStore((s) => s.trimOverlay);
   const trimAudio = useProjectStore((s) => s.trimAudio);
@@ -176,10 +175,10 @@ export function Timeline({ height }: { height: number }) {
       blocks.push({
         id: c.id, kind: "video" as const, start: c.timelineStart, end: clipEnd(c),
         label: info?.title ?? "clip", color: "bg-accent/25 text-accent-soft",
-        // Sin onda si la capa está muteada; si no, la amplitud escala con el
-        // volumen del clip (originalAudioVolume).
+        // Sin onda si la capa está muteada; si no, la onda se posiciona según el
+        // volumen propio del clip.
         waveform: info && !layer.muted
-          ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut, volume: originalAudioVolume }
+          ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut, volume: c.volume }
           : undefined,
       });
     }

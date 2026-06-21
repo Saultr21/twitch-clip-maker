@@ -248,7 +248,7 @@ export function buildFilterGraph(
             `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
             "asetpts=PTS-STARTPTS",
             ...atempoChain(clip.speed),
-            `volume=${num(project.originalAudioVolume)}`,
+            `volume=${num(clip.volume)}`,
             "aresample=44100",
             "aformat=channel_layouts=stereo",
             `adelay=${Math.round(start * 1000)}:all=1`,

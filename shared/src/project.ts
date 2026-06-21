@@ -65,6 +65,8 @@ export const videoClipFields = z.object({
   crop: cropRectSchema.default(null),
   // opacidad de la capa (1 = opaca). Sin efecto hasta la fase de compositación
   opacity: norm.default(1),
+  // volumen del audio propio del clip (1 = original). Por clip, no global.
+  volume: norm.default(1),
 });
 
 export const videoClipSchema = videoClipFields.refine(
@@ -374,6 +376,7 @@ export function createVideoClip(
     filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
     crop: null,
     opacity: 1,
+    volume: 1,
   };
 }
 

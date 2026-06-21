@@ -179,9 +179,10 @@ describe("buildFilterGraph — vídeo", () => {
     expect(g.filterComplex).not.toContain("split");
   });
 
-  it("el volumen del audio original se aplica a cada clip", () => {
+  it("el volumen POR CLIP se aplica a su audio", () => {
     const p = projectWithClip();
-    p.originalAudioVolume = 0.35;
+    const vclip = p.tracks.layers[0].items.find((it) => it.kind === "video")!;
+    if (vclip.kind === "video") vclip.volume = 0.35;
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("volume=0.35");
   });

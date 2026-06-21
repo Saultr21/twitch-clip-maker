@@ -51,11 +51,10 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
         aria-label="Posición de reproducción"
         className="w-full accent-accent h-1.5"
       />
-      {/* 3 columnas: izq. vacía · centro (controles + tiempo debajo) · der. (volumen).
-          El grid de 3 fracciones iguales mantiene los controles centrados respecto
-          a TODA la barra, como en los editores profesionales. */}
-      <div className="grid grid-cols-3 items-center">
-        <div aria-hidden="true" />
+      {/* Controles centrados respecto a TODA la barra (justify-center). El volumen
+          va anclado a la derecha en posición ABSOLUTA, así no desplaza el centro
+          de los controles — patrón habitual de los editores profesionales. */}
+      <div className="relative flex items-center justify-center">
         <div className="flex flex-col items-center gap-1">
           <div className="flex items-center justify-center gap-3">
             <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}><SkipBack size={16} aria-hidden="true" /></button>
@@ -85,7 +84,7 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
             {formatTimecode(playhead)} / {formatTimecode(duration)}
           </span>
         </div>
-        <div className="flex items-center justify-end gap-1.5">
+        <div className="absolute right-0 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
           <Volume2 size={16} aria-hidden="true" className="text-muted" />
           <input
             type="range"

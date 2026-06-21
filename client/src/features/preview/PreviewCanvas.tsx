@@ -295,6 +295,10 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
         <div
           className="relative rounded-sm shadow-[0_4px_24px_rgba(145,70,255,.15)]"
           style={{
+            // Contexto de apilado aislado: el z-index de los hijos (capas, velo,
+            // Konva) es autoritativo y un <video> compositado no puede "escaparse"
+            // por encima de un texto/imagen con z-index mayor de otra capa.
+            isolation: "isolate",
             width: canvas.width,
             height: canvas.height,
             backgroundColor: background.type === "color" ? background.color : "#000000",
@@ -327,25 +331,34 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               />
             </div>
           )}
-          {/* Cada elemento visual (vídeo / imagen / texto) se apila por el ÍNDICE
-              de su capa (orden de capas = z): un texto puede quedar DETRÁS de un
-              vídeo, una imagen ENTRE dos vídeos, etc. La base de vídeo conserva
-              videoRef; las demás capas de vídeo se registran en el motor de sync. */}
-          {videoLayers.map((track) => (
-            <TrackVideo
-              key={track.id}
-              track={track}
-              canvas={canvas}
-              isBase={track.id === baseVideoId}
-              videoRef={track.id === baseVideoId ? videoRef : undefined}
-              register={track.id === baseVideoId ? undefined : registerOverlayVideo}
-              zIndex={track.index}
-            />
-          ))}
-          {/* Imagen/texto activos de cada capa, en HTML, en su z (mismo apilado). */}
-          {layers.map((layer, index) => (
-            <LayerOverlayHtml key={`ov-${layer.id}`} layer={layer} zIndex={index} canvas={canvas} />
-          ))}
+          {/* UNA envoltura por capa, en ORDEN DE ARRAY = orden de apilado: el
+              orden del DOM coincide con el z (las capas posteriores pintan encima),
+              además del zIndex explícito. Así un texto en una capa superior queda
+              SIEMPRE por delante del vídeo de una capa inferior, sin depender de
+              rarezas de z-index entre <video> y elementos con transform. La capa
+              base de vídeo conserva videoRef; las demás se registran en el motor. */}
+          {layers.map((layer, index) => {
+            const videoTrack = videoLayers.find((t) => t.id === layer.id);
+            return (
+              <div
+                key={layer.id}
+                className="absolute inset-0"
+                style={{ zIndex: index, pointerEvents: "none" }}
+              >
+                {videoTrack && (
+                  <TrackVideo
+                    track={videoTrack}
+                    canvas={canvas}
+                    isBase={layer.id === baseVideoId}
+                    videoRef={layer.id === baseVideoId ? videoRef : undefined}
+                    register={layer.id === baseVideoId ? undefined : registerOverlayVideo}
+                    zIndex={0}
+                  />
+                )}
+                <LayerOverlayHtml layer={layer} zIndex={0} canvas={canvas} />
+              </div>
+            );
+          })}
           {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
           <div
             aria-hidden="true"

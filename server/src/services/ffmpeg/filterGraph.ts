@@ -1,5 +1,5 @@
-import type { Background, ClipInfo, ImageLayer, Project, TextLayer, VideoClip, VideoLayer } from "@clipforge/shared";
-import { allVideoClips, imageItems, textItems, videoLayers } from "@clipforge/shared";
+import type { Background, ClipInfo, Project, VideoClip } from "@clipforge/shared";
+import { allVideoClips, imageItems, textItems } from "@clipforge/shared";
 import { drawtextFilter, drawtextFilterCentered } from "./drawtext.js";
 import { renderRect } from "./geometry.js";
 import { atempoChain } from "./speed.js";
@@ -123,18 +123,29 @@ export function buildFilterGraph(
 
   // Necesitamos saber cuál es la primera capa de vídeo para:
   // (a) blur de fondo, (b) clipTransition
-  const firstVideoLayerIdx = project.tracks.layers.findIndex((l) => l.kind === "video");
+  const firstVideoLayerIdx = project.tracks.layers.findIndex((l) => l.items.some((it) => it.kind === "video"));
   let blurBgBuilt = false; // ¿ya construimos [bg] para blur?
 
   const transition = project.settings.clipTransition ?? 0;
 
   project.tracks.layers.forEach((layer, layerIdx) => {
-    if (layer.kind === "video") {
-      const vLayer = layer as VideoLayer;
-      const isFirstVideoLayer = layerIdx === firstVideoLayerIdx;
-      const layerClips = [...vLayer.clips].sort((a, b) => a.timelineStart - b.timelineStart);
+    let ci = 0;    // contador de items de vídeo dentro de esta capa
+    let imgIdx = 0; // contador de items de imagen dentro de esta capa
+    let txtIdx = 0; // contador de items de texto dentro de esta capa
 
-      layerClips.forEach((clip, ci) => {
+    const sortedItems = [...layer.items].sort((a, b) => {
+      const startA = a.kind === "video" ? a.timelineStart : a.start;
+      const startB = b.kind === "video" ? b.timelineStart : b.start;
+      return startA - startB;
+    });
+
+    const isFirstVideoLayer = layerIdx === firstVideoLayerIdx;
+    // Clips de vídeo de esta capa (ordenados) — necesario para la lógica de transición
+    const layerVideoItems = sortedItems.filter((it) => it.kind === "video");
+
+    sortedItems.forEach((item) => {
+      if (item.kind === "video") {
+        const clip = item as unknown as VideoClip;
         const cinfo = clipInfos.get(clip.clipId);
         if (!cinfo) throw new Error(`Falta la información del clip ${clip.clipId}`);
 
@@ -205,11 +216,11 @@ export function buildFilterGraph(
 
         // clipTransition solo en la primera capa de vídeo
         let finalVideoSrc = overlaySource;
-        if (transition > 0 && isFirstVideoLayer && layerClips.length > 1) {
+        if (transition > 0 && isFirstVideoLayer && layerVideoItems.length > 1) {
           const td = Math.min(transition, dur / 2);
           const vf: string[] = [];
           if (ci > 0) vf.push(`fade=t=in:st=${num(start)}:d=${num(td)}`);
-          if (ci < layerClips.length - 1) vf.push(`fade=t=out:st=${num(end - td)}:d=${num(td)}`);
+          if (ci < layerVideoItems.length - 1) vf.push(`fade=t=out:st=${num(end - td)}:d=${num(td)}`);
           if (vf.length) {
             const transLabel = `[cvt${clipLabel}]`;
             filters.push(`${overlaySource}${vf.join(",")}${transLabel}`);
@@ -237,10 +248,10 @@ export function buildFilterGraph(
         ];
         filters.push(`[${inputIdx}:a]${achain.join(",")}${aLabel}`);
         allAudioLabels.push(aLabel);
-      });
-    } else if (layer.kind === "image") {
-      const imgLayer = layer as ImageLayer;
-      imgLayer.items.forEach((img, j) => {
+
+        ci++;
+      } else if (item.kind === "image") {
+        const img = item;
         const inputIdx = inputs.length;
         inputs.push({ kind: "image", fileName: img.fileName });
         const w = Math.round(img.width * W);
@@ -253,26 +264,26 @@ export function buildFilterGraph(
           const r = `${num(img.rotation)}*PI/180`;
           pre.push(`rotate=${r}:c=none:ow=rotw(${r}):oh=roth(${r})`);
         }
-        // Label único por capa e item: img{layerIdx}_{j}
-        const imgLabel = `img${layerIdx}_${j}`;
+        // Label único por capa e item: img{layerIdx}_{imgIdx}
+        const imgLabel = `img${layerIdx}_${imgIdx}`;
         filters.push(`[${inputIdx}:v]${pre.join(",")}[${imgLabel}]`);
-        const nextLabel = `[img_acc${layerIdx}_${j}]`;
+        const nextLabel = `[img_acc${layerIdx}_${imgIdx}]`;
         filters.push(
           `${videoLabel}[${imgLabel}]overlay=x=${Math.round(img.x * W)}-overlay_w/2:y=${Math.round(img.y * H)}-overlay_h/2:eof_action=repeat:enable='between(t,${num(img.start)},${num(img.end)})'${nextLabel}`,
         );
         videoLabel = nextLabel;
-      });
-    } else if (layer.kind === "text") {
-      const txtLayer = layer as TextLayer;
-      txtLayer.items.forEach((t, k) => {
-        // Label único por capa e item: txt{layerIdx}_{k}
-        const txtLabel = `txt${layerIdx}_${k}`;
+
+        imgIdx++;
+      } else if (item.kind === "text") {
+        const t = item;
+        // Label único por capa e item: txt{layerIdx}_{txtIdx}
+        const txtLabel = `txt${layerIdx}_${txtIdx}`;
         if (t.rotation === 0) {
           filters.push(`${videoLabel}${drawtextFilter(t, W, H)}[${txtLabel}]`);
         } else {
           const r = `${num(t.rotation)}*PI/180`;
-          const tl = `tl${layerIdx}_${k}`;
-          const tr = `tr${layerIdx}_${k}`;
+          const tl = `tl${layerIdx}_${txtIdx}`;
+          const tr = `tr${layerIdx}_${txtIdx}`;
           filters.push(
             `color=c=0x00000000:s=${W}x${H}:r=${fps}:d=${num(totalDuration)},format=rgba,${drawtextFilterCentered(t, W, H)}[${tl}]`,
           );
@@ -282,8 +293,10 @@ export function buildFilterGraph(
           );
         }
         videoLabel = `[${txtLabel}]`;
-      });
-    }
+
+        txtIdx++;
+      }
+    });
   });
 
   // Si el fondo blur nunca se construyó (sin capa de vídeo, imposible ya que

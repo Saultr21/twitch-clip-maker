@@ -244,16 +244,16 @@ export function textItems(p: Project): TextOverlay[] {
 
 // v3 selector aliases — mantenidos para compatibilidad de lectores hasta Task 3.
 /** @deprecated Usa mediaLayers() en código nuevo. */
-export function videoLayers(p: Project): VideoLayer[] {
+export function videoLayers(_p: Project): VideoLayer[] {
   // En v4 no hay VideoLayer; devolvemos vacío para no romper lectores que lo esperan.
   return [];
 }
 /** @deprecated Usa mediaLayers() en código nuevo. */
-export function imageLayers(p: Project): ImageLayer[] {
+export function imageLayers(_p: Project): ImageLayer[] {
   return [];
 }
 /** @deprecated Usa mediaLayers() en código nuevo. */
-export function textLayers(p: Project): TextLayer[] {
+export function textLayers(_p: Project): TextLayer[] {
   return [];
 }
 

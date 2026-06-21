@@ -14,8 +14,10 @@ export interface BlockDescriptor {
   end: number;
   label: string;
   color: string; // clases tailwind del bloque
-  /** Audio a dibujar como waveform dentro del bloque (vídeo y música). */
-  waveform?: { kind: WaveformKind; fileName: string; trimIn: number; trimOut: number };
+  /** Audio a dibujar como waveform dentro del bloque (vídeo y música).
+   *  `volume` (0..1) escala la amplitud; omitido = 1. Si no hay waveform (p. ej.
+   *  pista muteada), no se dibuja onda. */
+  waveform?: { kind: WaveformKind; fileName: string; trimIn: number; trimOut: number; volume?: number };
 }
 
 const BLOCK_HEIGHT_PX = 28; // h-7
@@ -260,6 +262,7 @@ export function TrackRow({
                   width={Math.max(8, (b.end - b.start) * pxPerSecond)}
                   height={BLOCK_HEIGHT_PX}
                   color="currentColor"
+                  volumeScale={b.waveform.volume}
                 />
               )}
               <span aria-hidden="true" className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize rounded-l-md bg-white/10" />

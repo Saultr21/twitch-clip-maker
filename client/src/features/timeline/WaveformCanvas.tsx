@@ -11,10 +11,12 @@ interface WaveformCanvasProps {
   width: number;
   height: number;
   color: string;
+  /** Escala la amplitud dibujada según el volumen (0..1). 1 = altura completa. */
+  volumeScale?: number;
 }
 
 /** Dibuja la envolvente de amplitud del tramo recortado, centrada verticalmente. */
-export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height, color }: WaveformCanvasProps) {
+export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height, color, volumeScale = 1 }: WaveformCanvasProps) {
   const data = useWaveform(kind, fileName);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -38,6 +40,7 @@ export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height,
     if (span <= 0) return;
 
     const mid = height / 2;
+    const scale = Math.max(0, Math.min(1, volumeScale));
     // un pico por columna de píxel: el máximo de los picos que caen en ella
     for (let x = 0; x < width; x++) {
       const s = i0 + Math.floor((x / width) * span);
@@ -46,10 +49,11 @@ export function WaveformCanvas({ kind, fileName, trimIn, trimOut, width, height,
       for (let i = s; i < Math.max(s + 1, e); i++) {
         if (peaks[i] > max) max = peaks[i];
       }
-      const barH = Math.max(1, max * height);
+      // La amplitud sube/baja con el volumen; mínimo 1px para que se lea la línea.
+      const barH = Math.max(1, max * height * scale);
       ctx.fillRect(x, mid - barH / 2, 1, barH);
     }
-  }, [data, trimIn, trimOut, width, height, color]);
+  }, [data, trimIn, trimOut, width, height, color, volumeScale]);
 
   return (
     <canvas

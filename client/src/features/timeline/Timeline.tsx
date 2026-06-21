@@ -79,6 +79,7 @@ export function Timeline({ height }: { height: number }) {
   const project = useProjectStore((s) => s.project);
   const moveVideoClip = useProjectStore((s) => s.moveVideoClip);
   const moveOverlay = useProjectStore((s) => s.moveOverlay);
+  const originalAudioVolume = useProjectStore((s) => s.project.originalAudioVolume);
   const trimVideoClip = useProjectStore((s) => s.trimVideoClip);
   const trimOverlay = useProjectStore((s) => s.trimOverlay);
   const trimAudio = useProjectStore((s) => s.trimAudio);
@@ -143,7 +144,10 @@ export function Timeline({ height }: { height: number }) {
     end: a.end,
     label: a.fileName,
     color: "bg-sky-500/20 text-sky-200",
-    waveform: { kind: "asset" as const, fileName: a.fileName, trimIn: a.trimIn, trimOut: a.trimOut },
+    // Sin onda si la pista está muteada; si no, la amplitud escala con su volumen.
+    waveform: a.muted
+      ? undefined
+      : { kind: "asset" as const, fileName: a.fileName, trimIn: a.trimIn, trimOut: a.trimOut, volume: a.volume },
   }));
 
   const subtitleBlocks: BlockDescriptor[] = subtitleCues.map((c) => ({
@@ -172,7 +176,11 @@ export function Timeline({ height }: { height: number }) {
       blocks.push({
         id: c.id, kind: "video" as const, start: c.timelineStart, end: clipEnd(c),
         label: info?.title ?? "clip", color: "bg-accent/25 text-accent-soft",
-        waveform: info ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut } : undefined,
+        // Sin onda si la capa está muteada; si no, la amplitud escala con el
+        // volumen del clip (originalAudioVolume).
+        waveform: info && !layer.muted
+          ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut, volume: originalAudioVolume }
+          : undefined,
       });
     }
     for (const item of imageItems) {

@@ -51,10 +51,21 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
         aria-label="Posición de reproducción"
         className="w-full accent-accent h-1.5"
       />
-      {/* Controles centrados respecto a TODA la barra (justify-center). El volumen
-          va anclado a la derecha en posición ABSOLUTA, así no desplaza el centro
-          de los controles — patrón habitual de los editores profesionales. */}
+      {/* Controles centrados respecto a TODA la barra (justify-center), con el botón
+          PLAY como centro real: grupo simétrico 2-2 (inicio/‹ · play · ›/final). El
+          bucle (izquierda) y el volumen (derecha) van en posición ABSOLUTA, espejados,
+          para no desplazar el centro — patrón habitual de los editores profesionales. */}
       <div className="relative flex items-center justify-center">
+        {/* Bucle anclado a la izquierda, espejo del volumen */}
+        <button
+          type="button"
+          onClick={() => setLoop(!loop)}
+          aria-pressed={loop}
+          aria-label="Bucle"
+          className={`absolute left-0 top-1/2 -translate-y-1/2 ${controlClass} ${loop ? "text-accent" : ""}`}
+        >
+          <Repeat size={16} aria-hidden="true" />
+        </button>
         <div className="flex flex-col items-center gap-1">
           <div className="flex items-center justify-center gap-3">
             <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}><SkipBack size={16} aria-hidden="true" /></button>
@@ -70,15 +81,6 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
             </button>
             <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}><StepForward size={16} aria-hidden="true" /></button>
             <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}><SkipForward size={16} aria-hidden="true" /></button>
-            <button
-              type="button"
-              onClick={() => setLoop(!loop)}
-              aria-pressed={loop}
-              aria-label="Bucle"
-              className={`${controlClass} ${loop ? "text-accent" : ""}`}
-            >
-              <Repeat size={16} aria-hidden="true" />
-            </button>
           </div>
           <span className="font-mono text-[11px] text-muted tabular-nums">
             {formatTimecode(playhead)} / {formatTimecode(duration)}

@@ -3,8 +3,7 @@ import Konva from "konva";
 import { Image as KonvaImage, Layer, Line, Rect, Stage, Text as KonvaText, Transformer } from "react-konva";
 import { SubtitlesLayer } from "./SubtitlesLayer";
 import { CropOverlay } from "./CropOverlay";
-import type { ImageOverlay, TextOverlay, VideoClip, VideoLayer } from "@clipforge/shared";
-import { videoLayers } from "@clipforge/shared";
+import type { ImageOverlay, MediaElement, TextOverlay, VideoClip } from "@clipforge/shared";
 import { clamp01 } from "../../lib/normalized";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -258,9 +257,11 @@ function VideoFrameNode({ clip, width, height, onGuides, cropMode }: {
   // Lee el clip fresco del store (evita stale closure en gestos)
   const clipNow = (): VideoClip | undefined => {
     const project = useProjectStore.getState().project;
-    for (const layer of videoLayers(project)) {
-      const found = layer.clips.find((c) => c.id === clip.id);
-      if (found) return found;
+    for (const layer of project.tracks.layers) {
+      const found = layer.items.find(
+        (it): it is MediaElement & { kind: "video" } => it.kind === "video" && it.id === clip.id,
+      );
+      if (found) return found as unknown as VideoClip;
     }
     return undefined;
   };
@@ -368,9 +369,24 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   // y devolverlos directos desde el selector de Zustand provoca un bucle infinito
   // en useSyncExternalStore ("getSnapshot should be cached") → app en negro.
   const layers = useProjectStore((s) => s.project.tracks.layers);
-  const texts = useMemo(() => layers.flatMap((l) => (l.kind === "text" ? l.items : [])), [layers]);
-  const images = useMemo(() => layers.flatMap((l) => (l.kind === "image" ? l.items : [])), [layers]);
-  const videoTracks = useMemo(() => layers.filter((l): l is VideoLayer => l.kind === "video"), [layers]);
+  const texts = useMemo(
+    () => layers.flatMap((l) => l.items.filter((it): it is MediaElement & { kind: "text" } => it.kind === "text") as unknown as TextOverlay[]),
+    [layers],
+  );
+  const images = useMemo(
+    () => layers.flatMap((l) => l.items.filter((it): it is MediaElement & { kind: "image" } => it.kind === "image") as unknown as ImageOverlay[]),
+    [layers],
+  );
+  const videoTracks = useMemo(
+    () => layers
+      .map((l) => ({
+        id: l.id,
+        name: l.name,
+        clips: l.items.filter((it): it is MediaElement & { kind: "video" } => it.kind === "video") as unknown as VideoClip[],
+      }))
+      .filter((t) => t.clips.length > 0),
+    [layers],
+  );
   // Guías de centrado: visibles solo mientras un arrastre engancha al centro
   const [guides, setGuides] = useState({ vertical: false, horizontal: false });
   const onGuides: GuidesCallback = (vertical, horizontal) =>
@@ -382,12 +398,12 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
   const visibleImages = images.filter((i) => playhead >= i.start && playhead < i.end);
 
   // Clips activos por capa (una entrada por capa que tiene clip en el playhead)
-  const activeClipsByTrack: Array<{ track: VideoLayer; clip: VideoClip }> = videoTracks
+  const activeClipsByTrack = videoTracks
     .map((track) => {
       const active = videoClipAt(track.clips, playhead);
       return active ? { track, clip: active } : null;
     })
-    .filter((x): x is { track: VideoLayer; clip: VideoClip } => x !== null);
+    .filter((x): x is { track: typeof videoTracks[number]; clip: VideoClip } => x !== null);
 
   return (
     <Stage

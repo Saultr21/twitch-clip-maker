@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
-import { ASPECT_PRESETS, type VideoLayer } from "@clipforge/shared";
+import { ASPECT_PRESETS } from "@clipforge/shared";
+import type { VideoClip } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -44,6 +45,8 @@ function clipCssFilter(f: {
  * La capa base (isBase=true) usa videoRef; las capas se registran en el motor
  * vía registerOverlayVideo para que las sincronice.
  */
+type VideoTrackForPreview = { id: string; name: string; clips: VideoClip[] };
+
 function TrackVideo({
   track,
   canvas,
@@ -52,7 +55,7 @@ function TrackVideo({
   register,
   zIndex,
 }: {
-  track: VideoLayer;
+  track: VideoTrackForPreview;
   canvas: { width: number; height: number };
   isBase: boolean;
   videoRef?: RefObject<HTMLVideoElement | null>;
@@ -153,7 +156,16 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   // selector que devuelve videoLayers(...) crea array nuevo cada vez → bucle
   // infinito en useSyncExternalStore → app en negro).
   const layers = useProjectStore((s) => s.project.tracks.layers);
-  const videoTracks = useMemo(() => layers.filter((l): l is VideoLayer => l.kind === "video"), [layers]);
+  const videoTracks = useMemo(
+    () => layers
+      .map((l) => ({
+        id: l.id,
+        name: l.name,
+        clips: l.items.filter((it) => it.kind === "video") as unknown as VideoClip[],
+      }))
+      .filter((t) => t.clips.length > 0),
+    [layers],
+  );
   // Para la comprobación "sin clips" del estado vacío, miramos la capa base
   const baseTrackClips = videoTracks[0]?.clips ?? [];
   const background = settings.background;

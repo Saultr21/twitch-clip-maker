@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Crop, Scissors, Trash2 } from "lucide-react";
-import type { VideoClip } from "@clipforge/shared";
-import { videoLayers } from "@clipforge/shared";
+import type { ImageOverlay, MediaLayer, TextOverlay, VideoClip } from "@clipforge/shared";
 import { assignLanes, clipEnd, projectDuration } from "../../lib/timeline";
 import { cueStart, cueEnd } from "../../lib/subtitles";
 import { useClipsStore } from "../../stores/clipsStore";
@@ -114,8 +113,17 @@ export function Timeline({ height }: { height: number }) {
     insertEdge: "top" | "bottom" | null;
   } | null>(null);
 
+  // Capas de vídeo derivadas del modelo v4 (MediaLayer[])
+  const videoTracks = project.tracks.layers
+    .map((l) => ({
+      id: l.id,
+      name: l.name,
+      clips: l.items.filter((it) => it.kind === "video") as unknown as VideoClip[],
+    }))
+    .filter((t) => t.clips.length > 0);
+
   // Clips de la capa base (pista de vídeo 0). Referencia estable vía EMPTY_CLIPS.
-  const baseClips = videoLayers(project)[0]?.clips ?? EMPTY_CLIPS;
+  const baseClips = videoTracks[0]?.clips ?? EMPTY_CLIPS;
   const videoCount = baseClips.length;
   const prevVideoCount = useRef(videoCount);
   // Scroll al clip recién añadido por el usuario (no al restaurar sesión: dirty=false)
@@ -151,17 +159,6 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-pink-500/20 text-pink-200",
   }));
 
-  const videoTracks = videoLayers(project);
-  const blocksForTrack = (clipsOfTrack: VideoClip[]): BlockDescriptor[] =>
-    clipsOfTrack.map((c) => {
-      const info = clips.find((i) => i.id === c.clipId);
-      return {
-        id: c.id, kind: "video" as const, start: c.timelineStart, end: clipEnd(c),
-        label: info?.title ?? "clip", color: "bg-accent/25 text-accent-soft",
-        waveform: info ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut } : undefined,
-      };
-    });
-
   const audioLanes = assignLanes(audioBlocks);
   const subtitleLanes = assignLanes(subtitleBlocks);
 
@@ -169,47 +166,53 @@ export function Timeline({ height }: { height: number }) {
   const layers = project.tracks.layers;
   const reversedIndices = layers.map((_, i) => i).reverse();
 
-  function blocksForLayer(layer: typeof layers[number]): BlockDescriptor[] {
-    if (layer.kind === "video") {
-      return blocksForTrack(layer.clips);
+  function blocksForLayer(layer: MediaLayer): BlockDescriptor[] {
+    const videoClips = layer.items.filter((it) => it.kind === "video") as unknown as VideoClip[];
+    const imageItems = layer.items.filter((it) => it.kind === "image") as unknown as ImageOverlay[];
+    const textItems = layer.items.filter((it) => it.kind === "text") as unknown as TextOverlay[];
+
+    const blocks: BlockDescriptor[] = [];
+    for (const c of videoClips) {
+      const info = clips.find((i) => i.id === c.clipId);
+      blocks.push({
+        id: c.id, kind: "video" as const, start: c.timelineStart, end: clipEnd(c),
+        label: info?.title ?? "clip", color: "bg-accent/25 text-accent-soft",
+        waveform: info ? { kind: "clip" as const, fileName: info.fileName, trimIn: c.trimIn, trimOut: c.trimOut } : undefined,
+      });
     }
-    if (layer.kind === "image") {
-      return layer.items.map((item) => ({
-        id: item.id,
-        kind: "image" as const,
-        start: item.start,
-        end: item.end,
-        label: item.fileName,
-        color: "bg-amber-500/20 text-amber-200",
-      }));
+    for (const item of imageItems) {
+      blocks.push({
+        id: item.id, kind: "image" as const, start: item.start, end: item.end,
+        label: item.fileName, color: "bg-amber-500/20 text-amber-200",
+      });
     }
-    if (layer.kind === "text") {
-      return layer.items.map((item) => ({
-        id: item.id,
-        kind: "text" as const,
-        start: item.start,
-        end: item.end,
-        label: item.content || "texto",
-        color: "bg-emerald-500/20 text-emerald-200",
-      }));
+    for (const item of textItems) {
+      blocks.push({
+        id: item.id, kind: "text" as const, start: item.start, end: item.end,
+        label: item.content || "texto", color: "bg-emerald-500/20 text-emerald-200",
+      });
     }
-    return [];
+    return blocks;
   }
 
-  function layerTitle(layer: typeof layers[number]): string {
-    const videoLayersArr = layers.filter((l) => l.kind === "video");
-    const imageLayersArr = layers.filter((l) => l.kind === "image");
-    const textLayersArr = layers.filter((l) => l.kind === "text");
+  function layerTitle(layer: MediaLayer): string {
+    const hasVideo = layer.items.some((it) => it.kind === "video");
+    const hasImage = layer.items.some((it) => it.kind === "image");
+    const hasText = layer.items.some((it) => it.kind === "text");
 
-    if (layer.kind === "video") {
+    const videoLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "video"));
+    const imageLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "image"));
+    const textLayersArr = layers.filter((l) => l.items.some((it) => it.kind === "text"));
+
+    if (hasVideo) {
       const vidIdx = videoLayersArr.findIndex((l) => l.id === layer.id);
       return vidIdx === 0 ? "Vídeo" : `Vídeo ${vidIdx + 1}`;
     }
-    if (layer.kind === "image") {
+    if (hasImage) {
       const imgIdx = imageLayersArr.findIndex((l) => l.id === layer.id);
       return imageLayersArr.length === 1 ? "Imagen" : `Imagen ${imgIdx + 1}`;
     }
-    if (layer.kind === "text") {
+    if (hasText) {
       const txtIdx = textLayersArr.findIndex((l) => l.id === layer.id);
       return textLayersArr.length === 1 ? "Texto" : `Texto ${txtIdx + 1}`;
     }
@@ -236,7 +239,11 @@ export function Timeline({ height }: { height: number }) {
     // Los carriles se renderizan en reversedIndices order: visual 0 = capa superior
     const layerIndex = reversedIndices[Math.max(0, Math.min(reversedIndices.length - 1, visualLane))];
     const layer = layers[layerIndex];
-    return layer ? { layerId: layer.id, kind: layer.kind } : null;
+    const layerKind = layer.items.some((it) => it.kind === "video") ? "video"
+      : layer.items.some((it) => it.kind === "image") ? "image"
+      : layer.items.some((it) => it.kind === "text") ? "text"
+      : "unknown";
+    return layer ? { layerId: layer.id, kind: layerKind } : null;
   };
 
   const handleUnifiedMoveEnd = (elementId: string, clientY: number, start: number) => {
@@ -246,14 +253,12 @@ export function Timeline({ height }: { height: number }) {
     const contRect = cont.getBoundingClientRect();
 
     // Detectar la capa origen del elemento
-    const sourceLayer = layers.find((layer) => {
-      if (layer.kind === "video") return layer.clips.some((c) => c.id === elementId);
-      if (layer.kind === "image") return layer.items.some((i) => i.id === elementId);
-      if (layer.kind === "text") return layer.items.some((i) => i.id === elementId);
-      return false;
-    });
+    const sourceLayer = layers.find((layer) =>
+      layer.items.some((it) => it.id === elementId)
+    );
     if (!sourceLayer) return;
-    const elementKind = sourceLayer.kind;
+    const sourceItem = sourceLayer.items.find((it) => it.id === elementId);
+    const elementKind = sourceItem?.kind ?? "video";
 
     // Si el puntero cae por ENCIMA del bloque: crear capa nueva arriba
     if (clientY < contRect.top) {
@@ -402,7 +407,7 @@ export function Timeline({ height }: { height: number }) {
             {reversedIndices.map((i) => {
               const layer = layers[i];
               const isBaseVideoLayer =
-                layer.kind === "video" &&
+                layer.items.some((it) => it.kind === "video") &&
                 videoTracks.findIndex((t) => t.id === layer.id) === 0;
 
               return (
@@ -412,17 +417,21 @@ export function Timeline({ height }: { height: number }) {
                   blocks={blocksForLayer(layer)}
                   pxPerSecond={pxPerSecond}
                   onMove={(id, t, transient) => {
-                    if (layer.kind === "video") moveVideoClip(id, t, { transient });
-                    else if (layer.kind === "image") moveOverlay("image", id, t, { transient });
-                    else if (layer.kind === "text") moveOverlay("text", id, t, { transient });
+                    const item = layer.items.find((it) => it.id === id);
+                    if (!item) return;
+                    if (item.kind === "video") moveVideoClip(id, t, { transient });
+                    else if (item.kind === "image") moveOverlay("image", id, t, { transient });
+                    else if (item.kind === "text") moveOverlay("text", id, t, { transient });
                   }}
                   onTrim={(id, edge, t, transient) => {
-                    if (layer.kind === "video") trimVideoClip(id, edge, t, { transient });
-                    else if (layer.kind === "image") trimOverlay("image", id, edge, t, { transient });
-                    else if (layer.kind === "text") trimOverlay("text", id, edge, t, { transient });
+                    const item = layer.items.find((it) => it.id === id);
+                    if (!item) return;
+                    if (item.kind === "video") trimVideoClip(id, edge, t, { transient });
+                    else if (item.kind === "image") trimOverlay("image", id, edge, t, { transient });
+                    else if (item.kind === "text") trimOverlay("text", id, edge, t, { transient });
                   }}
                   onDropClip={
-                    layer.kind === "video"
+                    layer.items.some((it) => it.kind === "video")
                       ? (clipId, t) => {
                           const clip = clips.find((c) => c.id === clipId);
                           if (!clip) return;
@@ -437,7 +446,7 @@ export function Timeline({ height }: { height: number }) {
                       : () => removeLayer(layer.id)
                   }
                   onAddTrack={
-                    layer.kind === "video"
+                    layer.items.some((it) => it.kind === "video")
                       ? () => useProjectStore.getState().addVideoTrack("top")
                       : undefined
                   }

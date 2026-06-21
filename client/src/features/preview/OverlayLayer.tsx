@@ -81,7 +81,11 @@ function ImageNode({ overlay, width, height, selected, onGuides, cropMode }: {
         offsetX={w / 2}
         offsetY={h / 2}
         rotation={overlay.rotation}
-        opacity={overlay.opacity}
+        // Invisible: los píxeles los pinta el <img> HTML de PreviewCanvas, apilado
+        // por orden de capas (z). Este nodo solo aporta el área de hit y el tamaño
+        // para el Transformer (la detección de eventos de Konva.Image es por caja,
+        // independiente de la opacidad).
+        opacity={0}
         {...(overlay.crop && img ? {
           crop: {
             x: overlay.crop.x * img.naturalWidth,
@@ -172,7 +176,10 @@ function TextNode({ overlay, width, height, selected, onGuides }: {
         x={overlay.x * width}
         y={overlay.y * height}
         rotation={overlay.rotation}
-        opacity={overlay.opacity}
+        // Invisible: el texto visible lo pinta el <div> HTML de PreviewCanvas,
+        // apilado por orden de capas (z). Este nodo mide el texto (offset centrado
+        // y caja del Transformer) y aporta el área de selección.
+        opacity={0}
         draggable
         onMouseDown={() => select({ kind: "text", id: overlay.id })}
         onTap={() => select({ kind: "text", id: overlay.id })}
@@ -413,7 +420,10 @@ export function OverlayLayer({ width, height }: OverlayLayerProps) {
       x={STAGE_MARGIN}
       y={STAGE_MARGIN}
       className="absolute"
-      style={{ left: -STAGE_MARGIN, top: -STAGE_MARGIN }}
+      // zIndex alto: las asas/transformador, subtítulos y recorte van SIEMPRE por
+      // encima de los píxeles HTML (vídeo/imagen/texto, z = índice de capa). El
+      // Stage es transparente salvo su contenido, así que no tapa nada.
+      style={{ left: -STAGE_MARGIN, top: -STAGE_MARGIN, zIndex: 50 }}
       onMouseDown={(e) => {
         if (e.target === e.target.getStage()) select(null);
       }}

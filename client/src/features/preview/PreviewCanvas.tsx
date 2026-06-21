@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, type CSSProperties, type MutableRefObject, type ReactNode, type RefObject } from "react";
 import { Clapperboard, Link2, Upload } from "lucide-react";
 import { ASPECT_PRESETS } from "@clipforge/shared";
-import type { VideoClip } from "@clipforge/shared";
+import type { MediaLayer, VideoClip } from "@clipforge/shared";
 import { videoClipAt } from "../../lib/timeline";
 import { useClipsStore } from "../../stores/clipsStore";
 import { useProjectStore } from "../../stores/projectStore";
@@ -9,6 +9,7 @@ import { useUiStore } from "../../stores/uiStore";
 import { usePlayback } from "./PreviewArea";
 import { useElementSize } from "./useElementSize";
 import { visibleRect } from "./trackVideo";
+import { imageInnerStyle, imageOverlayStyle, textOverlayStyle } from "./overlayCss";
 
 interface PreviewCanvasProps {
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -148,6 +149,52 @@ function TrackVideo({
   );
 }
 
+/**
+ * Pinta en HTML el elemento de imagen/texto ACTIVO de una capa en el playhead,
+ * con `zIndex` = posición de la capa (orden de capas = z). Se suscribe él mismo
+ * al playhead para no re-renderizar todo el PreviewCanvas a 60fps. Konva (encima)
+ * solo dibuja las asas/transformador; los píxeles visibles los pone este HTML.
+ * `pointer-events:none`: la interacción es de la capa Konva superior.
+ */
+function LayerOverlayHtml({
+  layer,
+  zIndex,
+  canvas,
+}: {
+  layer: MediaLayer;
+  zIndex: number;
+  canvas: { width: number; height: number };
+}) {
+  const playhead = useUiStore((s) => s.playhead);
+  if (!canvas.width) return null;
+  // Sin solape temporal dentro de la capa → a lo sumo un elemento activo.
+  const active = layer.items.find(
+    (it) => it.kind !== "video" && playhead >= it.start && playhead < it.end,
+  );
+  if (!active || active.kind === "video") return null;
+
+  if (active.kind === "image") {
+    return (
+      <div style={{ ...imageOverlayStyle(active, canvas.width, canvas.height), zIndex }}>
+        <img
+          src={`/assets/${active.fileName}`}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="max-w-none"
+          style={imageInnerStyle(active, canvas.width, canvas.height)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...textOverlayStyle(active, canvas.width, canvas.height), zIndex }}>
+      {active.content}
+    </div>
+  );
+}
+
 export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps) {
   const settings = useProjectStore((s) => s.project.settings);
   const setAspect = useProjectStore((s) => s.setAspect);
@@ -156,9 +203,12 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
   // selector que devuelve videoLayers(...) crea array nuevo cada vez → bucle
   // infinito en useSyncExternalStore → app en negro).
   const layers = useProjectStore((s) => s.project.tracks.layers);
-  const videoTracks = useMemo(
+  // Capas con vídeo, conservando su ÍNDICE real en el array (= z): así el <video>
+  // se intercala en z con las imágenes/textos de otras capas.
+  const videoLayers = useMemo(
     () => layers
-      .map((l) => ({
+      .map((l, index) => ({
+        index,
         id: l.id,
         name: l.name,
         clips: l.items.filter((it) => it.kind === "video") as unknown as VideoClip[],
@@ -166,8 +216,9 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
       .filter((t) => t.clips.length > 0),
     [layers],
   );
-  // Para la comprobación "sin clips" del estado vacío, miramos la capa base
-  const baseTrackClips = videoTracks[0]?.clips ?? [];
+  // Base (usa videoRef y el motor de sync): primer carril con vídeo por orden de capas.
+  const baseVideoId = videoLayers[0]?.id;
+  const hasAnyVideo = videoLayers.length > 0;
   const background = settings.background;
   const containerRef = useRef<HTMLDivElement>(null);
   const bgVideoRef = useRef<HTMLVideoElement>(null);
@@ -276,18 +327,24 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               />
             </div>
           )}
-          {/* Una TrackVideo por pista en z-order ascendente. La pista base (i=0)
-              conserva videoRef; las superiores se registran en el motor para sync. */}
-          {videoTracks.map((track, i) => (
+          {/* Cada elemento visual (vídeo / imagen / texto) se apila por el ÍNDICE
+              de su capa (orden de capas = z): un texto puede quedar DETRÁS de un
+              vídeo, una imagen ENTRE dos vídeos, etc. La base de vídeo conserva
+              videoRef; las demás capas de vídeo se registran en el motor de sync. */}
+          {videoLayers.map((track) => (
             <TrackVideo
               key={track.id}
               track={track}
               canvas={canvas}
-              isBase={i === 0}
-              videoRef={i === 0 ? videoRef : undefined}
-              register={i === 0 ? undefined : registerOverlayVideo}
-              zIndex={i}
+              isBase={track.id === baseVideoId}
+              videoRef={track.id === baseVideoId ? videoRef : undefined}
+              register={track.id === baseVideoId ? undefined : registerOverlayVideo}
+              zIndex={track.index}
             />
+          ))}
+          {/* Imagen/texto activos de cada capa, en HTML, en su z (mismo apilado). */}
+          {layers.map((layer, index) => (
+            <LayerOverlayHtml key={`ov-${layer.id}`} layer={layer} zIndex={index} canvas={canvas} />
           ))}
           {/* Velo con agujero: oscurece todo lo que queda fuera del lienzo */}
           <div
@@ -298,7 +355,7 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
           {canvas.width > 0 && children?.(canvas)}
         </div>
 
-        {baseTrackClips.length === 0 && (
+        {!hasAnyVideo && (
           <div className="absolute inset-0 grid place-items-center p-6 pointer-events-none">
             <div className="max-w-xs text-center flex flex-col items-center gap-3 text-muted">
               <Clapperboard size={40} strokeWidth={1.5} aria-hidden="true" className="text-accent-soft" />

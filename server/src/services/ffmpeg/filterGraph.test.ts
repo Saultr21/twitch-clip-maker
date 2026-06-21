@@ -1,32 +1,34 @@
 import { describe, expect, it } from "vitest";
-import type { ClipInfo, ImageLayer, ImageOverlay, Project, TextLayer, TextOverlay, VideoLayer } from "@clipforge/shared";
+import type { ClipInfo, ImageOverlay, Project, TextOverlay } from "@clipforge/shared";
 import {
   createEmptyProject,
-  createImageLayer,
   createImageOverlay,
-  createTextLayer,
+  createMediaLayer,
   createTextOverlay,
   createVideoClip,
-  videoLayers,
 } from "@clipforge/shared";
 import { buildFilterGraph } from "./filterGraph.js";
 
-// Helpers para construir proyectos de prueba con el nuevo modelo de capas
+// Helpers para construir proyectos de prueba con el modelo v4 de capas
 
 function addText(p: Project, overlay: TextOverlay): void {
-  let layer = p.tracks.layers.find((l): l is TextLayer => l.kind === "text");
-  if (!layer) { layer = createTextLayer(); p.tracks.layers.push(layer); }
-  layer.items.push(overlay);
+  let layer = p.tracks.layers.find((l) => l.items.some((it) => it.kind === "text"));
+  if (!layer) { layer = createMediaLayer(); p.tracks.layers.push(layer); }
+  layer.items.push({ ...overlay, kind: "text" });
 }
 
 function addImage(p: Project, overlay: ImageOverlay): void {
-  let layer = p.tracks.layers.find((l): l is ImageLayer => l.kind === "image");
-  if (!layer) { layer = createImageLayer(); p.tracks.layers.push(layer); }
-  layer.items.push(overlay);
+  let layer = p.tracks.layers.find((l) => l.items.some((it) => it.kind === "image"));
+  if (!layer) { layer = createMediaLayer(); p.tracks.layers.push(layer); }
+  layer.items.push({ ...overlay, kind: "image" });
 }
 
-function addVideoLayer(p: Project, track: Omit<VideoLayer, "kind">): void {
-  p.tracks.layers.push({ kind: "video", ...track });
+function addVideoLayer(p: Project, track: { id: string; name: string; clips: ReturnType<typeof createVideoClip>[] }): void {
+  p.tracks.layers.push({
+    id: track.id,
+    name: track.name,
+    items: track.clips.map((c) => ({ ...c, kind: "video" as const })),
+  });
 }
 
 const info: ClipInfo = {
@@ -42,7 +44,7 @@ const info: ClipInfo = {
 
 function projectWithClip() {
   const p = createEmptyProject("demo");
-  videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7 });
+  p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7, kind: "video" as const });
   return p;
 }
 
@@ -67,7 +69,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("hueco inicial entre t=0 y el primer clip: fondo negro a totalDuration (no hay concat)", () => {
     const p = createEmptyProject("demo");
-    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4 });
+    p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 3, 10), trimIn: 0, trimOut: 4, kind: "video" as const });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // fondo de duración total (7s), no un segmento de 3s
     expect(g.filterComplex).toContain("color=black:s=1080x1920:d=7:r=30[bg]");
@@ -89,7 +91,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("dos clips contiguos: dos overlays temporizados, sin concat", () => {
     const p = projectWithClip(); // ocupa [0,5)
-    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2 });
+    p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 5, 10), trimIn: 0, trimOut: 2, kind: "video" as const });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.inputs).toHaveLength(2);
     // segundo clip trimmed y overlayed en [5,7)
@@ -154,7 +156,7 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("la velocidad ajusta setpts, atempo y la duración del overlay", () => {
     const p = createEmptyProject("demo");
-    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2 });
+    p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 0, trimOut: 4, speed: 2, kind: "video" as const });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("setpts=(PTS-STARTPTS)/2+0/TB");
     expect(g.filterComplex).toContain("atempo=2");
@@ -166,10 +168,11 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("los filtros de color generan eq y hue tras el scale", () => {
     const p = createEmptyProject("demo");
-    videoLayers(p)[0].clips.push({
+    p.tracks.layers[0].items.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0.2, contrast: 1.3, saturation: 1.5, hue: 30, grayscale: 0 },
+      kind: "video" as const,
     });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("eq=brightness=0.2:contrast=1.3:saturation=1.5");
@@ -178,10 +181,11 @@ describe("buildFilterGraph — vídeo", () => {
 
   it("el blanco y negro reduce la saturación efectiva", () => {
     const p = createEmptyProject("demo");
-    videoLayers(p)[0].clips.push({
+    p.tracks.layers[0].items.push({
       ...createVideoClip("clip-1", 0, 10),
       trimOut: 4,
       filters: { brightness: 0, contrast: 1, saturation: 2, hue: 0, grayscale: 0.5 },
+      kind: "video" as const,
     });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.filterComplex).toContain("eq=brightness=0:contrast=1:saturation=1"); // 2·(1−0.5)
@@ -422,7 +426,10 @@ describe("buildFilterGraph — música", () => {
   it("transición entre clips consecutivos de la primera capa: fade en los límites", () => {
     const p = createEmptyProject("demo");
     p.settings.clipTransition = 0.5;
-    videoLayers(p)[0].clips.push(createVideoClip("clip-1", 0, 4), createVideoClip("clip-1", 4, 4));
+    p.tracks.layers[0].items.push(
+      { ...createVideoClip("clip-1", 0, 4), kind: "video" as const },
+      { ...createVideoClip("clip-1", 4, 4), kind: "video" as const },
+    );
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // clip 0 (dur 4, [0,4)): solo fade-out al final (ci=0, no hay ci>0)
     expect(g.filterComplex).toContain("fade=t=out:st=3.5:d=0.5");
@@ -458,7 +465,7 @@ describe("buildFilterGraph — orden de capas (Fase 2)", () => {
   it("equivalencia v2: layers=[video, image, text] → overlay order vídeo < imagen < texto", () => {
     const p = createEmptyProject("v2-eq");
     // Capa 0: vídeo (índice 0 en layers, más al fondo)
-    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5 });
+    p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const });
     // Capa 1: imagen (encima del vídeo)
     addImage(p, createImageOverlay("img1", "logo.png", 0, 0.2, 0.2));
     // Capa 2: texto (encima de todo)
@@ -495,12 +502,16 @@ describe("buildFilterGraph — orden de capas (Fase 2)", () => {
   it("layers=[text, video]: el texto se compone primero (detrás del vídeo)", () => {
     const p = createEmptyProject("text-behind");
     // Capa 0 = texto (más al fondo, el más antiguo en layers)
-    const txtLayer = createTextLayer();
-    txtLayer.items.push({ ...createTextOverlay(0), content: "ATRÁS" });
+    const txtLayer = createMediaLayer();
+    txtLayer.items.push({ ...createTextOverlay(0), content: "ATRÁS", kind: "text" as const });
     // Reemplazar la capa de vídeo por defecto con texto primero
     p.tracks.layers = [txtLayer];
     // Capa 1 = vídeo (encima del texto)
-    p.tracks.layers.push({ kind: "video", id: "vid1", name: "", clips: [{ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5 }] });
+    p.tracks.layers.push({
+      id: "vid1",
+      name: "",
+      items: [{ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const }],
+    });
 
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     const fc = g.filterComplex;
@@ -523,15 +534,18 @@ describe("buildFilterGraph — orden de capas (Fase 2)", () => {
   it("layers=[video0, image, video1]: imagen se compone entre los dos vídeos", () => {
     const p = createEmptyProject("img-between");
     // Capa 0: vídeo base
-    videoLayers(p)[0].clips.push({ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5 });
+    p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const });
     // Capa 1: imagen en medio
-    const imgLayer = createImageLayer();
-    imgLayer.items.push(createImageOverlay("img1", "mid.png", 0, 0.3, 0.3));
-    p.tracks.layers.push(imgLayer);
+    p.tracks.layers.push({
+      id: "img1",
+      name: "",
+      items: [{ ...createImageOverlay("img1", "mid.png", 0, 0.3, 0.3), kind: "image" as const }],
+    });
     // Capa 2: segundo vídeo encima
     p.tracks.layers.push({
-      kind: "video", id: "vid2", name: "",
-      clips: [{ ...createVideoClip("clip-2", 0, 5), trimIn: 0, trimOut: 5 }],
+      id: "vid2",
+      name: "",
+      items: [{ ...createVideoClip("clip-2", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const }],
     });
 
     const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));

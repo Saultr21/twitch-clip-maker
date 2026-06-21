@@ -24,12 +24,10 @@ import path from "node:path";
 import { execa } from "execa";
 import {
   createEmptyProject,
-  createImageLayer,
   createImageOverlay,
-  createTextLayer,
+  createMediaLayer,
   createTextOverlay,
   createVideoClip,
-  videoLayers,
   type ClipInfo,
 } from "@clipforge/shared";
 import { buildFilterGraph } from "./filterGraph.js";
@@ -79,22 +77,23 @@ describe("export multipista e2e", () => {
       project.settings.height = 640;
       project.settings.fps = 30;
 
-      videoLayers(project)[0].clips.push({
+      project.tracks.layers[0].items.push({
         ...createVideoClip("ca", 0, 5),
         trimIn: 0,
         trimOut: 5,
+        kind: "video" as const,
       });
       project.tracks.layers.push({
-        kind: "video",
         id: "t2",
         name: "facecam",
-        clips: [
+        items: [
           {
             ...createVideoClip("cb", 1, 3),
             trimIn: 0,
             trimOut: 3,
             opacity: 0.9,
             zoom: { x: 0.5, y: 0.2, scale: 0.4 },
+            kind: "video" as const,
           },
         ],
       });
@@ -249,46 +248,48 @@ describe("export multipista e2e", () => {
       project.settings.fps = 30;
 
       // Layer 0: base video
-      videoLayers(project)[0].clips.push({
+      project.tracks.layers[0].items.push({
         ...createVideoClip("ca", 0, 5),
         trimIn: 0,
         trimOut: 5,
+        kind: "video" as const,
       });
 
       // Layer 1: text (interleaved between the two video layers)
-      const txtLayer = createTextLayer("overlay-text");
-      txtLayer.items.push({
-        ...createTextOverlay(0),
-        content: "TEST",
-        end: 5,
+      project.tracks.layers.push({
+        id: createMediaLayer().id,
+        name: "overlay-text",
+        items: [{ ...createTextOverlay(0), content: "TEST", end: 5, kind: "text" as const }],
       });
-      project.tracks.layers.push(txtLayer);
 
       // Layer 2: second video (corner cam, above text)
       project.tracks.layers.push({
-        kind: "video",
         id: "vid2",
         name: "corner",
-        clips: [
+        items: [
           {
             ...createVideoClip("cb", 1, 3),
             trimIn: 0,
             trimOut: 3,
             opacity: 0.9,
             zoom: { x: 0.5, y: 0.2, scale: 0.3 },
+            kind: "video" as const,
           },
         ],
       });
 
       // Layer 3: image (topmost)
-      const imgLayer = createImageLayer("overlay-image");
-      imgLayer.items.push({
-        ...createImageOverlay("img1", "img.png", 0, 0.15, 0.15),
-        end: 5,
-        x: 0.1,
-        y: 0.1,
+      project.tracks.layers.push({
+        id: createMediaLayer().id,
+        name: "overlay-image",
+        items: [{
+          ...createImageOverlay("img1", "img.png", 0, 0.15, 0.15),
+          end: 5,
+          x: 0.1,
+          y: 0.1,
+          kind: "image" as const,
+        }],
       });
-      project.tracks.layers.push(imgLayer);
 
       const infos = new Map<string, ClipInfo>([
         ["ca", { id: "ca", url: "", title: "a", fileName: "a.mp4", duration: 5, width: 320, height: 240, createdAt: "" }],
@@ -345,6 +346,120 @@ describe("export multipista e2e", () => {
       expect(audioStreams).toHaveLength(1);
 
       // Cleanup
+      fs.rmSync(dir, { recursive: true, force: true });
+    },
+    60_000,
+  );
+
+  it(
+    "una capa media con [video, imagen, texto] secuenciales → MP4 válido con 1 stream de vídeo y 1 de audio",
+    async () => {
+      const ffmpegAvailable = await hasFfmpeg();
+      if (!ffmpegAvailable) {
+        console.warn("ffmpeg no disponible — test omitido");
+        return;
+      }
+
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "mt-e2e-mixed-"));
+      const inputA = path.join(dir, "a.mp4");
+      const inputImg = path.join(dir, "img.png");
+
+      await execa(ffmpegBin, [
+        "-y",
+        "-f", "lavfi", "-i", "testsrc=size=320x240:rate=30:duration=5",
+        "-f", "lavfi", "-i", "sine=frequency=440:duration=5",
+        "-pix_fmt", "yuv420p",
+        "-shortest",
+        inputA,
+      ]);
+      await execa(ffmpegBin, [
+        "-y",
+        "-f", "lavfi", "-i", "color=c=blue:s=80x80:duration=1",
+        "-vframes", "1",
+        inputImg,
+      ]);
+
+      const project = createEmptyProject("e2e-mixed");
+      project.settings.width = 360;
+      project.settings.height = 640;
+      project.settings.fps = 30;
+
+      // ONE MediaLayer with mixed sequential items
+      project.tracks.layers[0].items.push(
+        { ...createVideoClip("ca", 0, 5), trimIn: 0, trimOut: 3, kind: "video" as const },
+        { ...createImageOverlay("img1", "img.png", 3, 0.2, 0.2), end: 4, kind: "image" as const },
+        { ...createTextOverlay(4), end: 5, content: "FIN", kind: "text" as const },
+      );
+
+      const infos = new Map<string, ClipInfo>([
+        [
+          "ca",
+          {
+            id: "ca",
+            url: "",
+            title: "a",
+            fileName: "a.mp4",
+            duration: 5,
+            width: 320,
+            height: 240,
+            createdAt: "",
+          },
+        ],
+      ]);
+
+      const graph = buildFilterGraph(project, infos);
+
+      const outPath = path.join(dir, "out-mixed.mp4");
+      const inputArgs: string[] = [];
+      for (const input of graph.inputs) {
+        if (input.loop) inputArgs.push("-loop", "1");
+        inputArgs.push("-i", path.join(dir, input.fileName).replaceAll("\\", "/"));
+      }
+
+      const ffmpegArgs = [
+        "-y",
+        ...inputArgs,
+        "-filter_complex", graph.filterComplex,
+        "-map", graph.videoLabel,
+        "-map", graph.audioLabel,
+        "-r", "30",
+        "-c:v", "libx264",
+        "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-shortest",
+        outPath,
+      ];
+
+      const result = await execa(ffmpegBin, ffmpegArgs, { reject: false });
+      if (result.exitCode !== 0) {
+        console.error("ffmpeg stderr:", result.stderr);
+      }
+      expect(result.exitCode).toBe(0);
+
+      expect(fs.existsSync(outPath)).toBe(true);
+      expect(fs.statSync(outPath).size).toBeGreaterThan(1000);
+
+      const probe = await execa(
+        ffprobeBin,
+        ["-v", "quiet", "-print_format", "json", "-show_streams", outPath],
+        { reject: false },
+      );
+
+      expect(probe.exitCode).toBe(0);
+      const probeData = JSON.parse(probe.stdout) as {
+        streams: Array<{ codec_type: string; duration?: string }>;
+      };
+      expect(probeData.streams.filter((s) => s.codec_type === "video")).toHaveLength(1);
+      expect(probeData.streams.filter((s) => s.codec_type === "audio")).toHaveLength(1);
+
+      // Assert non-zero duration
+      const videoDur = parseFloat(
+        probeData.streams.find((s) => s.codec_type === "video")?.duration ?? "0",
+      );
+      expect(videoDur).toBeGreaterThan(0);
+
       fs.rmSync(dir, { recursive: true, force: true });
     },
     60_000,

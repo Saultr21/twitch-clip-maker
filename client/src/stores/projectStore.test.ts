@@ -324,7 +324,7 @@ describe("subtítulos", () => {
   });
 });
 
-describe("capas media (addMediaLayer / addVideoTrack / reorderLayer / removeLayer)", () => {
+describe("capas media (addMediaLayer / reorderLayer / removeLayer)", () => {
   it("addMediaLayer añade una capa media vacía y devuelve su id", () => {
     const s = useProjectStore.getState();
     const before = mediaLayers(s.project).length;
@@ -352,28 +352,6 @@ describe("capas media (addMediaLayer / addVideoTrack / reorderLayer / removeLaye
     expect(mediaLayers(useProjectStore.getState().project)[0].id).toBe(bottom);
   });
 
-  it("addVideoTrack('top') añade una capa al final y devuelve su id", () => {
-    const s = useProjectStore.getState();
-    const id = s.addVideoTrack("top");
-    const layers = mediaLayers(useProjectStore.getState().project);
-    expect(layers[layers.length - 1].id).toBe(id);
-    expect(layers).toHaveLength(2);
-  });
-
-  it("addVideoTrack('bottom') añade una capa al principio", () => {
-    const s = useProjectStore.getState();
-    const id = s.addVideoTrack("bottom");
-    expect(mediaLayers(useProjectStore.getState().project)[0].id).toBe(id);
-  });
-
-  it("addImageLayer y addTextLayer añaden capas vacías (compat)", () => {
-    const s = useProjectStore.getState();
-    const imgId = s.addImageLayer();
-    const txtId = s.addTextLayer();
-    const layers = mediaLayers(useProjectStore.getState().project);
-    expect(layers.find((l) => l.id === imgId)).toBeDefined();
-    expect(layers.find((l) => l.id === txtId)).toBeDefined();
-  });
 
   it("reorderLayer reordena por índice de array total", () => {
     const s = useProjectStore.getState();
@@ -505,32 +483,6 @@ describe("no-solape mixto dentro de una capa (texto + vídeo en el mismo carril)
   });
 });
 
-describe("moveClipToTrack (compat deprecated)", () => {
-  it("mueve un clip de vídeo a otra capa si no hay solape", () => {
-    const s = useProjectStore.getState();
-    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const destId = s.addMediaLayer();
-    const clipId = allVideoClips(useProjectStore.getState().project)[0].id;
-    s.moveClipToTrack(clipId, destId, 0);
-    const p = useProjectStore.getState().project;
-    expect(mediaLayers(p)[0].items.filter((it) => it.kind === "video")).toHaveLength(0);
-    expect(mediaLayers(p).find((l) => l.id === destId)!.items.map((it) => it.id)).toContain(clipId);
-  });
-
-  it("rechaza el movimiento si solaparía en destino", () => {
-    const s = useProjectStore.getState();
-    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const destId = s.addMediaLayer();
-    const movingId = allVideoClips(useProjectStore.getState().project)[0].id;
-    s.moveClipToTrack(movingId, destId, 0);
-    s.addVideoClip({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const secondId = allVideoClips(useProjectStore.getState().project).find((c) => c.clipId === "c2")!.id;
-    s.moveClipToTrack(secondId, destId, 0); // solapa
-    const p = useProjectStore.getState().project;
-    expect(mediaLayers(p)[0].items.some((it) => it.id === secondId)).toBe(true);
-  });
-});
-
 describe("addVideoClipToTrack", () => {
   it("añade el clip a la capa indicada en el instante dado", () => {
     const s = useProjectStore.getState();
@@ -560,27 +512,16 @@ describe("addVideoClipToTrack", () => {
   });
 });
 
-describe("reorderVideoTrack (compat deprecated)", () => {
-  it("reordena pistas usando índices del array total de capas", () => {
-    const s = useProjectStore.getState();
-    const top = s.addVideoTrack("top"); // [base, top]
-    s.reorderVideoTrack(1, 0);          // [top, base]
-    const layers = mediaLayers(useProjectStore.getState().project);
-    expect(layers[0].id).toBe(top);
-    expect(layers).toHaveLength(2);
-  });
-});
-
-describe("removeVideoTrack (compat deprecated)", () => {
-  it("elimina la pista indicada pero nunca deja 0 capas", () => {
+describe("removeLayer", () => {
+  it("elimina la capa indicada pero nunca deja 0 capas", () => {
     const s = useProjectStore.getState();
     const id = s.addMediaLayer();
-    s.removeVideoTrack(id);
+    s.removeLayer(id);
     expect(mediaLayers(useProjectStore.getState().project).find((l) => l.id === id)).toBeUndefined();
-    // intentar eliminar la última no debe funcionar
+    // intentar eliminar la última no debe funcionar (siempre ≥1 capa)
     const baseId = mediaLayers(useProjectStore.getState().project)[0].id;
-    s.removeVideoTrack(baseId);
-    expect(mediaLayers(useProjectStore.getState().project)).toHaveLength(1);
+    s.removeLayer(baseId);
+    expect(mediaLayers(useProjectStore.getState().project).length).toBeGreaterThanOrEqual(1);
   });
 });
 

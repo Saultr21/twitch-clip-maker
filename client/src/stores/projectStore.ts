@@ -131,21 +131,11 @@ interface ProjectState {
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   setAudioDucking: (on: boolean) => void;
   setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
-  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía encima. */
-  addVideoTrack: (position?: "top" | "bottom") => string;
-  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía. */
-  addImageLayer: () => string;
-  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía. */
-  addTextLayer: () => string;
   /** Crea una capa media vacía. Con `atIndex` la inserta en esa posición del
    *  array (0 = fondo); sin él, la añade al final (frente). Devuelve su id. */
   addMediaLayer: (atIndex?: number) => string;
-  reorderVideoTrack: (fromIndex: number, toIndex: number) => void;
   reorderLayer: (fromIndex: number, toIndex: number) => void;
-  removeVideoTrack: (trackId: string) => void;
   removeLayer: (id: string) => void;
-  /** @deprecated Usa moveElementToLayer(). Mueve un clip de vídeo a otra capa. */
-  moveClipToTrack: (clipId: string, destLayerId: string, newStart: number, opts?: MutateOptions) => void;
   moveElementToLayer: (elementId: string, destLayerId: string, newStart: number) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
@@ -247,33 +237,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       return layer.id;
     },
 
-    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
-    addVideoTrack: (position = "top") => {
-      const layer = createMediaLayer();
-      mutate((d) => {
-        if (position === "bottom") {
-          d.tracks.layers.unshift(layer);
-        } else {
-          d.tracks.layers.push(layer);
-        }
-      });
-      return layer.id;
-    },
-
-    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
-    addImageLayer: () => {
-      const layer = createMediaLayer();
-      mutate((d) => void d.tracks.layers.push(layer));
-      return layer.id;
-    },
-
-    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
-    addTextLayer: () => {
-      const layer = createMediaLayer();
-      mutate((d) => void d.tracks.layers.push(layer));
-      return layer.id;
-    },
-
     reorderLayer: (fromIndex, toIndex) => {
       const n = get().project.tracks.layers.length;
       if (fromIndex < 0 || fromIndex >= n) return;
@@ -333,45 +296,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
             return aStart - bStart;
           });
         }
-      }),
-
-    /** @deprecated — usa moveElementToLayer. Mueve un clip de vídeo a otra capa. */
-    moveClipToTrack: (clipId, destLayerId, newStart, opts) =>
-      mutate((d) => {
-        const ctx = findElement(d, clipId);
-        if (!ctx || ctx.item.kind !== "video") return;
-        const destLayer = d.tracks.layers.find((l) => l.id === destLayerId);
-        if (!destLayer) return;
-        const clip = ctx.item;
-        const start = Math.max(0, newStart);
-        const end = start + (clip.trimOut - clip.trimIn) / clip.speed;
-        if (overlaps(destLayer.items, start, end, clipId)) return;
-        ctx.layer.items.splice(ctx.index, 1);
-        destLayer.items.push({ ...clip, timelineStart: start });
-        destLayer.items.sort((a, b) => {
-          const aS = a.kind === "video" ? a.timelineStart : a.start;
-          const bS = b.kind === "video" ? b.timelineStart : b.start;
-          return aS - bS;
-        });
-      }, opts),
-
-    reorderVideoTrack: (fromIndex, toIndex) =>
-      mutate((d) => {
-        // En v4 no hay sub-lista de "video tracks"; reordena en la lista completa de capas.
-        // fromIndex/toIndex se interpretan como índices dentro del array total de capas.
-        const n = d.tracks.layers.length;
-        if (fromIndex < 0 || fromIndex >= n) return;
-        const to = Math.max(0, Math.min(n - 1, toIndex));
-        if (fromIndex === to) return;
-        const [moved] = d.tracks.layers.splice(fromIndex, 1);
-        d.tracks.layers.splice(to, 0, moved);
-      }),
-
-    removeVideoTrack: (trackId) =>
-      mutate((d) => {
-        if (d.tracks.layers.length <= 1) return; // nunca dejar 0 capas
-        const idx = d.tracks.layers.findIndex((l) => l.id === trackId);
-        if (idx !== -1) d.tracks.layers.splice(idx, 1);
       }),
 
     // ── Ops de clips de vídeo ─────────────────────────────────────────────────

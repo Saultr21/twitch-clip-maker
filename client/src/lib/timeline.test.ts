@@ -34,6 +34,8 @@ describe("duraciones", () => {
       id: "txt-layer",
       name: "",
       items: [{ ...createTextOverlay(8), end: 15, kind: "text" as const }],
+      hidden: false,
+      muted: false,
     });
     expect(projectDuration(p)).toBe(15);
   });

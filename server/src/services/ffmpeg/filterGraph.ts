@@ -149,6 +149,9 @@ export function buildFilterGraph(
         const cinfo = clipInfos.get(clip.clipId);
         if (!cinfo) throw new Error(`Falta la información del clip ${clip.clipId}`);
 
+        // Capa oculta (ojito) y muteada: el clip no aporta ni vídeo ni audio → omitir.
+        if (layer.hidden && layer.muted) return;
+
         const inputIdx = inputs.length;
         inputs.push({ kind: "video", fileName: cinfo.fileName });
 
@@ -164,6 +167,8 @@ export function buildFilterGraph(
         // Label único por capa y clip: vl{layerIdx}_{ci}
         const clipLabel = `vl${layerIdx}_${ci}`;
 
+        // ── VISUAL: solo si la capa NO está oculta (su audio sí puede sonar) ──
+        if (!layer.hidden) {
         if (bg.type === "blur" && isFirstVideoLayer && !blurBgBuilt) {
           // Primer clip de la primera capa de vídeo cuando el fondo es blur:
           // generamos el fondo blur para el segmento de este clip, y usamos
@@ -234,23 +239,27 @@ export function buildFilterGraph(
           `${videoLabel}${finalVideoSrc}overlay=x=${rect.left}:y=${rect.top}:enable='between(t,${num(start)},${num(end)})':eof_action=pass${nextLabel}`,
         );
         videoLabel = nextLabel;
+        } // fin VISUAL (!layer.hidden)
 
-        // Audio de este clip: atrim + asetpts + atempo + volume + aresample + aformat + adelay
-        const aLabel = `[va${layerIdx}_${ci}]`;
-        const achain = [
-          `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
-          "asetpts=PTS-STARTPTS",
-          ...atempoChain(clip.speed),
-          `volume=${num(project.originalAudioVolume)}`,
-          "aresample=44100",
-          "aformat=channel_layouts=stereo",
-          `adelay=${Math.round(start * 1000)}:all=1`,
-        ];
-        filters.push(`[${inputIdx}:a]${achain.join(",")}${aLabel}`);
-        allAudioLabels.push(aLabel);
+        // ── AUDIO: solo si la capa NO está muteada (aunque esté oculta) ──
+        if (!layer.muted) {
+          const aLabel = `[va${layerIdx}_${ci}]`;
+          const achain = [
+            `atrim=start=${num(clip.trimIn)}:end=${num(clip.trimOut)}`,
+            "asetpts=PTS-STARTPTS",
+            ...atempoChain(clip.speed),
+            `volume=${num(project.originalAudioVolume)}`,
+            "aresample=44100",
+            "aformat=channel_layouts=stereo",
+            `adelay=${Math.round(start * 1000)}:all=1`,
+          ];
+          filters.push(`[${inputIdx}:a]${achain.join(",")}${aLabel}`);
+          allAudioLabels.push(aLabel);
+        }
 
         ci++;
       } else if (item.kind === "image") {
+        if (layer.hidden) return; // capa oculta: no se compone
         const img = item;
         const inputIdx = inputs.length;
         inputs.push({ kind: "image", fileName: img.fileName });
@@ -275,6 +284,7 @@ export function buildFilterGraph(
 
         imgIdx++;
       } else if (item.kind === "text") {
+        if (layer.hidden) return; // capa oculta: no se compone
         const t = item;
         // Label único por capa e item: txt{layerIdx}_{txtIdx}
         const txtLabel = `txt${layerIdx}_${txtIdx}`;
@@ -336,9 +346,11 @@ export function buildFilterGraph(
     audioLabel = "[voicemix]";
   }
 
-  if (project.tracks.audio.length > 0) {
+  // Las pistas de música muteadas no se mezclan en el export.
+  const activeAudio = project.tracks.audio.filter((a) => !a.muted);
+  if (activeAudio.length > 0) {
     const musLabels: string[] = [];
-    project.tracks.audio.forEach((a, m) => {
+    activeAudio.forEach((a, m) => {
       const inputIdx = inputs.length;
       inputs.push({ kind: "audio", fileName: a.fileName });
       const playDur = a.end - a.start;

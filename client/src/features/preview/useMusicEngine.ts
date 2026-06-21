@@ -35,6 +35,7 @@ export function useMusicEngine(): void {
           pool.set(t.id, el);
         }
         el.volume = t.volume;
+        el.muted = t.muted;
         const active = playhead >= t.start && playhead < t.end;
         if (!active) {
           if (!el.paused) el.pause();

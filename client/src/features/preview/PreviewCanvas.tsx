@@ -55,6 +55,7 @@ function TrackVideo({
   videoRef,
   register,
   zIndex,
+  muted,
 }: {
   track: VideoTrackForPreview;
   canvas: { width: number; height: number };
@@ -62,6 +63,8 @@ function TrackVideo({
   videoRef?: RefObject<HTMLVideoElement | null>;
   register?: (id: string, el: HTMLVideoElement | null) => void;
   zIndex: number;
+  /** Silencia el audio de esta capa (capa media muteada). */
+  muted: boolean;
 }) {
   const playhead = useUiStore((s) => s.playhead);
   const cropMode = useUiStore((s) => s.cropMode);
@@ -73,6 +76,12 @@ function TrackVideo({
 
   // ref: la base usa videoRef externo; las capas tienen su ref local y se registran
   const localRef = useRef<HTMLVideoElement>(null);
+  // El mute se aplica imperativamente (la prop `muted` declarativa de React en
+  // <video> no siempre refleja los cambios de estado de forma fiable).
+  useEffect(() => {
+    const el = isBase ? videoRef?.current ?? null : localRef.current;
+    if (el) el.muted = muted;
+  });
   // Identidad estable: si no se memoiza, React invoca el ref-callback con null y
   // luego con el elemento en CADA render, re-registrando el <video> (delete→set)
   // en cada tick del playhead, con riesgo de perder un ciclo de sync
@@ -343,7 +352,9 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
               <div
                 key={layer.id}
                 className="absolute inset-0"
-                style={{ zIndex: index, pointerEvents: "none" }}
+                // Capa oculta (ojito): se esconde visualmente PERO el <video> sigue
+                // montado y sonando (salvo mute) y el motor conserva su referencia.
+                style={{ zIndex: index, pointerEvents: "none", visibility: layer.hidden ? "hidden" : "visible" }}
               >
                 {videoTrack && (
                   <TrackVideo
@@ -353,6 +364,7 @@ export function PreviewCanvas({ videoRef, children, inGap }: PreviewCanvasProps)
                     videoRef={layer.id === baseVideoId ? videoRef : undefined}
                     register={layer.id === baseVideoId ? undefined : registerOverlayVideo}
                     zIndex={0}
+                    muted={layer.muted}
                   />
                 )}
                 <LayerOverlayHtml layer={layer} zIndex={0} canvas={canvas} />

@@ -136,6 +136,12 @@ interface ProjectState {
   addMediaLayer: (atIndex?: number) => string;
   reorderLayer: (fromIndex: number, toIndex: number) => void;
   removeLayer: (id: string) => void;
+  /** Alterna la visibilidad de una capa media (ojito). */
+  toggleLayerHidden: (id: string) => void;
+  /** Alterna el silencio del audio de una capa media. */
+  toggleLayerMuted: (id: string) => void;
+  /** Alterna el silencio de una pista de música. */
+  toggleAudioMuted: (id: string) => void;
   moveElementToLayer: (elementId: string, destLayerId: string, newStart: number) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
@@ -254,6 +260,24 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         if (idx === -1) return;
         d.tracks.layers.splice(idx, 1);
         if (d.tracks.layers.length === 0) d.tracks.layers.push(createMediaLayer());
+      }),
+
+    toggleLayerHidden: (id) =>
+      mutate((d) => {
+        const l = d.tracks.layers.find((x) => x.id === id);
+        if (l) l.hidden = !l.hidden;
+      }),
+
+    toggleLayerMuted: (id) =>
+      mutate((d) => {
+        const l = d.tracks.layers.find((x) => x.id === id);
+        if (l) l.muted = !l.muted;
+      }),
+
+    toggleAudioMuted: (id) =>
+      mutate((d) => {
+        const a = d.tracks.audio.find((x) => x.id === id);
+        if (a) a.muted = !a.muted;
       }),
 
     moveElementToLayer: (elementId, destLayerId, newStart) =>

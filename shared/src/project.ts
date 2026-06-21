@@ -135,6 +135,10 @@ export const mediaLayerSchema = z.object({
   id: z.string().min(1),
   name: z.string().default(""),
   items: z.array(mediaElementSchema),
+  /** Oculta la capa en la vista previa y el export (su audio sigue salvo `muted`). */
+  hidden: z.boolean().default(false),
+  /** Silencia el audio de los clips de vídeo de la capa (preview y export). */
+  muted: z.boolean().default(false),
 });
 export type MediaLayer = z.infer<typeof mediaLayerSchema>;
 
@@ -174,6 +178,8 @@ export const audioTrackSchema = z.object({
   end: z.number().min(0),
   trimIn: z.number().min(0),
   trimOut: z.number().min(0),
+  /** Silencia esta pista de música (preview y export). */
+  muted: z.boolean().default(false),
 });
 
 export const projectSchema = z.object({
@@ -195,7 +201,7 @@ export function createVideoTrack(name = ""): VideoTrack {
 
 /** Factory de capa media v4 (lista mixta de elementos). */
 export function createMediaLayer(name = ""): MediaLayer {
-  return { id: globalThis.crypto.randomUUID(), name, items: [] };
+  return { id: globalThis.crypto.randomUUID(), name, items: [], hidden: false, muted: false };
 }
 
 // Factories v3 — mantenidas para tests y compatibilidad hasta que Task 2/3 las reemplacen.
@@ -348,6 +354,7 @@ export function createAudioTrack(
     end: start + duration,
     trimIn: 0,
     trimOut: duration,
+    muted: false,
   };
 }
 

@@ -109,6 +109,7 @@ describe("allVideoClips", () => {
         filters: { brightness: 0, contrast: 1, saturation: 1, hue: 0, grayscale: 0 },
         crop: null, opacity: 1,
       }],
+      hidden: false, muted: false,
     });
     expect(allVideoClips(p).map((c) => c.id)).toEqual(["v1", "v2"]);
   });

@@ -155,7 +155,6 @@ export function Timeline({ height }: { height: number }) {
     color: "bg-pink-500/20 text-pink-200",
   }));
 
-  const audioLanes = assignLanes(audioBlocks);
   const subtitleLanes = assignLanes(subtitleBlocks);
 
   // Capas unificadas (vídeo + imagen + texto), en orden inverso para render
@@ -397,8 +396,11 @@ export function Timeline({ height }: { height: number }) {
                   }}
                   // Quitar cualquier capa (removeLayer garantiza ≥1).
                   onRemoveTrack={() => removeLayer(layer.id)}
-                  // Insertar una capa nueva ENCIMA de esta (índice array i+1).
-                  onAddTrack={() => addMediaLayer(i + 1)}
+                  // Ojito (visibilidad) y mute por capa.
+                  hidden={layer.hidden}
+                  onToggleHidden={() => useProjectStore.getState().toggleLayerHidden(layer.id)}
+                  muted={layer.muted}
+                  onToggleMuted={() => useProjectStore.getState().toggleLayerMuted(layer.id)}
                   onMoveEnd={handleUnifiedMoveEnd}
                   onMoveDrag={(p) => {
                     const target = resolveDropTarget(p.clientY);
@@ -435,15 +437,28 @@ export function Timeline({ height }: { height: number }) {
               useUiStore.getState().select(null);
             }}
           />
-          <TrackRow
-            title="Música"
-            blocks={audioBlocks}
-            pxPerSecond={pxPerSecond}
-            lanes={audioLanes.lanes}
-            laneCount={audioLanes.count}
-            onMove={(id, t, transient) => moveOverlay("audio", id, t, { transient })}
-            onTrim={(id, edge, t, transient) => trimAudio(id, edge, t, { transient })}
-          />
+          {/* Una pista de música por carril (varias pueden sonar a la vez), cada
+              una con su icono de mute. Si no hay ninguna, un carril "Música" vacío. */}
+          {project.tracks.audio.length === 0 ? (
+            <TrackRow title="Música" blocks={[]} pxPerSecond={pxPerSecond} onMove={() => {}} onTrim={() => {}} />
+          ) : (
+            project.tracks.audio.map((a, i) => (
+              <TrackRow
+                key={a.id}
+                title={a.fileName}
+                blocks={[audioBlocks[i]]}
+                pxPerSecond={pxPerSecond}
+                onMove={(id, t, transient) => moveOverlay("audio", id, t, { transient })}
+                onTrim={(id, edge, t, transient) => trimAudio(id, edge, t, { transient })}
+                muted={a.muted}
+                onToggleMuted={() => useProjectStore.getState().toggleAudioMuted(a.id)}
+                onRemoveTrack={() => {
+                  useProjectStore.getState().removeElement("audio", a.id);
+                  useUiStore.getState().select(null);
+                }}
+              />
+            ))
+          )}
           <TrackRow
             title="Subtítulos"
             blocks={subtitleBlocks}

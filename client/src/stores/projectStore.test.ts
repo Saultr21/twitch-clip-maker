@@ -512,6 +512,31 @@ describe("addVideoClipToTrack", () => {
   });
 });
 
+describe("visibilidad / mute de capas y audio", () => {
+  it("toggleLayerHidden y toggleLayerMuted alternan los flags de la capa", () => {
+    const s = useProjectStore.getState();
+    const id = s.addMediaLayer();
+    s.toggleLayerHidden(id);
+    s.toggleLayerMuted(id);
+    let layer = mediaLayers(useProjectStore.getState().project).find((l) => l.id === id)!;
+    expect(layer.hidden).toBe(true);
+    expect(layer.muted).toBe(true);
+    s.toggleLayerHidden(id);
+    layer = mediaLayers(useProjectStore.getState().project).find((l) => l.id === id)!;
+    expect(layer.hidden).toBe(false);
+    expect(layer.muted).toBe(true);
+  });
+
+  it("toggleAudioMuted alterna el mute de una pista de música", () => {
+    const s = useProjectStore.getState();
+    const id = s.addAudio("a1", "song.mp3", 0, 10);
+    s.toggleAudioMuted(id);
+    expect(useProjectStore.getState().project.tracks.audio.find((a) => a.id === id)!.muted).toBe(true);
+    s.toggleAudioMuted(id);
+    expect(useProjectStore.getState().project.tracks.audio.find((a) => a.id === id)!.muted).toBe(false);
+  });
+});
+
 describe("removeLayer", () => {
   it("elimina la capa indicada pero nunca deja 0 capas", () => {
     const s = useProjectStore.getState();

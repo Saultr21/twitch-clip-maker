@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { Eye, EyeOff, Volume2, VolumeX } from "lucide-react";
 import type { Project } from "@clipforge/shared";
 import { findSnapPoints, snapTime } from "../../lib/timeline";
 import { useProjectStore } from "../../stores/projectStore";
@@ -34,8 +35,12 @@ interface TrackRowProps {
   onDropClip?: (clipId: string, t: number) => void;
   /** Si se define, muestra un botón "×" en la cabecera para borrar la pista. */
   onRemoveTrack?: () => void;
-  /** Si se define, muestra un botón "+" en la cabecera para añadir otra pista. */
-  onAddTrack?: () => void;
+  /** Si se define, muestra el ojito de visibilidad (capas media). */
+  onToggleHidden?: () => void;
+  hidden?: boolean;
+  /** Si se define, muestra el icono de mute (capas media y música). */
+  onToggleMuted?: () => void;
+  muted?: boolean;
   /** Al soltar un arrastre de tipo "move", informa de la Y de pantalla y el start final. */
   onMoveEnd?: (id: string, clientY: number, start: number) => void;
   /** Informa en tiempo real de la posición del cursor mientras se arrastra un clip. */
@@ -66,13 +71,16 @@ export function TrackRow({
   onTrim,
   onDropClip,
   onRemoveTrack,
-  onAddTrack,
   onMoveEnd,
   onMoveDrag,
   onMoveDragEnd,
   highlight = false,
   trackIndex,
   onReorder,
+  onToggleHidden,
+  hidden = false,
+  onToggleMuted,
+  muted = false,
 }: TrackRowProps) {
   const [dropActive, setDropActive] = useState(false);
   // started: la transacción de historial se abre en el PRIMER movimiento real,
@@ -106,9 +114,29 @@ export function TrackRow({
       >
         <span className="truncate">{title}</span>
         <span className="flex items-center gap-1 shrink-0">
-          {onAddTrack && (
-            <button type="button" onClick={onAddTrack} title="Añadir capa encima"
-              aria-label="Añadir capa encima" className="text-muted hover:text-text text-sm leading-none">+</button>
+          {onToggleHidden && (
+            <button
+              type="button"
+              onClick={onToggleHidden}
+              aria-pressed={hidden}
+              title={hidden ? "Mostrar capa" : "Ocultar capa"}
+              aria-label={hidden ? `Mostrar ${title}` : `Ocultar ${title}`}
+              className={`leading-none ${hidden ? "text-muted/50 hover:text-text" : "text-muted hover:text-text"}`}
+            >
+              {hidden ? <EyeOff size={12} aria-hidden="true" /> : <Eye size={12} aria-hidden="true" />}
+            </button>
+          )}
+          {onToggleMuted && (
+            <button
+              type="button"
+              onClick={onToggleMuted}
+              aria-pressed={muted}
+              title={muted ? "Activar sonido" : "Silenciar"}
+              aria-label={muted ? `Activar sonido de ${title}` : `Silenciar ${title}`}
+              className={`leading-none ${muted ? "text-danger hover:text-text" : "text-muted hover:text-text"}`}
+            >
+              {muted ? <VolumeX size={12} aria-hidden="true" /> : <Volume2 size={12} aria-hidden="true" />}
+            </button>
           )}
           {onRemoveTrack && (
             <button type="button" onClick={onRemoveTrack} title="Quitar pista"

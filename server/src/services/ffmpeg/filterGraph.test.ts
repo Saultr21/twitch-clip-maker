@@ -28,6 +28,8 @@ function addVideoLayer(p: Project, track: { id: string; name: string; clips: Ret
     id: track.id,
     name: track.name,
     items: track.clips.map((c) => ({ ...c, kind: "video" as const })),
+    hidden: false,
+    muted: false,
   });
 }
 
@@ -47,6 +49,36 @@ function projectWithClip() {
   p.tracks.layers[0].items.push({ ...createVideoClip("clip-1", 0, 10), trimIn: 2, trimOut: 7, kind: "video" as const });
   return p;
 }
+
+describe("buildFilterGraph — visibilidad y mute de capa", () => {
+  it("capa OCULTA: no compone el vídeo pero conserva su audio", () => {
+    const p = projectWithClip();
+    p.tracks.layers[0].hidden = true;
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    // sin rama visible ni overlay del clip
+    expect(g.filterComplex).not.toContain("[cvvl0_0]");
+    expect(g.filterComplex).not.toContain("overlay=x=0:y=656");
+    // pero el audio del clip sigue presente
+    expect(g.filterComplex).toContain("[va0_0]");
+    expect(g.audioLabel).toBe("[va0_0]");
+  });
+
+  it("capa MUTEADA: compone el vídeo pero descarta su audio", () => {
+    const p = projectWithClip();
+    p.tracks.layers[0].muted = true;
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).toContain("[cvvl0_0]"); // vídeo sí
+    expect(g.filterComplex).not.toContain("[va0_0]"); // audio no
+  });
+
+  it("pista de música MUTEADA: no se mezcla en el export", () => {
+    const p = projectWithClip();
+    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5, muted: true });
+    const g = buildFilterGraph(p, new Map([["clip-1", info]]));
+    expect(g.filterComplex).not.toContain("m.mp3");
+    expect(g.filterComplex).not.toContain("[mus0]");
+  });
+});
 
 describe("buildFilterGraph — vídeo", () => {
   it("un clip: trim, setpts, escala, fondo negro y overlay temporizado", () => {
@@ -364,7 +396,7 @@ describe("buildFilterGraph — multipista (audio)", () => {
   it("con música y ducking, la música baja bajo la voz combinada (base + capa)", () => {
     const p = twoTrackProject();
     p.settings.audioDucking = true;
-    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5 });
+    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5, muted: false });
     const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));
     // voz combinada mezclada antes del ducking
     expect(g.filterComplex).toContain("[va0_0][va1_0]amix=inputs=2:duration=longest:normalize=0[voicemix]");
@@ -374,7 +406,7 @@ describe("buildFilterGraph — multipista (audio)", () => {
 
   it("una sola pista con música: audioLabel = va0_0 → amix con música (sin voicemix)", () => {
     const p = projectWithClip();
-    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5 });
+    p.tracks.audio.push({ id: "a1", assetId: "m1", fileName: "m.mp3", volume: 0.8, start: 0, end: 5, trimIn: 0, trimOut: 5, muted: false });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // con un solo clip de vídeo no hay amix de voz (voiceLabel = va0_0 directo)
     expect(g.filterComplex).not.toContain("voicemix");
@@ -387,7 +419,7 @@ describe("buildFilterGraph — música", () => {
     const p = projectWithClip(); // vídeo en [0,5)
     p.tracks.audio.push({
       id: "m1", assetId: "a9", fileName: "song.mp3",
-      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40,
+      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40, muted: false,
     });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     expect(g.inputs[1]).toEqual({ kind: "audio", fileName: "song.mp3" });
@@ -442,7 +474,7 @@ describe("buildFilterGraph — música", () => {
     p.settings.audioDucking = true;
     p.tracks.audio.push({
       id: "m1", assetId: "a9", fileName: "song.mp3",
-      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40,
+      volume: 0.6, start: 1, end: 4, trimIn: 10, trimOut: 40, muted: false,
     });
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
     // un solo clip: voiceLabel = va0_0 (sin voicemix)
@@ -511,6 +543,8 @@ describe("buildFilterGraph — orden de capas (Fase 2)", () => {
       id: "vid1",
       name: "",
       items: [{ ...createVideoClip("clip-1", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const }],
+      hidden: false,
+      muted: false,
     });
 
     const g = buildFilterGraph(p, new Map([["clip-1", info]]));
@@ -540,12 +574,16 @@ describe("buildFilterGraph — orden de capas (Fase 2)", () => {
       id: "img1",
       name: "",
       items: [{ ...createImageOverlay("img1", "mid.png", 0, 0.3, 0.3), kind: "image" as const }],
+      hidden: false,
+      muted: false,
     });
     // Capa 2: segundo vídeo encima
     p.tracks.layers.push({
       id: "vid2",
       name: "",
       items: [{ ...createVideoClip("clip-2", 0, 5), trimIn: 0, trimOut: 5, kind: "video" as const }],
+      hidden: false,
+      muted: false,
     });
 
     const g = buildFilterGraph(p, new Map([["clip-1", info], ["clip-2", info2]]));

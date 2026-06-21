@@ -96,6 +96,8 @@ describe("export multipista e2e", () => {
             kind: "video" as const,
           },
         ],
+        hidden: false,
+        muted: false,
       });
 
       const infos = new Map<string, ClipInfo>([
@@ -260,6 +262,8 @@ describe("export multipista e2e", () => {
         id: createMediaLayer().id,
         name: "overlay-text",
         items: [{ ...createTextOverlay(0), content: "TEST", end: 5, kind: "text" as const }],
+        hidden: false,
+        muted: false,
       });
 
       // Layer 2: second video (corner cam, above text)
@@ -276,6 +280,8 @@ describe("export multipista e2e", () => {
             kind: "video" as const,
           },
         ],
+        hidden: false,
+        muted: false,
       });
 
       // Layer 3: image (topmost)
@@ -289,6 +295,8 @@ describe("export multipista e2e", () => {
           y: 0.1,
           kind: "image" as const,
         }],
+        hidden: false,
+        muted: false,
       });
 
       const infos = new Map<string, ClipInfo>([

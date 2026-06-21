@@ -51,30 +51,41 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
         aria-label="Posición de reproducción"
         className="w-full accent-accent h-1.5"
       />
-      <div className="flex items-center justify-center gap-3">
-        <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}><SkipBack size={16} aria-hidden="true" /></button>
-        <button type="button" onClick={() => seek(playhead - frame)} aria-label="Fotograma anterior" className={controlClass}><StepBack size={16} aria-hidden="true" /></button>
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={duration === 0}
-          aria-label={playing ? "Pausar" : "Reproducir"}
-          className="w-9 h-9 rounded-full bg-accent text-white grid place-items-center hover:bg-accent-dark disabled:opacity-40"
-        >
-          {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
-        </button>
-        <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}><StepForward size={16} aria-hidden="true" /></button>
-        <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}><SkipForward size={16} aria-hidden="true" /></button>
-        <button
-          type="button"
-          onClick={() => setLoop(!loop)}
-          aria-pressed={loop}
-          aria-label="Bucle"
-          className={`${controlClass} ${loop ? "text-accent" : ""}`}
-        >
-          <Repeat size={16} aria-hidden="true" />
-        </button>
-        <div className="flex items-center gap-1.5 ml-4">
+      {/* 3 columnas: izq. vacía · centro (controles + tiempo debajo) · der. (volumen).
+          El grid de 3 fracciones iguales mantiene los controles centrados respecto
+          a TODA la barra, como en los editores profesionales. */}
+      <div className="grid grid-cols-3 items-center">
+        <div aria-hidden="true" />
+        <div className="flex flex-col items-center gap-1">
+          <div className="flex items-center justify-center gap-3">
+            <button type="button" onClick={() => seek(0)} aria-label="Ir al inicio" className={controlClass}><SkipBack size={16} aria-hidden="true" /></button>
+            <button type="button" onClick={() => seek(playhead - frame)} aria-label="Fotograma anterior" className={controlClass}><StepBack size={16} aria-hidden="true" /></button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              disabled={duration === 0}
+              aria-label={playing ? "Pausar" : "Reproducir"}
+              className="w-9 h-9 rounded-full bg-accent text-white grid place-items-center hover:bg-accent-dark disabled:opacity-40"
+            >
+              {playing ? <Pause size={18} aria-hidden="true" /> : <Play size={18} aria-hidden="true" />}
+            </button>
+            <button type="button" onClick={() => seek(playhead + frame)} aria-label="Fotograma siguiente" className={controlClass}><StepForward size={16} aria-hidden="true" /></button>
+            <button type="button" onClick={() => seek(duration)} aria-label="Ir al final" className={controlClass}><SkipForward size={16} aria-hidden="true" /></button>
+            <button
+              type="button"
+              onClick={() => setLoop(!loop)}
+              aria-pressed={loop}
+              aria-label="Bucle"
+              className={`${controlClass} ${loop ? "text-accent" : ""}`}
+            >
+              <Repeat size={16} aria-hidden="true" />
+            </button>
+          </div>
+          <span className="font-mono text-[11px] text-muted tabular-nums">
+            {formatTimecode(playhead)} / {formatTimecode(duration)}
+          </span>
+        </div>
+        <div className="flex items-center justify-end gap-1.5">
           <Volume2 size={16} aria-hidden="true" className="text-muted" />
           <input
             type="range"
@@ -84,12 +95,9 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
             value={volume}
             onChange={(e) => setVolume(parseFloat(e.target.value))}
             aria-label="Volumen"
-            className="w-20 accent-accent h-1"
+            className="w-24 accent-accent h-1"
           />
         </div>
-        <span className="font-mono text-[11px] text-muted ml-4">
-          {formatTimecode(playhead)} / {formatTimecode(duration)}
-        </span>
       </div>
     </div>
   );

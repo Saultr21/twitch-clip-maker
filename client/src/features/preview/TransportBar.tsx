@@ -1,4 +1,4 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect } from "react";
 import { SkipBack, StepBack, Play, Pause, StepForward, SkipForward, Repeat, Volume2 } from "lucide-react";
 import { formatTimecode } from "../../lib/time";
 import { projectDuration } from "../../lib/timeline";
@@ -9,12 +9,11 @@ import { useUiStore } from "../../stores/uiStore";
 interface TransportBarProps {
   seek: (t: number) => void;
   togglePlay: () => void;
-  videoRef: RefObject<HTMLVideoElement | null>;
   loop: boolean;
   setLoop: (l: boolean) => void;
 }
 
-export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: TransportBarProps) {
+export function TransportBar({ seek, togglePlay, loop, setLoop }: TransportBarProps) {
   const playing = useUiStore((s) => s.playing);
   const playhead = useUiStore((s) => s.playhead);
   const fps = useProjectStore((s) => s.project.settings.fps);
@@ -23,10 +22,8 @@ export function TransportBar({ seek, togglePlay, videoRef, loop, setLoop }: Tran
   const setVolume = usePlayerStore((s) => s.setVolume);
   const frame = 1 / fps;
 
-  useEffect(() => {
-    const v = videoRef.current;
-    if (v) v.volume = volume;
-  }, [volume, videoRef]);
+  // El volumen del transporte lo aplica el motor de reproducción (transporte ×
+  // volumen del clip); no se fija aquí directamente para no pisar el del clip.
 
   // Bucle: al agotar la duración con loop activo, vuelve al inicio
   useEffect(() => {

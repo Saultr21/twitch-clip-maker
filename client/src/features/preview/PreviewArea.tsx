@@ -50,7 +50,6 @@ export function PreviewArea() {
       <TransportBar
         seek={seek}
         togglePlay={togglePlay}
-        videoRef={videoRef}
         loop={loop}
         setLoop={setLoop}
       />

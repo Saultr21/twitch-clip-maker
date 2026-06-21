@@ -39,7 +39,8 @@ export function usePlaybackEngine(
         if (!info) continue;
         const src = `/files/${info.fileName}`;
         if (el.getAttribute("src") !== src) el.src = src;
-        el.volume = volume;
+        // Volumen del transporte × volumen propio del clip.
+        el.volume = volume * active.volume;
         if (el.playbackRate !== active.speed) el.playbackRate = active.speed;
         const target = sourceTimeFor(active, playhead);
         if (seeking || Math.abs(el.currentTime - target) > SYNC_TOLERANCE) el.currentTime = target;
@@ -72,7 +73,8 @@ export function usePlaybackEngine(
       if (video.getAttribute("src") !== src) {
         video.src = src;
       }
-      video.volume = usePlayerStore.getState().volume;
+      // Volumen del transporte × volumen propio del clip.
+      video.volume = usePlayerStore.getState().volume * active.volume;
       if (video.playbackRate !== active.speed) video.playbackRate = active.speed;
       const target = sourceTimeFor(active, playhead);
       if (seeking || Math.abs(video.currentTime - target) > SYNC_TOLERANCE) {
@@ -89,6 +91,13 @@ export function usePlaybackEngine(
   // <video> aunque esté en pausa — p. ej. mostrar el primer fotograma al añadir
   useEffect(() => {
     const unsub = useProjectStore.subscribe(() => sync(false));
+    return unsub;
+  }, [sync]);
+
+  // Cambiar el volumen del transporte re-aplica volumen (= transporte × clip) a
+  // los <video> base y esclavos, también en pausa.
+  useEffect(() => {
+    const unsub = usePlayerStore.subscribe(() => sync(false));
     return unsub;
   }, [sync]);
 

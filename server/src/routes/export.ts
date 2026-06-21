@@ -136,20 +136,28 @@ export function exportRoutes(app: FastifyInstance): void {
     return reply.code(204).send();
   });
 
-  // Revela el archivo exportado en el Explorador. `explorer.exe /select,<archivo>`
-  // SIEMPRE abre y enfoca una ventana con el archivo resaltado — a diferencia de
-  // abrir solo la carpeta, que Windows ignora si ya hay una ventana de esa carpeta
-  // abierta (el bug que veía el usuario: "no pasa nada"). Si no llega un archivo
-  // válido (o no existe), cae a abrir la carpeta. explorer.exe devuelve código ≠ 0
-  // aun teniendo éxito, por eso reject:false. `path.basename` evita path traversal.
+  // Revela el archivo exportado en el Explorador. `explorer.exe /select,"<archivo>"`
+  // SIEMPRE abre y enfoca una ventana con el archivo resaltado. Las comillas alrededor
+  // de la ruta son obligatorias cuando ésta contiene espacios; shell:true deja que
+  // cmd.exe las procese correctamente. explorer.exe devuelve código ≠ 0 aun en éxito,
+  // por eso reject:false. `path.basename` evita path traversal en rutas relativas.
   app.post("/api/exports/open", async (req) => {
     const { fileName, filePath } = z
       .object({ fileName: z.string().optional(), filePath: z.string().optional() })
       .parse(req.body ?? {});
 
+    const openSelect = (p: string) => {
+      const safe = p.replace(/"/g, "");
+      void execa(`explorer.exe /select,"${safe}"`, { shell: true, reject: false });
+    };
+    const openDir = (p: string) => {
+      const safe = p.replace(/"/g, "");
+      void execa(`explorer.exe "${safe}"`, { shell: true, reject: false });
+    };
+
     // Ruta absoluta (el usuario eligió ubicación custom): abre directamente con /select
     if (filePath && path.isAbsolute(filePath) && fs.existsSync(filePath)) {
-      void execa("explorer.exe", [`/select,${filePath}`], { reject: false });
+      openSelect(filePath);
       return { opened: true };
     }
 
@@ -157,12 +165,12 @@ export function exportRoutes(app: FastifyInstance): void {
     if (fileName) {
       const full = path.join(EXPORTS_DIR, path.basename(fileName));
       if (fs.existsSync(full)) {
-        void execa("explorer.exe", [`/select,${full}`], { reject: false });
+        openSelect(full);
         return { opened: true };
       }
     }
 
-    void execa("explorer.exe", [EXPORTS_DIR], { reject: false });
+    openDir(EXPORTS_DIR);
     return { opened: true };
   });
 }

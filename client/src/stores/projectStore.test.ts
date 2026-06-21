@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { createEmptyProject, projectToPreset, videoLayers, textItems, imageItems } from "@clipforge/shared";
+import { createEmptyProject, mediaLayers, allVideoClips, textItems, imageItems, projectToPreset } from "@clipforge/shared";
 import type { ClipInfo, SubtitleCue } from "@clipforge/shared";
 import { useProjectStore, nonSilentSegments } from "./projectStore";
 import { useUiStore } from "./uiStore";
@@ -15,6 +15,12 @@ const clipInfo: ClipInfo = {
   createdAt: "2026-06-10T00:00:00.000Z",
 };
 
+// Helper: items de vídeo de la primera capa
+function baseVideoItems(p = useProjectStore.getState().project) {
+  const layer = mediaLayers(p)[0];
+  return layer ? layer.items.filter((it) => it.kind === "video") : [];
+}
+
 beforeEach(() => {
   useProjectStore.getState().loadProject(createEmptyProject("test"));
 });
@@ -24,27 +30,29 @@ describe("addVideoClip", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.addVideoClip(clipInfo);
-    const [a, b] = videoLayers(useProjectStore.getState().project)[0].clips;
-    expect(a.timelineStart).toBe(0);
-    expect(b.timelineStart).toBe(10);
+    const items = baseVideoItems();
+    expect(items).toHaveLength(2);
+    expect(items[0].kind).toBe("video");
+    if (items[0].kind === "video") expect(items[0].timelineStart).toBe(0);
+    if (items[1].kind === "video") expect(items[1].timelineStart).toBe(10);
   });
 });
 
 describe("addVideoClipAt", () => {
   it("coloca el clip en el instante soltado si el hueco está libre", () => {
     useProjectStore.getState().addVideoClipAt(clipInfo, 5);
-    const v = videoLayers(useProjectStore.getState().project)[0].clips;
-    expect(v).toHaveLength(1);
-    expect(v[0].timelineStart).toBe(5);
+    const items = baseVideoItems();
+    expect(items).toHaveLength(1);
+    if (items[0].kind === "video") expect(items[0].timelineStart).toBe(5);
   });
 
   it("si el instante pisa otro bloque, lo coloca al final de la secuencia", () => {
     const s = useProjectStore.getState();
     s.addVideoClipAt(clipInfo, 5); // 5..15 (duración 10)
     s.addVideoClipAt(clipInfo, 3); // 3..13 solapa con 5..15 → al final
-    const v = videoLayers(useProjectStore.getState().project)[0].clips;
-    expect(v).toHaveLength(2);
-    expect(v[1].timelineStart).toBe(15);
+    const items = baseVideoItems();
+    expect(items).toHaveLength(2);
+    if (items[1].kind === "video") expect(items[1].timelineStart).toBe(15);
   });
 });
 
@@ -74,21 +82,23 @@ describe("removeSilencesFromClip", () => {
   it("parte el clip en sus tramos con voz, pegados desde el inicio", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo); // duración 10 → trimIn 0, trimOut 10, start 0
-    const id = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    const id = allVideoClips(useProjectStore.getState().project)[0].id;
     s.removeSilencesFromClip(id, [{ start: 2, end: 4 }]);
-    const v = videoLayers(useProjectStore.getState().project)[0].clips;
-    expect(v).toHaveLength(2);
-    expect([v[0].trimIn, v[0].trimOut, v[0].timelineStart]).toEqual([0, 2, 0]);
-    // 2º tramo: 4..10, pegado tras el primero (que dura 2s en proyecto)
-    expect([v[1].trimIn, v[1].trimOut, v[1].timelineStart]).toEqual([4, 10, 2]);
+    const items = baseVideoItems();
+    expect(items).toHaveLength(2);
+    const v0 = items[0]; const v1 = items[1];
+    if (v0.kind === "video" && v1.kind === "video") {
+      expect([v0.trimIn, v0.trimOut, v0.timelineStart]).toEqual([0, 2, 0]);
+      expect([v1.trimIn, v1.trimOut, v1.timelineStart]).toEqual([4, 10, 2]);
+    }
   });
 
   it("sin silencios no hace nada", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    const id = allVideoClips(useProjectStore.getState().project)[0].id;
     s.removeSilencesFromClip(id, []);
-    expect(videoLayers(useProjectStore.getState().project)[0].clips).toHaveLength(1);
+    expect(baseVideoItems()).toHaveLength(1);
   });
 });
 
@@ -101,7 +111,6 @@ describe("addCue", () => {
     expect(cues).toHaveLength(2);
     expect(cues[0].words[0].start).toBe(4);
     expect(cues[1].words[0].start).toBe(10);
-    // dura 2s por defecto y trae texto editable
     expect(cues[0].words[0].end).toBe(6);
     expect(cues[0].words[0].text).toBeTruthy();
   });
@@ -117,12 +126,18 @@ describe("moveVideoClip", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.addVideoClip(clipInfo);
-    const [a, b] = videoLayers(useProjectStore.getState().project)[0].clips;
+    const clips = allVideoClips(useProjectStore.getState().project);
+    const [a, b] = clips;
     s.moveVideoClip(b.id, 25);
-    expect(videoLayers(useProjectStore.getState().project)[0].clips[1].timelineStart).toBe(25);
+    const after = allVideoClips(useProjectStore.getState().project);
+    const bAfter = after.find((c) => c.id === b.id)!;
+    expect(bAfter.timelineStart).toBe(25);
     s.moveVideoClip(b.id, 3); // solaparía con a
-    expect(videoLayers(useProjectStore.getState().project)[0].clips[1].timelineStart).toBe(25);
-    expect(a.timelineStart).toBe(0);
+    const after2 = allVideoClips(useProjectStore.getState().project);
+    const bAfter2 = after2.find((c) => c.id === b.id)!;
+    expect(bAfter2.timelineStart).toBe(25);
+    const aAfter = after2.find((c) => c.id === a.id)!;
+    expect(aAfter.timelineStart).toBe(0);
   });
 });
 
@@ -130,9 +145,9 @@ describe("trimVideoClip", () => {
   it("recorta por el borde izquierdo ajustando trimIn y timelineStart", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    const id = allVideoClips(useProjectStore.getState().project)[0].id;
     s.trimVideoClip(id, "start", 2);
-    const c = videoLayers(useProjectStore.getState().project)[0].clips[0];
+    const c = allVideoClips(useProjectStore.getState().project)[0];
     expect(c.timelineStart).toBe(2);
     expect(c.trimIn).toBe(2);
     expect(c.trimOut).toBe(10);
@@ -141,9 +156,9 @@ describe("trimVideoClip", () => {
   it("recorta por el borde derecho ajustando trimOut", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    const id = allVideoClips(useProjectStore.getState().project)[0].id;
     s.trimVideoClip(id, "end", 7);
-    const c = videoLayers(useProjectStore.getState().project)[0].clips[0];
+    const c = allVideoClips(useProjectStore.getState().project)[0];
     expect(c.trimOut).toBeCloseTo(7);
     expect(c.timelineStart).toBe(0);
   });
@@ -151,9 +166,9 @@ describe("trimVideoClip", () => {
   it("impone una duración mínima de 0.1s", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
-    const id = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
+    const id = allVideoClips(useProjectStore.getState().project)[0].id;
     s.trimVideoClip(id, "end", 0.01);
-    expect(videoLayers(useProjectStore.getState().project)[0].clips[0].trimOut).toBeCloseTo(0.1);
+    expect(allVideoClips(useProjectStore.getState().project)[0].trimOut).toBeCloseTo(0.1);
   });
 });
 
@@ -162,10 +177,12 @@ describe("splitVideoAt y removeElement", () => {
     const s = useProjectStore.getState();
     s.addVideoClip(clipInfo);
     s.splitVideoAt(4);
-    const track = videoLayers(useProjectStore.getState().project)[0].clips;
-    expect(track).toHaveLength(2);
-    expect(track[0].trimOut).toBe(4);
-    expect(track[1].timelineStart).toBe(4);
+    const items = baseVideoItems();
+    expect(items).toHaveLength(2);
+    if (items[0].kind === "video" && items[1].kind === "video") {
+      expect(items[0].trimOut).toBe(4);
+      expect(items[1].timelineStart).toBe(4);
+    }
   });
 
   it("elimina un overlay de texto", () => {
@@ -292,7 +309,7 @@ describe("subtítulos", () => {
     s.setSubtitleCues(cues);
     s.moveCue("c2", 5);
     const c2 = useProjectStore.getState().project.subtitles.cues[1];
-    expect(c2.words[0].start).toBe(5); // estaba en 1 → +4
+    expect(c2.words[0].start).toBe(5);
     s.removeCue("c1");
     expect(useProjectStore.getState().project.subtitles.cues.map((c) => c.id)).toEqual(["c2"]);
   });
@@ -307,122 +324,247 @@ describe("subtítulos", () => {
   });
 });
 
-describe("pistas de vídeo (multipista)", () => {
-  it("addVideoTrack añade una pista vacía encima", () => {
+describe("capas media (addMediaLayer / addVideoTrack / reorderLayer / removeLayer)", () => {
+  it("addMediaLayer añade una capa media vacía y devuelve su id", () => {
     const s = useProjectStore.getState();
-    expect(videoLayers(s.project)).toHaveLength(1);
-    s.addVideoTrack();
-    expect(videoLayers(useProjectStore.getState().project)).toHaveLength(2);
-    expect(videoLayers(useProjectStore.getState().project)[1].clips).toEqual([]);
+    const before = mediaLayers(s.project).length;
+    const id = s.addMediaLayer();
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers).toHaveLength(before + 1);
+    const newLayer = layers.find((l) => l.id === id)!;
+    expect(newLayer).toBeDefined();
+    expect(newLayer.items).toEqual([]);
   });
 
-  it("reorderVideoTrack reordena el vídeo y deja intacta la capa de imagen", () => {
+  it("addVideoTrack('top') añade una capa al final y devuelve su id", () => {
     const s = useProjectStore.getState();
-    s.addImage("a", "a.png", 0, 0.2, 0.2); // crea capa de imagen → [V0, I]
-    const v1 = s.addVideoTrack("top"); // los vídeos se mantienen contiguos → [V0, V1, I]
-    const kinds0 = useProjectStore.getState().project.tracks.layers.map((l) => l.kind);
-    expect(kinds0.filter((k) => k === "video")).toHaveLength(2);
-    expect(kinds0).toContain("image");
-    s.reorderVideoTrack(1, 0); // mueve V1 (índice de vídeo 1) a la posición de vídeo 0
-    const layers = useProjectStore.getState().project.tracks.layers;
-    // V1 queda primero entre los vídeos y la capa de imagen sigue presente
-    expect(videoLayers(useProjectStore.getState().project)[0].id).toBe(v1);
-    expect(layers.some((l) => l.kind === "image")).toBe(true);
-    expect(layers.filter((l) => l.kind === "video")).toHaveLength(2);
+    const id = s.addVideoTrack("top");
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers[layers.length - 1].id).toBe(id);
+    expect(layers).toHaveLength(2);
   });
 
-  it("removeVideoTrack elimina la pista y sus clips, pero nunca deja 0 pistas", () => {
+  it("addVideoTrack('bottom') añade una capa al principio", () => {
     const s = useProjectStore.getState();
-    s.addVideoTrack();
-    const id = videoLayers(useProjectStore.getState().project)[1].id;
-    s.removeVideoTrack(id);
-    expect(videoLayers(useProjectStore.getState().project)).toHaveLength(1);
-    // intentar borrar la última no la borra
-    const baseId = videoLayers(useProjectStore.getState().project)[0].id;
-    s.removeVideoTrack(baseId);
-    expect(videoLayers(useProjectStore.getState().project).length).toBeGreaterThanOrEqual(1);
+    const id = s.addVideoTrack("bottom");
+    expect(mediaLayers(useProjectStore.getState().project)[0].id).toBe(id);
   });
 
-  it("moveClipToTrack mueve un clip a otra pista si no solapa", () => {
+  it("addImageLayer y addTextLayer añaden capas vacías (compat)", () => {
+    const s = useProjectStore.getState();
+    const imgId = s.addImageLayer();
+    const txtId = s.addTextLayer();
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers.find((l) => l.id === imgId)).toBeDefined();
+    expect(layers.find((l) => l.id === txtId)).toBeDefined();
+  });
+
+  it("reorderLayer reordena por índice de array total", () => {
+    const s = useProjectStore.getState();
+    const l1 = s.addMediaLayer();
+    s.addMediaLayer();
+    // capas: [base, l1, l2] — mover base (0) al final (2)
+    s.reorderLayer(0, 2);
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers[0].id).toBe(l1);
+    expect(layers[2].id).not.toBe(l1);
+  });
+
+  it("reorderLayer no-op si fromIndex === toIndex", () => {
+    const s = useProjectStore.getState();
+    s.addMediaLayer();
+    const before = mediaLayers(useProjectStore.getState().project).map((l) => l.id);
+    s.reorderLayer(0, 0);
+    const after = mediaLayers(useProjectStore.getState().project).map((l) => l.id);
+    expect(before).toEqual(after);
+  });
+
+  it("reorderLayer clampea toIndex a [0, length-1]", () => {
+    const s = useProjectStore.getState();
+    s.addMediaLayer(); // [base, new] → 2 capas
+    const baseId = mediaLayers(useProjectStore.getState().project)[0].id;
+    s.reorderLayer(0, 99); // clamp a 1
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers[0].id).not.toBe(baseId);
+    expect(layers[1].id).toBe(baseId);
+  });
+
+  it("removeLayer elimina la capa indicada", () => {
+    const s = useProjectStore.getState();
+    const id = s.addMediaLayer();
+    s.removeLayer(id);
+    expect(mediaLayers(useProjectStore.getState().project).find((l) => l.id === id)).toBeUndefined();
+  });
+
+  it("removeLayer nunca deja 0 capas: si era la última, inserta una vacía", () => {
+    const s = useProjectStore.getState();
+    const baseId = mediaLayers(useProjectStore.getState().project)[0].id;
+    s.removeLayer(baseId);
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers).toHaveLength(1);
+    expect(layers[0].items).toEqual([]);
+  });
+});
+
+describe("moveElementToLayer — cualquier kind puede moverse a cualquier capa", () => {
+  it("mueve un clip de vídeo a otra capa si no hay solape", () => {
     const s = useProjectStore.getState();
     s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    s.addVideoTrack();
-    const baseTrack = videoLayers(useProjectStore.getState().project)[0];
-    const destId = videoLayers(useProjectStore.getState().project)[1].id;
-    const clipId = baseTrack.clips[0].id;
+    const destId = s.addMediaLayer();
+    const srcClipId = allVideoClips(useProjectStore.getState().project)[0].id;
+    s.moveElementToLayer(srcClipId, destId, 0);
+    const p = useProjectStore.getState().project;
+    expect(mediaLayers(p)[0].items.filter((it) => it.kind === "video")).toHaveLength(0);
+    expect(mediaLayers(p).find((l) => l.id === destId)!.items.map((it) => it.id)).toContain(srcClipId);
+  });
+
+  it("rechaza mover si solaparía en destino", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const destId = s.addMediaLayer();
+    // pone un clip ocupando [0,5) en destino
+    s.addVideoClipToTrack({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" }, destId, 0);
+    const srcClipId = allVideoClips(useProjectStore.getState().project).find((c) => c.clipId === "c1")!.id;
+    s.moveElementToLayer(srcClipId, destId, 2); // solapa [0,5)
+    const p = useProjectStore.getState().project;
+    // el clip sigue en la capa base
+    expect(mediaLayers(p)[0].items.some((it) => it.id === srcClipId)).toBe(true);
+  });
+
+  it("mueve un item de texto a otra capa (cross-kind: la capa acepta cualquier kind)", () => {
+    const s = useProjectStore.getState();
+    const destId = s.addMediaLayer();
+    s.addText(0); // va a la primera capa (base, índice 0)
+    const txtId = textItems(useProjectStore.getState().project)[0].id;
+    s.moveElementToLayer(txtId, destId, 10);
+    const p = useProjectStore.getState().project;
+    // ya no está en la base
+    expect(mediaLayers(p)[0].items.some((it) => it.id === txtId)).toBe(false);
+    // está en destino
+    const destLayer = mediaLayers(p).find((l) => l.id === destId)!;
+    expect(destLayer.items.some((it) => it.id === txtId)).toBe(true);
+    const moved = destLayer.items.find((it) => it.id === txtId)!;
+    if (moved.kind === "text") expect(moved.start).toBe(10);
+  });
+
+  it("mueve un item de imagen a otra capa sin solape", () => {
+    const s = useProjectStore.getState();
+    const destId = s.addMediaLayer();
+    s.addImage("a1", "a.png", 0, 0.2, 0.2);
+    const imgId = imageItems(useProjectStore.getState().project)[0].id;
+    s.moveElementToLayer(imgId, destId, 5);
+    const p = useProjectStore.getState().project;
+    expect(mediaLayers(p)[0].items.some((it) => it.id === imgId)).toBe(false);
+    const moved = mediaLayers(p).find((l) => l.id === destId)!.items.find((it) => it.id === imgId)!;
+    expect(moved).toBeDefined();
+    if (moved.kind === "image") expect(moved.start).toBe(5);
+  });
+});
+
+describe("no-solape mixto dentro de una capa (texto + vídeo en el mismo carril)", () => {
+  it("un texto y un vídeo en la misma capa no pueden solaparse en el tiempo", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip(clipInfo); // vídeo [0, 10) en capa base
+    // intentar añadir texto en t=5 → solapa con el vídeo → cae al final
+    s.addText(5); // duration=4 → [5,9) solapa → debe caer al final del clip (10)
+    const txt = textItems(useProjectStore.getState().project);
+    expect(txt).toHaveLength(1);
+    expect(txt[0].start).toBeGreaterThanOrEqual(10);
+  });
+
+  it("en capas distintas, texto y vídeo pueden coincidir en el tiempo", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip(clipInfo); // vídeo [0, 10) en capa base (índice 0)
+    // añadir texto en otra capa
+    const destId = s.addMediaLayer();
+    s.addText(0); // irá a la capa base (mediaLayerFor = primera capa)
+    // mover ese texto a la capa dest
+    const txtId = textItems(useProjectStore.getState().project)[0].id;
+    s.moveElementToLayer(txtId, destId, 0); // [0, 4) en destId sin vídeos → ok
+    const p = useProjectStore.getState().project;
+    const destLayer = mediaLayers(p).find((l) => l.id === destId)!;
+    expect(destLayer.items.some((it) => it.id === txtId)).toBe(true);
+    // el vídeo sigue en la base
+    expect(allVideoClips(p)).toHaveLength(1);
+  });
+});
+
+describe("moveClipToTrack (compat deprecated)", () => {
+  it("mueve un clip de vídeo a otra capa si no hay solape", () => {
+    const s = useProjectStore.getState();
+    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
+    const destId = s.addMediaLayer();
+    const clipId = allVideoClips(useProjectStore.getState().project)[0].id;
     s.moveClipToTrack(clipId, destId, 0);
-    const st = videoLayers(useProjectStore.getState().project);
-    expect(st[0].clips).toHaveLength(0);
-    expect(st[1].clips.map((c) => c.id)).toContain(clipId);
+    const p = useProjectStore.getState().project;
+    expect(mediaLayers(p)[0].items.filter((it) => it.kind === "video")).toHaveLength(0);
+    expect(mediaLayers(p).find((l) => l.id === destId)!.items.map((it) => it.id)).toContain(clipId);
   });
 
-  it("moveClipToTrack rechaza el movimiento si solaparía en destino", () => {
+  it("rechaza el movimiento si solaparía en destino", () => {
     const s = useProjectStore.getState();
     s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    s.addVideoTrack();
-    // pone un clip ocupando [0,5) en la pista destino
-    const destId = videoLayers(useProjectStore.getState().project)[1].id;
-    const movingId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
-    s.moveClipToTrack(movingId, destId, 0); // primero mueve uno
+    const destId = s.addMediaLayer();
+    const movingId = allVideoClips(useProjectStore.getState().project)[0].id;
+    s.moveClipToTrack(movingId, destId, 0);
     s.addVideoClip({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const secondId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
-    // intenta mover el segundo a destino en t=0 → solapa con el primero
-    s.moveClipToTrack(secondId, destId, 0);
-    const st = videoLayers(useProjectStore.getState().project);
-    expect(st[0].clips.map((c) => c.id)).toContain(secondId); // sigue en base
+    const secondId = allVideoClips(useProjectStore.getState().project).find((c) => c.clipId === "c2")!.id;
+    s.moveClipToTrack(secondId, destId, 0); // solapa
+    const p = useProjectStore.getState().project;
+    expect(mediaLayers(p)[0].items.some((it) => it.id === secondId)).toBe(true);
   });
 });
 
 describe("addVideoClipToTrack", () => {
-  it("addVideoClipToTrack añade el clip a la pista indicada en el instante dado", () => {
+  it("añade el clip a la capa indicada en el instante dado", () => {
     const s = useProjectStore.getState();
-    s.addVideoTrack();
-    const destId = videoLayers(useProjectStore.getState().project)[1].id;
+    const destId = s.addMediaLayer();
     s.addVideoClipToTrack(
       { id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" },
       destId, 2,
     );
-    const st = videoLayers(useProjectStore.getState().project);
-    expect(st[0].clips).toHaveLength(0);
-    expect(st[1].clips).toHaveLength(1);
-    expect(st[1].clips[0].timelineStart).toBe(2);
+    const p = useProjectStore.getState().project;
+    const destLayer = mediaLayers(p).find((l) => l.id === destId)!;
+    expect(destLayer.items.filter((it) => it.kind === "video")).toHaveLength(1);
+    const it = destLayer.items[0];
+    if (it.kind === "video") expect(it.timelineStart).toBe(2);
   });
 
-  it("addVideoClipToTrack cae al final si el instante solaparía en esa pista", () => {
+  it("cae al final si el instante solaparía en esa capa", () => {
     const s = useProjectStore.getState();
-    s.addVideoTrack();
-    const destId = videoLayers(useProjectStore.getState().project)[1].id;
+    const destId = s.addMediaLayer();
     const info = { id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" };
     s.addVideoClipToTrack(info, destId, 0); // ocupa [0,5)
     s.addVideoClipToTrack(info, destId, 2); // solaparía → al final (5)
-    const clips = videoLayers(useProjectStore.getState().project)[1].clips;
-    expect(clips).toHaveLength(2);
-    expect(Math.max(...clips.map((c) => c.timelineStart))).toBe(5);
+    const destLayer = mediaLayers(useProjectStore.getState().project).find((l) => l.id === destId)!;
+    const videoItems = destLayer.items.filter((it) => it.kind === "video");
+    expect(videoItems).toHaveLength(2);
+    const starts = videoItems.map((it) => it.kind === "video" ? it.timelineStart : 0);
+    expect(Math.max(...starts)).toBe(5);
   });
 });
 
-describe("addVideoTrack con posición y reorderVideoTrack", () => {
-  it("addVideoTrack('top') añade arriba (último índice) y devuelve su id", () => {
-    const s = useProjectStore.getState();
-    const id = s.addVideoTrack("top");
-    const v = videoLayers(useProjectStore.getState().project);
-    expect(v[v.length - 1].id).toBe(id);
-    expect(v).toHaveLength(2);
-  });
-
-  it("addVideoTrack('bottom') añade abajo (índice 0)", () => {
-    const s = useProjectStore.getState();
-    const id = s.addVideoTrack("bottom");
-    expect(videoLayers(useProjectStore.getState().project)[0].id).toBe(id);
-  });
-
-  it("reorderVideoTrack mueve una pista a otro índice", () => {
+describe("reorderVideoTrack (compat deprecated)", () => {
+  it("reordena pistas usando índices del array total de capas", () => {
     const s = useProjectStore.getState();
     const top = s.addVideoTrack("top"); // [base, top]
     s.reorderVideoTrack(1, 0);          // [top, base]
-    const v = videoLayers(useProjectStore.getState().project);
-    expect(v[0].id).toBe(top);
-    expect(v).toHaveLength(2);
+    const layers = mediaLayers(useProjectStore.getState().project);
+    expect(layers[0].id).toBe(top);
+    expect(layers).toHaveLength(2);
+  });
+});
+
+describe("removeVideoTrack (compat deprecated)", () => {
+  it("elimina la pista indicada pero nunca deja 0 capas", () => {
+    const s = useProjectStore.getState();
+    const id = s.addMediaLayer();
+    s.removeVideoTrack(id);
+    expect(mediaLayers(useProjectStore.getState().project).find((l) => l.id === id)).toBeUndefined();
+    // intentar eliminar la última no debe funcionar
+    const baseId = mediaLayers(useProjectStore.getState().project)[0].id;
+    s.removeVideoTrack(baseId);
+    expect(mediaLayers(useProjectStore.getState().project)).toHaveLength(1);
   });
 });
 
@@ -437,141 +579,17 @@ describe("applyPreset", () => {
     const p = useProjectStore.getState().project;
     expect(textItems(p)).toHaveLength(1);
     expect(textItems(p)[0].id).not.toBe(preset.text[0].id); // id regenerado
-    expect(videoLayers(p)[0].clips).toHaveLength(1); // el vídeo no se toca
+    expect(allVideoClips(p)).toHaveLength(1); // el vídeo no se toca
     s.undo();
     expect(textItems(useProjectStore.getState().project)).toHaveLength(0);
-  });
-});
-
-describe("addImageLayer / addTextLayer", () => {
-  it("addImageLayer añade una capa de imagen vacía y devuelve su id", () => {
-    const s = useProjectStore.getState();
-    const id = s.addImageLayer();
-    const p = useProjectStore.getState().project;
-    const imgLayers = p.tracks.layers.filter(l => l.kind === "image");
-    expect(imgLayers).toHaveLength(1);
-    expect(imgLayers[0].id).toBe(id);
-    expect((imgLayers[0] as any).items).toEqual([]);
-  });
-
-  it("addTextLayer añade una capa de texto vacía y devuelve su id", () => {
-    const s = useProjectStore.getState();
-    const id = s.addTextLayer();
-    const p = useProjectStore.getState().project;
-    const txtLayers = p.tracks.layers.filter(l => l.kind === "text");
-    expect(txtLayers).toHaveLength(1);
-    expect(txtLayers[0].id).toBe(id);
-    expect((txtLayers[0] as any).items).toEqual([]);
-  });
-});
-
-describe("reorderLayer", () => {
-  it("reordena cualquier capa por índice de array total", () => {
-    const s = useProjectStore.getState();
-    // layers start with [VideoLayer]. Add image and text layers.
-    s.addImageLayer(); // index 1
-    s.addTextLayer();  // index 2
-    const layersBefore = useProjectStore.getState().project.tracks.layers;
-    expect(layersBefore.map(l => l.kind)).toEqual(["video", "image", "text"]);
-    s.reorderLayer(0, 2); // move video to end
-    const layers = useProjectStore.getState().project.tracks.layers;
-    expect(layers.map(l => l.kind)).toEqual(["image", "text", "video"]);
-  });
-
-  it("no-op si fromIndex === toIndex", () => {
-    const s = useProjectStore.getState();
-    s.addImageLayer();
-    const before = useProjectStore.getState().project.tracks.layers.map(l => l.id);
-    s.reorderLayer(0, 0);
-    const after = useProjectStore.getState().project.tracks.layers.map(l => l.id);
-    expect(before).toEqual(after);
-  });
-
-  it("clampea toIndex a [0, length-1]", () => {
-    const s = useProjectStore.getState();
-    s.addImageLayer();
-    // 2 layers: [V, I]. reorderLayer(0, 99) should clamp to index 1.
-    s.reorderLayer(0, 99);
-    const layers = useProjectStore.getState().project.tracks.layers;
-    expect(layers.map(l => l.kind)).toEqual(["image", "video"]);
-  });
-});
-
-describe("removeLayer", () => {
-  it("elimina una capa por id", () => {
-    const s = useProjectStore.getState();
-    const imgId = s.addImageLayer();
-    s.removeLayer(imgId);
-    const layers = useProjectStore.getState().project.tracks.layers;
-    expect(layers.filter(l => l.kind === "image")).toHaveLength(0);
-  });
-
-  it("nunca deja 0 capas: si era la última, inserta una de vídeo vacía", () => {
-    const s = useProjectStore.getState();
-    const baseId = useProjectStore.getState().project.tracks.layers[0].id;
-    s.removeLayer(baseId);
-    const layers = useProjectStore.getState().project.tracks.layers;
-    expect(layers).toHaveLength(1);
-    expect(layers[0].kind).toBe("video");
-  });
-});
-
-describe("moveElementToLayer", () => {
-  it("mueve un clip de vídeo a otra capa de vídeo si no hay solape", () => {
-    const s = useProjectStore.getState();
-    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const destId = s.addVideoTrack("top");
-    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
-    s.moveElementToLayer(srcClipId, destId, 0);
-    const p = useProjectStore.getState().project;
-    expect(videoLayers(p)[0].clips).toHaveLength(0);
-    expect(videoLayers(p)[1].clips.map(c => c.id)).toContain(srcClipId);
-  });
-
-  it("rechaza mover a capa de distinto tipo", () => {
-    const s = useProjectStore.getState();
-    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const imgId = s.addImageLayer();
-    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
-    s.moveElementToLayer(srcClipId, imgId, 0); // video → image: no-op
-    const p = useProjectStore.getState().project;
-    expect(videoLayers(p)[0].clips).toHaveLength(1); // unchanged
-  });
-
-  it("rechaza mover si solaparía en destino (video)", () => {
-    const s = useProjectStore.getState();
-    s.addVideoClip({ id: "c1", url: "", title: "", fileName: "c1.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" });
-    const destId = s.addVideoTrack("top");
-    s.addVideoClipToTrack({ id: "c2", url: "", title: "", fileName: "c2.mp4", duration: 5, width: 1920, height: 1080, createdAt: "" }, destId, 0);
-    const srcClipId = videoLayers(useProjectStore.getState().project)[0].clips[0].id;
-    s.moveElementToLayer(srcClipId, destId, 2); // overlaps [0,5)
-    const p = useProjectStore.getState().project;
-    expect(videoLayers(p)[0].clips.map(c => c.id)).toContain(srcClipId); // stays in source
-  });
-
-  it("mueve un item de imagen a otra capa de imagen si no hay solape", () => {
-    const s = useProjectStore.getState();
-    // Create two image layers
-    const layer1Id = s.addImageLayer(); // index 1 in tracks.layers
-    const layer2Id = s.addImageLayer(); // index 2 in tracks.layers
-    // Add image item to layer 1
-    s.addImage("a1", "a.png", 0, 0.2, 0.2); // goes to first image layer (layer1)
-    const imgItemId = imageItems(useProjectStore.getState().project)[0].id;
-    s.moveElementToLayer(imgItemId, layer2Id, 10);
-    const p = useProjectStore.getState().project;
-    const imgLayer1 = p.tracks.layers.find(l => l.id === layer1Id) as any;
-    const imgLayer2 = p.tracks.layers.find(l => l.id === layer2Id) as any;
-    expect(imgLayer1.items).toHaveLength(0);
-    expect(imgLayer2.items).toHaveLength(1);
-    expect(imgLayer2.items[0].start).toBe(10);
   });
 });
 
 describe("no-solape en addText / addImage", () => {
   it("addText cae al final si el start solaparía en la capa", () => {
     const s = useProjectStore.getState();
-    s.addText(0); // creates text layer, item [0, 4)
-    s.addText(2); // overlaps [0,4) → should land at end=4
+    s.addText(0); // [0, 4)
+    s.addText(2); // overlaps [0,4) → debería ir al final=4
     const items = textItems(useProjectStore.getState().project);
     expect(items).toHaveLength(2);
     expect(items[1].start).toBe(4);

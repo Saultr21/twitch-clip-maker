@@ -1,70 +1,67 @@
 import { create } from "zustand";
 import { produce } from "immer";
-import type { AudioTrack, ClipInfo, CropRect, ImageLayer, ImageOverlay, Preset, Project, SubtitleCue, SubtitleStyle, TextLayer, TextOverlay, VideoClip, VideoLayer } from "@clipforge/shared";
+import type { AudioTrack, ClipInfo, CropRect, ImageOverlay, MediaElement, MediaLayer, Preset, Project, SubtitleCue, SubtitleStyle, TextOverlay, VideoClip } from "@clipforge/shared";
 import {
-  allVideoClips,
   createAudioTrack,
   createEmptyProject,
-  createImageLayer,
   createImageOverlay,
-  createTextLayer,
+  createMediaLayer,
   createTextOverlay,
   createVideoClip,
-  createVideoLayer,
-  imageItems,
-  textItems,
 } from "@clipforge/shared";
-import { clipDuration, clipEnd, hasOverlap, splitVideoClip, videoClipAt } from "../lib/timeline";
+import { clipEnd, splitVideoClip, videoClipAt } from "../lib/timeline";
 import { cueEnd, cueStart, redistributeWordTimes, scaleCueWords, shiftCueWords } from "../lib/subtitles";
 import { useUiStore } from "./uiStore";
 
-// ── Helpers internos sobre layers ──────────────────────────────────────────
+// ── Helpers internos sobre capas media (v4) ──────────────────────────────────
 
-/** Primera capa de vídeo (base). La crea si no hay ninguna. */
-function baseVideoLayer(d: Project): VideoLayer {
-  let base = d.tracks.layers.find((l): l is VideoLayer => l.kind === "video");
-  if (!base) { base = createVideoLayer(); d.tracks.layers.unshift(base); }
+/** Primera capa media. La crea si no hay ninguna. */
+function mediaLayerFor(d: Project): MediaLayer {
+  let base = d.tracks.layers[0];
+  if (!base) {
+    base = createMediaLayer();
+    d.tracks.layers.push(base);
+  }
   return base;
 }
 
-function findClipCtx(d: Project, id: string): { layer: VideoLayer; clip: VideoClip; index: number } | null {
-  for (const l of d.tracks.layers) {
-    if (l.kind !== "video") continue;
-    const index = l.clips.findIndex((c) => c.id === id);
-    if (index !== -1) return { layer: l, clip: l.clips[index], index };
+/** Busca un elemento por id en TODOS los items de TODAS las capas (cualquier kind). */
+function findElement(
+  d: Project,
+  id: string,
+): { layer: MediaLayer; item: MediaElement; index: number } | null {
+  for (const layer of d.tracks.layers) {
+    const index = layer.items.findIndex((it) => it.id === id);
+    if (index !== -1) return { layer, item: layer.items[index], index };
   }
   return null;
 }
 
-/** Capa de imagen donde añadir (la primera; crea una si no hay). */
-function imageLayerFor(d: Project): ImageLayer {
-  let l = d.tracks.layers.find((x): x is ImageLayer => x.kind === "image");
-  if (!l) { l = createImageLayer(); d.tracks.layers.push(l); }
-  return l;
-}
-
-function textLayerFor(d: Project): TextLayer {
-  let l = d.tracks.layers.find((x): x is TextLayer => x.kind === "text");
-  if (!l) { l = createTextLayer(); d.tracks.layers.push(l); }
-  return l;
-}
-
-function findImage(d: Project, id: string): { layer: ImageLayer; item: ImageOverlay; index: number } | null {
-  for (const l of d.tracks.layers) {
-    if (l.kind !== "image") continue;
-    const index = l.items.findIndex((i) => i.id === id);
-    if (index !== -1) return { layer: l, item: l.items[index], index };
-  }
-  return null;
-}
-
-function findText(d: Project, id: string): { layer: TextLayer; item: TextOverlay; index: number } | null {
-  for (const l of d.tracks.layers) {
-    if (l.kind !== "text") continue;
-    const index = l.items.findIndex((i) => i.id === id);
-    if (index !== -1) return { layer: l, item: l.items[index], index };
-  }
-  return null;
+/**
+ * No-solape en una capa media contra TODOS los items (cualquier kind).
+ * Para items de vídeo, duración = (trimOut - trimIn) / speed.
+ * Para imagen/texto, duración = end - start.
+ * La ventana de un item = [start, start + duration).
+ */
+function overlaps(
+  items: MediaElement[],
+  start: number,
+  end: number,
+  ignoreId?: string,
+): boolean {
+  return items.some((it) => {
+    if (it.id === ignoreId) return false;
+    let itStart: number;
+    let itEnd: number;
+    if (it.kind === "video") {
+      itStart = it.timelineStart;
+      itEnd = itStart + (it.trimOut - it.trimIn) / it.speed;
+    } else {
+      itStart = it.start;
+      itEnd = it.end;
+    }
+    return start < itEnd && end > itStart;
+  });
 }
 
 // Tras undo/redo el elemento seleccionado puede haber dejado de existir;
@@ -76,22 +73,13 @@ function pruneSelection(project: Project): void {
     if (!project.subtitles.cues.some((c) => c.id === sel.id)) useUiStore.getState().select(null);
     return;
   }
-  if (sel.kind === "video") {
-    if (!allVideoClips(project).some((c) => c.id === sel.id)) useUiStore.getState().select(null);
-    return;
-  }
-  if (sel.kind === "image") {
-    if (!imageItems(project).some((x) => x.id === sel.id)) useUiStore.getState().select(null);
-    return;
-  }
-  if (sel.kind === "text") {
-    if (!textItems(project).some((x) => x.id === sel.id)) useUiStore.getState().select(null);
-    return;
-  }
   if (sel.kind === "audio") {
     if (!project.tracks.audio.some((x) => x.id === sel.id)) useUiStore.getState().select(null);
     return;
   }
+  // video / image / text — buscar en items de todas las capas
+  const found = project.tracks.layers.some((l) => l.items.some((it) => it.id === sel.id));
+  if (!found) useUiStore.getState().select(null);
 }
 
 const HISTORY_LIMIT = 100;
@@ -143,18 +131,23 @@ interface ProjectState {
   setBackground: (patch: Partial<Project["settings"]["background"]>) => void;
   setAudioDucking: (on: boolean) => void;
   setFade: (patch: { fadeIn?: number; fadeOut?: number; clipTransition?: number }) => void;
+  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía encima. */
   addVideoTrack: (position?: "top" | "bottom") => string;
+  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía. */
   addImageLayer: () => string;
+  /** @deprecated Usa addMediaLayer(). Añade una capa media vacía. */
   addTextLayer: () => string;
+  addMediaLayer: () => string;
   reorderVideoTrack: (fromIndex: number, toIndex: number) => void;
   reorderLayer: (fromIndex: number, toIndex: number) => void;
   removeVideoTrack: (trackId: string) => void;
   removeLayer: (id: string) => void;
-  moveClipToTrack: (clipId: string, destTrackId: string, newStart: number, opts?: MutateOptions) => void;
+  /** @deprecated Usa moveElementToLayer(). Mueve un clip de vídeo a otra capa. */
+  moveClipToTrack: (clipId: string, destLayerId: string, newStart: number, opts?: MutateOptions) => void;
   moveElementToLayer: (elementId: string, destLayerId: string, newStart: number) => void;
   addVideoClip: (clip: ClipInfo) => void;
   addVideoClipAt: (clip: ClipInfo, start: number) => void;
-  addVideoClipToTrack: (clip: ClipInfo, trackId: string, start: number) => void;
+  addVideoClipToTrack: (clip: ClipInfo, layerId: string, start: number) => void;
   removeVideoClipsBySource: (clipId: string) => void;
   removeSilencesFromClip: (id: string, silences: Array<{ start: number; end: number }>) => void;
   applyReframe: (
@@ -237,36 +230,37 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         Object.assign(d.settings.background, patch);
       }),
 
+    // ── Ops de capas ──────────────────────────────────────────────────────────
+
+    addMediaLayer: () => {
+      const layer = createMediaLayer();
+      mutate((d) => void d.tracks.layers.push(layer));
+      return layer.id;
+    },
+
+    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
     addVideoTrack: (position = "top") => {
-      const layer = createVideoLayer();
+      const layer = createMediaLayer();
       mutate((d) => {
-        // Las capas de vídeo se insertan respecto a las capas de vídeo existentes.
-        // "bottom" = nueva pista base (unshift en el array total antes del primer vídeo)
-        // "top" = pista superior (push, antes de imagen/texto si los hay)
         if (position === "bottom") {
-          // Insertar al principio del array (será la nueva pista base)
           d.tracks.layers.unshift(layer);
         } else {
-          // Insertar después de la última capa de vídeo (antes de imagen/texto)
-          const lastVideoIdx = d.tracks.layers.reduce((acc, l, i) => l.kind === "video" ? i : acc, -1);
-          if (lastVideoIdx === -1) {
-            d.tracks.layers.unshift(layer);
-          } else {
-            d.tracks.layers.splice(lastVideoIdx + 1, 0, layer);
-          }
+          d.tracks.layers.push(layer);
         }
       });
       return layer.id;
     },
 
+    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
     addImageLayer: () => {
-      const layer = createImageLayer();
+      const layer = createMediaLayer();
       mutate((d) => void d.tracks.layers.push(layer));
       return layer.id;
     },
 
+    /** @deprecated — envuelve addMediaLayer para compatibilidad con UI v3. */
     addTextLayer: () => {
-      const layer = createTextLayer();
+      const layer = createMediaLayer();
       mutate((d) => void d.tracks.layers.push(layer));
       return layer.id;
     },
@@ -287,7 +281,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const idx = d.tracks.layers.findIndex((l) => l.id === id);
         if (idx === -1) return;
         d.tracks.layers.splice(idx, 1);
-        if (d.tracks.layers.length === 0) d.tracks.layers.push(createVideoLayer());
+        if (d.tracks.layers.length === 0) d.tracks.layers.push(createMediaLayer());
       }),
 
     moveElementToLayer: (elementId, destLayerId, newStart) =>
@@ -295,168 +289,149 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         const destLayer = d.tracks.layers.find((l) => l.id === destLayerId);
         if (!destLayer) return;
 
-        // Try video clip
-        const clipCtx = findClipCtx(d, elementId);
-        if (clipCtx) {
-          if (destLayer.kind !== "video") return;
-          const dest = destLayer as VideoLayer;
-          const start = Math.max(0, newStart);
-          if (hasOverlap(dest.clips, start, clipDuration(clipCtx.clip), elementId)) return;
-          clipCtx.layer.clips.splice(clipCtx.index, 1);
-          dest.clips.push({ ...clipCtx.clip, timelineStart: start });
-          dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);
-          return;
+        const ctx = findElement(d, elementId);
+        if (!ctx) return;
+
+        const item = ctx.item;
+        const start = Math.max(0, newStart);
+
+        let end: number;
+        if (item.kind === "video") {
+          end = start + (item.trimOut - item.trimIn) / item.speed;
+        } else {
+          end = start + (item.end - item.start);
         }
 
-        // Try image item
-        const imgCtx = findImage(d, elementId);
-        if (imgCtx) {
-          if (destLayer.kind !== "image") return;
-          const dest = destLayer as ImageLayer;
-          const item = imgCtx.item;
-          const duration = item.end - item.start;
-          const start = Math.max(0, newStart);
-          const end = start + duration;
-          const overlaps = dest.items.some(
-            (o) => o.id !== elementId && start < o.end && end > o.start,
-          );
-          if (overlaps) return;
-          imgCtx.layer.items.splice(imgCtx.index, 1);
-          dest.items.push({ ...item, start, end });
-          dest.items.sort((a, b) => a.start - b.start);
-          return;
-        }
+        if (overlaps(destLayer.items, start, end, elementId)) return;
 
-        // Try text item
-        const txtCtx = findText(d, elementId);
-        if (txtCtx) {
-          if (destLayer.kind !== "text") return;
-          const dest = destLayer as TextLayer;
-          const item = txtCtx.item;
+        // Saca el item de la capa origen
+        ctx.layer.items.splice(ctx.index, 1);
+
+        // Inserta en destino con el nuevo start
+        if (item.kind === "video") {
+          destLayer.items.push({ ...item, timelineStart: start });
+          destLayer.items.sort((a, b) => {
+            const aStart = a.kind === "video" ? a.timelineStart : a.start;
+            const bStart = b.kind === "video" ? b.timelineStart : b.start;
+            return aStart - bStart;
+          });
+        } else {
           const duration = item.end - item.start;
-          const start = Math.max(0, newStart);
-          const end = start + duration;
-          const overlaps = dest.items.some(
-            (o) => o.id !== elementId && start < o.end && end > o.start,
-          );
-          if (overlaps) return;
-          txtCtx.layer.items.splice(txtCtx.index, 1);
-          dest.items.push({ ...item, start, end });
-          dest.items.sort((a, b) => a.start - b.start);
-          return;
+          destLayer.items.push({ ...item, start, end: start + duration });
+          destLayer.items.sort((a, b) => {
+            const aStart = a.kind === "video" ? a.timelineStart : a.start;
+            const bStart = b.kind === "video" ? b.timelineStart : b.start;
+            return aStart - bStart;
+          });
         }
       }),
 
+    /** @deprecated — usa moveElementToLayer. Mueve un clip de vídeo a otra capa. */
+    moveClipToTrack: (clipId, destLayerId, newStart, opts) =>
+      mutate((d) => {
+        const ctx = findElement(d, clipId);
+        if (!ctx || ctx.item.kind !== "video") return;
+        const destLayer = d.tracks.layers.find((l) => l.id === destLayerId);
+        if (!destLayer) return;
+        const clip = ctx.item;
+        const start = Math.max(0, newStart);
+        const end = start + (clip.trimOut - clip.trimIn) / clip.speed;
+        if (overlaps(destLayer.items, start, end, clipId)) return;
+        ctx.layer.items.splice(ctx.index, 1);
+        destLayer.items.push({ ...clip, timelineStart: start });
+        destLayer.items.sort((a, b) => {
+          const aS = a.kind === "video" ? a.timelineStart : a.start;
+          const bS = b.kind === "video" ? b.timelineStart : b.start;
+          return aS - bS;
+        });
+      }, opts),
+
     reorderVideoTrack: (fromIndex, toIndex) =>
       mutate((d) => {
-        // fromIndex/toIndex son índices en la SUBLISTA de capas de vídeo; se
-        // traducen a ids y se reordena el array TOTAL de capas (que puede tener
-        // imagen/texto intercaladas) insertando junto a la capa de vídeo destino.
-        const vids = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
-        const n = vids.length;
+        // En v4 no hay sub-lista de "video tracks"; reordena en la lista completa de capas.
+        // fromIndex/toIndex se interpretan como índices dentro del array total de capas.
+        const n = d.tracks.layers.length;
         if (fromIndex < 0 || fromIndex >= n) return;
         const to = Math.max(0, Math.min(n - 1, toIndex));
-        if (fromIndex === to) return; // no-op
-        const fromId = vids[fromIndex].id;
-        const toId = vids[to].id; // distinto de fromId porque from !== to
-        const fromLayerIdx = d.tracks.layers.findIndex((l) => l.id === fromId);
-        const [moved] = d.tracks.layers.splice(fromLayerIdx, 1);
-        const insertAt = d.tracks.layers.findIndex((l) => l.id === toId);
-        d.tracks.layers.splice(insertAt, 0, moved);
+        if (fromIndex === to) return;
+        const [moved] = d.tracks.layers.splice(fromIndex, 1);
+        d.tracks.layers.splice(to, 0, moved);
       }),
 
     removeVideoTrack: (trackId) =>
       mutate((d) => {
-        const videoLayersArr = d.tracks.layers.filter((l): l is VideoLayer => l.kind === "video");
-        if (videoLayersArr.length <= 1) return; // nunca dejar 0 capas de vídeo
+        if (d.tracks.layers.length <= 1) return; // nunca dejar 0 capas
         const idx = d.tracks.layers.findIndex((l) => l.id === trackId);
         if (idx !== -1) d.tracks.layers.splice(idx, 1);
       }),
 
-    moveClipToTrack: (clipId, destTrackId, newStart, opts) =>
-      mutate((d) => {
-        const ctx = findClipCtx(d, clipId);
-        const dest = d.tracks.layers.find((l): l is VideoLayer => l.kind === "video" && l.id === destTrackId);
-        if (!ctx || !dest) return;
-        const start = Math.max(0, newStart);
-        // no-solape en la capa destino (excluye el propio clip si ya estuviera ahí)
-        if (hasOverlap(dest.clips, start, clipDuration(ctx.clip), clipId)) return;
-        // saca el clip de su capa actual y lo inserta en destino
-        ctx.layer.clips.splice(ctx.index, 1);
-        dest.clips.push({ ...ctx.clip, timelineStart: start });
-        dest.clips.sort((a, b) => a.timelineStart - b.timelineStart);
-      }, opts),
+    // ── Ops de clips de vídeo ─────────────────────────────────────────────────
 
     addVideoClip: (clip) =>
       mutate((d) => {
-        const layer = baseVideoLayer(d);
-        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
-        layer.clips.push(createVideoClip(clip.id, lastEnd, clip.duration));
+        const layer = mediaLayerFor(d);
+        const videoItems = layer.items.filter((it): it is MediaElement & { kind: "video" } => it.kind === "video");
+        const lastEnd = videoItems.length ? Math.max(...videoItems.map((v) => v.timelineStart + (v.trimOut - v.trimIn) / v.speed)) : 0;
+        const newClip = createVideoClip(clip.id, lastEnd, clip.duration);
+        layer.items.push({ ...newClip, kind: "video" });
       }),
 
-    // suelta el clip en el instante indicado si el hueco está libre; si pisa otro
-    // bloque, cae al final de la secuencia (evita solapes en la capa de vídeo)
     addVideoClipAt: (clip, start) =>
       mutate((d) => {
-        const layer = baseVideoLayer(d);
+        const layer = mediaLayerFor(d);
         const dur = clip.duration;
         const desired = Math.max(0, start);
-        const overlaps = layer.clips.some(
-          (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
-        );
-        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
-        layer.clips.push(createVideoClip(clip.id, overlaps ? lastEnd : desired, dur));
+        const end = desired + dur;
+        const hasOvlp = overlaps(layer.items, desired, end);
+        const videoItems = layer.items.filter((it): it is MediaElement & { kind: "video" } => it.kind === "video");
+        const lastEnd = videoItems.length ? Math.max(...videoItems.map((v) => v.timelineStart + (v.trimOut - v.trimIn) / v.speed)) : 0;
+        const newClip = createVideoClip(clip.id, hasOvlp ? lastEnd : desired, dur);
+        layer.items.push({ ...newClip, kind: "video" });
       }),
 
-    addVideoClipToTrack: (clip, trackId, start) =>
+    addVideoClipToTrack: (clip, layerId, start) =>
       mutate((d) => {
-        const layerIdx = d.tracks.layers.findIndex((l) => l.kind === "video" && l.id === trackId);
-        if (layerIdx === -1) return;
-        const layer = d.tracks.layers[layerIdx] as VideoLayer;
+        const layer = d.tracks.layers.find((l) => l.id === layerId);
+        if (!layer) return;
         const dur = clip.duration;
         const desired = Math.max(0, start);
-        const overlaps = layer.clips.some(
-          (v) => desired < clipEnd(v) && desired + dur > v.timelineStart,
-        );
-        const lastEnd = layer.clips.length ? Math.max(...layer.clips.map(clipEnd)) : 0;
-        const newClip = createVideoClip(clip.id, overlaps ? lastEnd : desired, dur);
-        // En capas superiores (no base, índice 0) el clip entra como PiP: a media escala y
-        // centrado, así hay margen para moverlo y no tapa el vídeo de base. La base
-        // mantiene el frame completo (scale 1).
-        const videoLayersArr = d.tracks.layers.filter((l) => l.kind === "video");
-        const videoLayerIndex = videoLayersArr.findIndex((l) => l.id === trackId);
-        if (videoLayerIndex !== 0) newClip.zoom = { x: 0.5, y: 0.5, scale: 0.5 };
-        layer.clips.push(newClip);
-        layer.clips.sort((a, b) => a.timelineStart - b.timelineStart);
+        const end = desired + dur;
+        const hasOvlp = overlaps(layer.items, desired, end);
+        const videoItems = layer.items.filter((it): it is MediaElement & { kind: "video" } => it.kind === "video");
+        const lastEnd = videoItems.length ? Math.max(...videoItems.map((v) => v.timelineStart + (v.trimOut - v.trimIn) / v.speed)) : 0;
+        const newClip = createVideoClip(clip.id, hasOvlp ? lastEnd : desired, dur);
+        // En capas superiores (no índice 0) el clip entra como PiP: a media escala
+        const layerIndex = d.tracks.layers.findIndex((l) => l.id === layerId);
+        if (layerIndex !== 0) newClip.zoom = { x: 0.5, y: 0.5, scale: 0.5 };
+        layer.items.push({ ...newClip, kind: "video" });
+        layer.items.sort((a, b) => {
+          const aS = a.kind === "video" ? a.timelineStart : a.start;
+          const bS = b.kind === "video" ? b.timelineStart : b.start;
+          return aS - bS;
+        });
       }),
 
-    // al borrar un medio: quita del timeline los bloques que apuntan a esa fuente
     removeVideoClipsBySource: (clipId) =>
       mutate((d) => {
         for (const l of d.tracks.layers) {
-          if (l.kind !== "video") continue;
-          l.clips = l.clips.filter((v) => v.clipId !== clipId);
+          l.items = l.items.filter((it) => !(it.kind === "video" && it.clipId === clipId));
         }
       }),
 
-    // parte el clip en sus tramos con voz (quita los silencios) y los deja
-    // pegados desde su inicio; los bloques de vídeo posteriores se desplazan a
-    // la izquierda lo recortado (ripple en la capa de vídeo)
     removeSilencesFromClip: (id, silences) => {
       let firstPieceId: string | null = null;
       mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (!ctx) return;
-        const c = ctx.clip;
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind !== "video") return;
+        const c = ctx.item;
         const segs = nonSilentSegments(c.trimIn, c.trimOut, silences);
-        // sin silencios reales (un único segmento == clip entero) o todo silencio
         if (segs.length === 0 || (segs.length === 1 && segs[0][0] === c.trimIn && segs[0][1] === c.trimOut)) {
           return;
         }
-        const oldEnd = clipEnd(c);
+        const oldEnd = c.timelineStart + (c.trimOut - c.trimIn) / c.speed;
         let start = c.timelineStart;
-        const pieces = segs.map(([a, b]) => {
-          const piece = {
+        const pieces: MediaElement[] = segs.map(([a, b]) => {
+          const piece: MediaElement = {
             ...c,
             id: globalThis.crypto.randomUUID(),
             trimIn: a,
@@ -464,42 +439,41 @@ export const useProjectStore = create<ProjectState>((set, get) => {
             timelineStart: start,
             zoom: { ...c.zoom },
             filters: { ...c.filters },
+            kind: "video",
           };
           start += (b - a) / c.speed;
           return piece;
         });
         firstPieceId = pieces[0].id;
         const removed = (c.trimOut - c.trimIn) / c.speed - (start - c.timelineStart);
-        // TODO(fase2): el ripple solo desplaza la capa del clip (ctx.layer); en
-        // multipista habrá que decidir si arrastra también las otras capas
-        ctx.layer.clips = ctx.layer.clips
-          .flatMap((v) => {
-            if (v.id === id) return pieces;
-            // ripple: los clips que iban después se adelantan lo recortado
-            if (v.timelineStart >= oldEnd && removed > 0) {
-              return [{ ...v, timelineStart: Math.max(0, v.timelineStart - removed) }];
+        ctx.layer.items = ctx.layer.items
+          .flatMap((it) => {
+            if (it.id === id) return pieces;
+            if (it.kind === "video" && it.timelineStart >= oldEnd && removed > 0) {
+              return [{ ...it, timelineStart: Math.max(0, it.timelineStart - removed) }];
             }
-            return [v];
+            return [it];
           })
-          .sort((a, b) => a.timelineStart - b.timelineStart);
+          .sort((a, b) => {
+            const aS = a.kind === "video" ? a.timelineStart : a.start;
+            const bS = b.kind === "video" ? b.timelineStart : b.start;
+            return aS - bS;
+          });
       });
-      // el clip original desapareció: mueve la selección al primer segmento
       if (firstPieceId && useUiStore.getState().selection?.id === id) {
         useUiStore.getState().select({ kind: "video", id: firstPieceId });
       }
     },
 
-    // auto-reframe: parte el clip en segmentos contiguos (misma duración total,
-    // sin ripple) y aplica a cada uno el encuadre que centra la cara
     applyReframe: (id, segments) => {
       let firstPieceId: string | null = null;
       mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (!ctx || segments.length === 0) return;
-        const c = ctx.clip;
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind !== "video" || segments.length === 0) return;
+        const c = ctx.item;
         let start = c.timelineStart;
-        const pieces = segments.map((s) => {
-          const piece = {
+        const pieces: MediaElement[] = segments.map((s) => {
+          const piece: MediaElement = {
             ...c,
             id: globalThis.crypto.randomUUID(),
             trimIn: s.start,
@@ -507,14 +481,19 @@ export const useProjectStore = create<ProjectState>((set, get) => {
             timelineStart: start,
             zoom: { x: s.zoom.x, y: s.zoom.y, scale: s.zoom.scale },
             filters: { ...c.filters },
+            kind: "video",
           };
           start += (s.end - s.start) / c.speed;
           return piece;
         });
         firstPieceId = pieces[0].id;
-        ctx.layer.clips = ctx.layer.clips
-          .flatMap((v) => (v.id === id ? pieces : [v]))
-          .sort((a, b) => a.timelineStart - b.timelineStart);
+        ctx.layer.items = ctx.layer.items
+          .flatMap((it) => (it.id === id ? pieces : [it]))
+          .sort((a, b) => {
+            const aS = a.kind === "video" ? a.timelineStart : a.start;
+            const bS = b.kind === "video" ? b.timelineStart : b.start;
+            return aS - bS;
+          });
       });
       if (firstPieceId && useUiStore.getState().selection?.id === id) {
         useUiStore.getState().select({ kind: "video", id: firstPieceId });
@@ -523,20 +502,23 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     moveVideoClip: (id, newStart, opts) =>
       mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (!ctx) return;
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind !== "video") return;
+        const clip = ctx.item;
         const start = Math.max(0, newStart);
-        if (hasOverlap(ctx.layer.clips, start, clipDuration(ctx.clip), id)) return;
-        ctx.clip.timelineStart = start;
+        const end = start + (clip.trimOut - clip.trimIn) / clip.speed;
+        if (overlaps(ctx.layer.items, start, end, id)) return;
+        clip.timelineStart = start;
       }, opts),
 
     trimVideoClip: (id, edge, t, opts) =>
       mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (!ctx) return;
-        const c = ctx.clip;
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind !== "video") return;
+        const c = ctx.item;
         if (edge === "start") {
-          const maxStart = clipEnd(c) - MIN_CLIP_DURATION;
+          const dur = (c.trimOut - c.trimIn) / c.speed;
+          const maxStart = c.timelineStart + dur - MIN_CLIP_DURATION;
           const newTimelineStart = Math.min(Math.max(0, t), maxStart);
           const delta = (newTimelineStart - c.timelineStart) * c.speed;
           const newTrimIn = Math.max(0, c.trimIn + delta);
@@ -550,79 +532,120 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     updateVideoClip: (id, patch, opts) =>
       mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (ctx) Object.assign(ctx.clip, patch);
+        const ctx = findElement(d, id);
+        if (ctx && ctx.item.kind === "video") Object.assign(ctx.item, patch);
       }, opts),
 
     splitVideoAt: (t) =>
       mutate((d) => {
-        // TODO(fase2): parte solo en la capa base; en multipista habrá que
-        // partir el clip activo de cada capa (o el de la capa seleccionada)
-        const layer = baseVideoLayer(d);
-        const c = videoClipAt(layer.clips, t);
+        const layer = mediaLayerFor(d);
+        // Busca el clip de vídeo activo bajo t en la capa base
+        const videoClips = layer.items.filter((it): it is MediaElement & { kind: "video" } => it.kind === "video");
+        const c = videoClipAt(videoClips, t);
         if (!c || t <= c.timelineStart || t >= clipEnd(c)) return;
         const [left, right] = splitVideoClip(c, t);
-        const idx = layer.clips.findIndex((v) => v.id === c.id);
-        layer.clips.splice(idx, 1, left, right);
+        const idx = layer.items.findIndex((it) => it.id === c.id);
+        layer.items.splice(idx, 1, { ...left, kind: "video" }, { ...right, kind: "video" });
       }),
 
-    addText: (start) => {
-      const overlay = createTextOverlay(start);
+    setVideoCrop: (id, crop) =>
       mutate((d) => {
-        const layer = textLayerFor(d);
-        const duration = overlay.end - overlay.start;
-        const newEnd = start + duration;
-        const overlaps = layer.items.some((o) => start < o.end && newEnd > o.start);
-        const effectiveStart = overlaps
-          ? (layer.items.length ? Math.max(...layer.items.map((i) => i.end)) : 0)
-          : Math.max(0, start);
-        overlay.start = effectiveStart;
-        overlay.end = effectiveStart + duration;
-        layer.items.push(overlay);
-      });
-      return overlay.id;
-    },
+        const ctx = findElement(d, id);
+        if (ctx && ctx.item.kind === "video") ctx.item.crop = crop;
+      }),
+
+    // ── Ops de imagen ─────────────────────────────────────────────────────────
 
     addImage: (assetId, fileName, start, w, h) => {
       const overlay = createImageOverlay(assetId, fileName, start, w, h);
       mutate((d) => {
-        const layer = imageLayerFor(d);
+        const layer = mediaLayerFor(d);
         const duration = overlay.end - overlay.start;
-        const newEnd = start + duration;
-        const overlaps = layer.items.some((o) => start < o.end && newEnd > o.start);
-        const effectiveStart = overlaps
-          ? (layer.items.length ? Math.max(...layer.items.map((i) => i.end)) : 0)
-          : Math.max(0, start);
+        const end = start + duration;
+        const hasOvlp = overlaps(layer.items, start, end);
+        const lastEnd = layer.items.length
+          ? Math.max(...layer.items.map((it) => (it.kind === "video" ? it.timelineStart + (it.trimOut - it.trimIn) / it.speed : it.end)))
+          : 0;
+        const effectiveStart = hasOvlp ? lastEnd : Math.max(0, start);
         overlay.start = effectiveStart;
         overlay.end = effectiveStart + duration;
-        layer.items.push(overlay);
+        layer.items.push({ ...overlay, kind: "image" });
+      });
+      return overlay.id;
+    },
+
+    updateImage: (id, patch, opts) =>
+      mutate((d) => {
+        const ctx = findElement(d, id);
+        if (ctx && ctx.item.kind === "image") Object.assign(ctx.item, patch);
+      }, opts),
+
+    setImageCrop: (id, crop) =>
+      mutate((d) => {
+        const ctx = findElement(d, id);
+        if (ctx && ctx.item.kind === "image") ctx.item.crop = crop;
+      }),
+
+    // ── Ops de texto ──────────────────────────────────────────────────────────
+
+    addText: (start) => {
+      const overlay = createTextOverlay(start);
+      mutate((d) => {
+        const layer = mediaLayerFor(d);
+        const duration = overlay.end - overlay.start;
+        const end = start + duration;
+        const hasOvlp = overlaps(layer.items, start, end);
+        const lastEnd = layer.items.length
+          ? Math.max(...layer.items.map((it) => (it.kind === "video" ? it.timelineStart + (it.trimOut - it.trimIn) / it.speed : it.end)))
+          : 0;
+        const effectiveStart = hasOvlp ? lastEnd : Math.max(0, start);
+        overlay.start = effectiveStart;
+        overlay.end = effectiveStart + duration;
+        layer.items.push({ ...overlay, kind: "text" });
       });
       return overlay.id;
     },
 
     updateText: (id, patch, opts) =>
       mutate((d) => {
-        const ctx = findText(d, id);
-        if (ctx) Object.assign(ctx.item, patch);
+        const ctx = findElement(d, id);
+        if (ctx && ctx.item.kind === "text") Object.assign(ctx.item, patch);
       }, opts),
 
-    updateImage: (id, patch, opts) =>
+    // ── Ops de overlay genéricas ──────────────────────────────────────────────
+
+    moveOverlay: (kind, id, newStart, opts) =>
       mutate((d) => {
-        const ctx = findImage(d, id);
-        if (ctx) Object.assign(ctx.item, patch);
+        if (kind === "audio") {
+          // El audio puede solaparse (varias pistas de música): sin no-solape
+          const a = d.tracks.audio.find((x) => x.id === id);
+          if (!a) return;
+          const dur = a.end - a.start;
+          a.start = Math.max(0, newStart);
+          a.end = a.start + dur;
+          return;
+        }
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind === "video") return;
+        const item = ctx.item;
+        const dur = item.end - item.start;
+        const start = Math.max(0, newStart);
+        const end = start + dur;
+        if (overlaps(ctx.layer.items, start, end, id)) return;
+        item.start = start;
+        item.end = end;
       }, opts),
 
-    setImageCrop: (id, crop) =>
+    trimOverlay: (_kind, id, edge, t, opts) =>
       mutate((d) => {
-        const ctx = findImage(d, id);
-        if (ctx) ctx.item.crop = crop;
-      }),
+        const ctx = findElement(d, id);
+        if (!ctx || ctx.item.kind === "video") return;
+        const o = ctx.item;
+        if (edge === "start") o.start = Math.min(Math.max(0, t), o.end - MIN_CLIP_DURATION);
+        else o.end = Math.max(o.start + MIN_CLIP_DURATION, t);
+      }, opts),
 
-    setVideoCrop: (id, crop) =>
-      mutate((d) => {
-        const ctx = findClipCtx(d, id);
-        if (ctx) ctx.clip.crop = crop;
-      }),
+    // ── Ops de audio ──────────────────────────────────────────────────────────
 
     addAudio: (assetId, fileName, start, duration) => {
       const track = createAudioTrack(assetId, fileName, start, duration);
@@ -651,41 +674,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         if (a) Object.assign(a, patch);
       }, opts),
 
-    moveOverlay: (kind, id, newStart, opts) =>
-      mutate((d) => {
-        if (kind === "audio") {
-          // El audio puede solaparse (varias pistas de música): sin no-solape
-          const a = d.tracks.audio.find((x) => x.id === id);
-          if (!a) return;
-          const dur = a.end - a.start;
-          a.start = Math.max(0, newStart);
-          a.end = a.start + dur;
-          return;
-        }
-        // Imagen/texto: no-solape dentro de su carril (rechaza, como moveVideoClip)
-        const ctx = kind === "image" ? findImage(d, id) : findText(d, id);
-        if (!ctx) return;
-        const dur = ctx.item.end - ctx.item.start;
-        const start = Math.max(0, newStart);
-        const end = start + dur;
-        const overlaps = ctx.layer.items.some((s) => s.id !== id && start < s.end && end > s.start);
-        if (overlaps) return;
-        ctx.item.start = start;
-        ctx.item.end = end;
-      }, opts),
-
-    trimOverlay: (kind, id, edge, t, opts) =>
-      mutate((d) => {
-        let o: { id: string; start: number; end: number } | undefined;
-        if (kind === "image") {
-          o = findImage(d, id)?.item;
-        } else {
-          o = findText(d, id)?.item;
-        }
-        if (!o) return;
-        if (edge === "start") o.start = Math.min(Math.max(0, t), o.end - MIN_CLIP_DURATION);
-        else o.end = Math.max(o.start + MIN_CLIP_DURATION, t);
-      }, opts),
+    // ── Eliminar elemento genérico ────────────────────────────────────────────
 
     removeElement: (kind, id) =>
       mutate((d) => {
@@ -693,31 +682,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           d.subtitles.cues = d.subtitles.cues.filter((c) => c.id !== id);
           return;
         }
-        if (kind === "video") {
-          const ctx = findClipCtx(d, id);
-          if (ctx) ctx.layer.clips.splice(ctx.index, 1);
-          return;
-        }
-        if (kind === "image") {
-          const ctx = findImage(d, id);
-          if (ctx) ctx.layer.items.splice(ctx.index, 1);
-          return;
-        }
-        if (kind === "text") {
-          const ctx = findText(d, id);
-          if (ctx) ctx.layer.items.splice(ctx.index, 1);
-          return;
-        }
         if (kind === "audio") {
           const idx = d.tracks.audio.findIndex((x) => x.id === id);
           if (idx !== -1) d.tracks.audio.splice(idx, 1);
+          return;
         }
+        // video / image / text — buscar en items de todas las capas
+        const ctx = findElement(d, id);
+        if (ctx) ctx.layer.items.splice(ctx.index, 1);
       }),
+
+    // ── Ops de subtítulos ─────────────────────────────────────────────────────
 
     setSubtitleCues: (cues) => mutate((d) => void (d.subtitles.cues = cues)),
 
-    // Inserta una frase nueva (2s) en el playhead para rellenar a mano lo que la
-    // transcripción no pilló; se mantiene la lista ordenada por tiempo de inicio
     addCue: (start) => {
       const id = globalThis.crypto.randomUUID();
       mutate((d) => {
@@ -764,21 +742,26 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
     clearSubtitles: () => mutate((d) => void (d.subtitles.cues = [])),
 
+    // ── Preset ────────────────────────────────────────────────────────────────
+
     applyPreset: (preset) =>
       mutate((d) => {
         d.settings = { ...preset.settings };
-        // Elimina las capas de imagen y texto actuales, conserva las de vídeo
-        d.tracks.layers = d.tracks.layers.filter((l) => l.kind === "video");
-        // ids regenerados: aplicar dos veces la misma plantilla no colisiona
-        if (preset.image.length > 0) {
-          d.tracks.layers.push(createImageLayer());
-          const imgLayer = d.tracks.layers[d.tracks.layers.length - 1] as ImageLayer;
-          imgLayer.items = preset.image.map((i) => ({ ...i, id: globalThis.crypto.randomUUID() }));
+        // Conserva las capas que tienen clips de vídeo; elimina las que solo tenían imagen/texto
+        // En v4 todas las capas son MediaLayer: conservamos todas y eliminamos los items
+        // de imagen/texto (se repondrán desde el preset). Los items de vídeo se conservan.
+        for (const layer of d.tracks.layers) {
+          layer.items = layer.items.filter((it) => it.kind === "video");
         }
-        if (preset.text.length > 0) {
-          d.tracks.layers.push(createTextLayer());
-          const txtLayer = d.tracks.layers[d.tracks.layers.length - 1] as TextLayer;
-          txtLayer.items = preset.text.map((t) => ({ ...t, id: globalThis.crypto.randomUUID() }));
+        // Añadir imagen y texto del preset en una nueva capa media
+        const presetItems: MediaElement[] = [
+          ...preset.image.map((i) => ({ ...i, id: globalThis.crypto.randomUUID(), kind: "image" as const })),
+          ...preset.text.map((t) => ({ ...t, id: globalThis.crypto.randomUUID(), kind: "text" as const })),
+        ];
+        if (presetItems.length > 0) {
+          const newLayer = createMediaLayer();
+          newLayer.items = presetItems;
+          d.tracks.layers.push(newLayer);
         }
       }),
 

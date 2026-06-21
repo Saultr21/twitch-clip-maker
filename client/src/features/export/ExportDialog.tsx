@@ -220,7 +220,7 @@ export function ExportDialog({ open, onClose }: ExportDialogProps) {
               <span>Exportado como <span className="font-mono text-accent-soft">{state.fileName}</span></span>
             </p>
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => openFolder(state.fileName)} className="flex items-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
+              <button type="button" onClick={() => openFolder(state.fileName, state.filePath)} className="flex items-center gap-1.5 text-xs text-accent-soft border border-border-2 rounded-full px-3 py-1.5 hover:border-accent">
                 <FolderOpen size={14} aria-hidden="true" />
                 Abrir carpeta
               </button>

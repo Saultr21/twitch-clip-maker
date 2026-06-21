@@ -9,6 +9,7 @@ export const exportRequestSchema = z.object({
   project: projectSchema,
   preset: qualityPresetIdSchema,
   fileName: z.string().min(1).max(80).optional(),
+  outputPath: z.string().optional(),
 });
 
 export type QualityPresetId = z.infer<typeof qualityPresetIdSchema>;
@@ -27,5 +28,5 @@ export interface ExportJobStatus {
 /** Evento SSE del progreso de exportación. */
 export type ExportEvent =
   | { type: "progress"; percent: number }
-  | { type: "done"; fileName: string }
+  | { type: "done"; fileName: string; filePath: string }
   | { type: "error"; message: string };

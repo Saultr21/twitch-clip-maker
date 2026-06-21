@@ -5,8 +5,24 @@ import { useProjectStore } from "../../stores/projectStore";
 export type ExportPhase =
   | { phase: "idle" }
   | { phase: "running"; jobId: string; percent: number }
-  | { phase: "done"; fileName: string }
+  | { phase: "done"; fileName: string; filePath: string }
   | { phase: "error"; message: string };
+
+/** Abre el diálogo nativo "Guardar como" en el servidor y devuelve la ruta elegida (o null si se cancela). */
+async function chooseSavePath(defaultName: string): Promise<string | null> {
+  try {
+    const res = await fetch("/api/export/save-dialog", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ defaultName }),
+    });
+    if (!res.ok) return null;
+    const { filePath } = (await res.json()) as { filePath: string | null };
+    return filePath;
+  } catch {
+    return null;
+  }
+}
 
 export function useExport() {
   const [state, setState] = useState<ExportPhase>({ phase: "idle" });
@@ -18,11 +34,17 @@ export function useExport() {
 
   const start = useCallback(async (preset: QualityPresetId, fileName: string) => {
     const project = useProjectStore.getState().project;
+
+    // Mostrar el diálogo nativo "Guardar como" antes de lanzar el export
+    const rawDefault = (fileName.trim() || project.name).replace(/\.mp4$/i, "");
+    const outputPath = await chooseSavePath(`${rawDefault}.mp4`);
+    if (outputPath === null) return; // el usuario canceló el diálogo
+
     try {
       const res = await fetch("/api/export", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ project, preset, fileName: fileName.trim() || undefined }),
+        body: JSON.stringify({ project, preset, fileName: fileName.trim() || undefined, outputPath }),
       });
       if (!res.ok) {
         const body = (await res.json()) as { error: string };
@@ -42,7 +64,7 @@ export function useExport() {
           sourceRef.current = null;
           setState(
             event.type === "done"
-              ? { phase: "done", fileName: event.fileName }
+              ? { phase: "done", fileName: event.fileName, filePath: event.filePath }
               : { phase: "error", message: event.message },
           );
         }
@@ -69,13 +91,14 @@ export function useExport() {
 
   const reset = useCallback(() => setState({ phase: "idle" }), []);
 
-  // Revela el archivo exportado en el Explorador (resaltado). Si no se pasa
-  // nombre, el servidor abre la carpeta de exports a secas.
-  const openFolder = useCallback((fileName?: string) => {
+  // Revela el archivo exportado en el Explorador (resaltado).
+  // filePath: ruta absoluta cuando el usuario eligió ubicación custom.
+  // fileName: nombre relativo para la carpeta de exports por defecto.
+  const openFolder = useCallback((fileName?: string, filePath?: string) => {
     void fetch("/api/exports/open", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ fileName }),
+      body: JSON.stringify({ fileName, filePath }),
     });
   }, []);
 

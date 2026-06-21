@@ -44,6 +44,8 @@ export interface ExportJob {
   state: ExportJobState;
   percent: number;
   fileName: string;
+  /** Ruta absoluta del archivo de salida (puede estar fuera de EXPORTS_DIR si el usuario eligió ubicación custom). */
+  outPath: string;
   error?: string;
   proc?: ResultPromise;
   /** Ruta del archivo .ass temporal cuando el export quema subtítulos. */
@@ -85,12 +87,23 @@ export function startExport(
   project: Project,
   preset: QualityPresetId,
   rawFileName?: string,
+  customOutputPath?: string,
 ): ExportJob {
   pruneJobs(); // hygiene: no acumular jobs terminados de sesiones largas
-  const fileName = sanitizeFileName(
-    rawFileName ?? `${project.name}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}`,
-  );
-  const outPath = path.join(EXPORTS_DIR, fileName);
+
+  let outPath: string;
+  let fileName: string;
+
+  if (customOutputPath) {
+    outPath = customOutputPath;
+    fileName = path.basename(customOutputPath);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  } else {
+    fileName = sanitizeFileName(
+      rawFileName ?? `${project.name}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}`,
+    );
+    outPath = path.join(EXPORTS_DIR, fileName);
+  }
 
   const clipInfos = new Map(listClips().map((c) => [c.id, c]));
 
@@ -115,6 +128,7 @@ export function startExport(
     state: "running",
     percent: 0,
     fileName,
+    outPath,
     assPath,
     listeners: new Set(),
   };
@@ -192,13 +206,12 @@ export function cancelExport(jobId: string): boolean {
   const job = jobs.get(jobId);
   if (!job || job.state !== "running") return false;
   job.state = "cancelled";
-  const outPath = path.join(EXPORTS_DIR, job.fileName);
   job.proc?.kill();
   // El parcial se borra cuando el proceso suelta el lock del archivo
   // (en Windows un rmSync inmediato fallaría en silencio con force:true)
   void job.proc
     ?.then(() => {
-      fs.rmSync(outPath, { force: true });
+      fs.rmSync(job.outPath, { force: true });
       if (job.assPath) fs.rmSync(job.assPath, { force: true });
     })
     .catch(() => {});

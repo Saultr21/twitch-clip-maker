@@ -1,6 +1,7 @@
 {
   "name": "clipforge",
   "private": true,
+  "license": "GPL-3.0-only",
   "workspaces": ["client", "server", "shared"],
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w @clipforge/server\" \"npm run dev -w @clipforge/client\"",

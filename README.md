@@ -12,6 +12,8 @@ para TikTok, Reels, Shorts o YouTube.
 Aplicación de un solo usuario, sin autenticación y sin despliegue: se arranca en
 local y se abre en el navegador. Pensada para Windows.
 
+![Interfaz de VideoForge](Interfaz.png)
+
 ## Requisitos
 
 - **Node.js 22+**
@@ -144,3 +146,16 @@ magic bytes; los colores de texto se validan como hex estricto antes de entrar a
 - Solo Windows (rutas de binarios y fuentes TTF del sistema).
 - La paridad visual entre la preview (CSS/Konva) y el MP4 (FFmpeg) es muy alta
   pero no píxel-perfect en métricas finas de texto.
+
+## Licencia
+
+**GNU General Public License v3.0** — ver [LICENSE](./LICENSE).
+
+Puedes usar, modificar y distribuir este proyecto libremente siempre que:
+
+- Mantengas la atribución original (copyright).
+- Publiques el código fuente de cualquier versión modificada bajo la misma licencia.
+
+La idea es que las mejoras vuelvan a este repositorio y el proyecto crezca en comunidad, no en forks privados. Si construyes algo encima de VideoForge, considera abrir un PR.
+
+© 2026 Saúl Trujillo Rodríguez — CognitiaTech

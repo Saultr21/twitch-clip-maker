@@ -158,4 +158,4 @@ Puedes usar, modificar y distribuir este proyecto libremente siempre que:
 
 La idea es que las mejoras vuelvan a este repositorio y el proyecto crezca en comunidad, no en forks privados. Si construyes algo encima de VideoForge, considera abrir un PR.
 
-© 2026 Saúl Trujillo Rodríguez — CognitiaTech
+© 2026 Saúl Trujillo Rodríguez ([@Saultr21](https://github.com/Saultr21)) — https://github.com/Saultr21/video-forge

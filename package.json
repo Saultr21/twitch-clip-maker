@@ -2,6 +2,12 @@
   "name": "clipforge",
   "private": true,
   "license": "GPL-3.0-only",
+  "author": "Saúl Trujillo Rodríguez (https://github.com/Saultr21)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Saultr21/video-forge.git"
+  },
+  "homepage": "https://github.com/Saultr21/video-forge#readme",
   "workspaces": ["client", "server", "shared"],
   "scripts": {
     "dev": "concurrently -n server,client -c magenta,cyan \"npm run dev -w @clipforge/server\" \"npm run dev -w @clipforge/client\"",

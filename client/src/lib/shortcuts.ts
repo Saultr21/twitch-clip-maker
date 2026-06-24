@@ -1,5 +1,7 @@
-import { imageItems, textItems } from "@clipforge/shared";
+import { imageItems, textItems, allVideoClips } from "@clipforge/shared";
+import type { MediaElement } from "@clipforge/shared";
 import { saveNow } from "../features/projects/useAutosave";
+import { useClipsStore } from "../stores/clipsStore";
 import { useProjectStore } from "../stores/projectStore";
 import { useUiStore } from "../stores/uiStore";
 
@@ -53,6 +55,55 @@ export function handleShortcut(e: KeyboardEvent, deps: ShortcutDeps): void {
     } else if (e.code === "KeyS") {
       e.preventDefault();
       void saveNow();
+    } else if (e.code === "KeyC") {
+      e.preventDefault();
+      const sel = ui.selection;
+      if (!sel || sel.kind === "audio" || sel.kind === "subtitle") return;
+      let found: MediaElement | undefined;
+      if (sel.kind === "image") {
+        found = imageItems(store.project).find((it) => it.id === sel.id) as MediaElement | undefined;
+      } else if (sel.kind === "text") {
+        found = textItems(store.project).find((it) => it.id === sel.id) as MediaElement | undefined;
+      } else if (sel.kind === "video") {
+        found = allVideoClips(store.project).find((it) => it.id === sel.id) as unknown as MediaElement | undefined;
+      }
+      if (found) ui.setClipboard({ ...found });
+    } else if (e.code === "KeyV") {
+      e.preventDefault();
+      const item = ui.clipboard;
+      if (!item) return;
+      const playhead = ui.playhead;
+      if (item.kind === "image") {
+        const newId = store.addImage(item.assetId, item.fileName, playhead, item.width, item.height);
+        store.updateImage(newId, {
+          x: item.x,
+          y: item.y,
+          rotation: item.rotation,
+          opacity: item.opacity,
+          crop: item.crop,
+        });
+        ui.select({ kind: "image", id: newId });
+      } else if (item.kind === "text") {
+        const newId = store.addText(playhead);
+        store.updateText(newId, {
+          content: item.content,
+          fontFamily: item.fontFamily,
+          fontSize: item.fontSize,
+          fill: item.fill,
+          stroke: item.stroke,
+          strokeWidth: item.strokeWidth,
+          shadow: item.shadow,
+          x: item.x,
+          y: item.y,
+          rotation: item.rotation,
+          opacity: item.opacity,
+        });
+        ui.select({ kind: "text", id: newId });
+      } else if (item.kind === "video") {
+        const clip = useClipsStore.getState().clips.find((c) => c.id === item.clipId);
+        if (!clip) return;
+        store.addVideoClipAt(clip, playhead);
+      }
     }
     return;
   }

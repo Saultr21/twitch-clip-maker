@@ -8,6 +8,8 @@ const SHORTCUTS: Array<[string, string]> = [
   ["Supr / Retroceso", "Eliminar el elemento seleccionado"],
   ["Ctrl+Z / Ctrl+Y", "Deshacer / rehacer"],
   ["Ctrl+S", "Guardar el proyecto"],
+  ["Ctrl+C", "Copiar elemento seleccionado"],
+  ["Ctrl+V", "Pegar en el playhead"],
   ["Flechas", "Mover el overlay seleccionado (Shift acelera)"],
   ["← →", "Sin selección: playhead fotograma a fotograma"],
   ["Escape", "Deseleccionar / cerrar menús"],

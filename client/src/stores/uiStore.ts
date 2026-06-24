@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { MediaElement } from "@clipforge/shared";
 import type { ElementKind } from "./projectStore";
 
 export type Tool = "media" | "text" | "image" | "audio" | "subtitles";
@@ -20,7 +21,9 @@ interface UiState {
   propertiesWidth: number;
   helpOpen: boolean;
   cropMode: boolean;
+  clipboard: MediaElement | null;
   setCropMode: (v: boolean) => void;
+  setClipboard: (item: MediaElement | null) => void;
   select: (sel: Selection | null) => void;
   setPlayhead: (t: number) => void;
   setPlaying: (p: boolean) => void;
@@ -43,7 +46,9 @@ export const useUiStore = create<UiState>((set) => ({
   propertiesWidth: 288,
   helpOpen: false,
   cropMode: false,
+  clipboard: null,
   setCropMode: (cropMode) => set({ cropMode }),
+  setClipboard: (clipboard) => set({ clipboard }),
   select: (selection) => set({ selection }),
   setPlayhead: (t) => set({ playhead: Math.max(0, t) }),
   setPlaying: (playing) => set({ playing }),

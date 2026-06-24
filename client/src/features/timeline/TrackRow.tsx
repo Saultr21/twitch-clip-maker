@@ -59,7 +59,7 @@ interface TrackRowProps {
 const CLIP_DND_TYPE = "application/x-clip-id";
 
 const SNAP_PX = 8;
-const EDGE_PX = 8;
+const EDGE_PX = 12;
 
 const LANE_HEIGHT = 32;
 
@@ -181,7 +181,7 @@ export function TrackRow({
               type="button"
               aria-label={`${title}: ${b.label}`}
               aria-pressed={selected}
-              className={`absolute h-7 rounded-md border text-[10px] truncate px-1.5 text-left cursor-grab active:cursor-grabbing ${b.color} ${
+              className={`group absolute h-7 rounded-md border text-[10px] truncate px-1.5 text-left cursor-grab active:cursor-grabbing ${b.color} ${
                 selected ? "border-accent ring-1 ring-accent" : "border-transparent"
               }`}
               style={{
@@ -265,8 +265,8 @@ export function TrackRow({
                   volumeScale={b.waveform.volume}
                 />
               )}
-              <span aria-hidden="true" className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize rounded-l-md bg-white/10" />
-              <span aria-hidden="true" className="absolute right-0 top-0 h-full w-1.5 cursor-ew-resize rounded-r-md bg-white/10" />
+              <span aria-hidden="true" className="absolute left-0 top-0 h-full w-2 cursor-ew-resize rounded-l-md bg-white/0 group-hover:bg-white/30 transition-colors" />
+              <span aria-hidden="true" className="absolute right-0 top-0 h-full w-2 cursor-ew-resize rounded-r-md bg-white/0 group-hover:bg-white/30 transition-colors" />
               <span className="relative">{b.label}</span>
             </button>
           );
